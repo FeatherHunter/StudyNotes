@@ -393,7 +393,9 @@ class CustomViewByView(context: Context, attrs: AttributeSet?, defStyleAttr: Int
 ```
 
 35、自定义View：继承自ViewGroup
-
+>1. 需要重写onMeasure方法，进行测量(测量子元素，测量自身-需要处理margin和padding)
+>2. 必须实现onLayout方法，并且处理margin和padding属性
+>3. 要支持margin功能，需要重写LayoutParmas相关方法
 ```Kotlin
 class CustomViewByViewGroup(context: Context, attrs: AttributeSet?, defStyleAttr: Int, defStyleRes: Int):
         ViewGroup(context, attrs, defStyleAttr, defStyleRes){
@@ -402,20 +404,31 @@ class CustomViewByViewGroup(context: Context, attrs: AttributeSet?, defStyleAttr
     constructor(context: Context, attrs: AttributeSet):this(context, attrs, 0, 0)
     constructor(context: Context): this(context, null, 0, 0)
 
-    //1. 继承ViewGroup必须实现onLayout方法
+    /**
+     * 1. 继承ViewGroup必须实现onLayout方法
+     */
     override fun onLayout(changed: Boolean, left: Int, top: Int, right: Int, bottom: Int) {
-        var childLeft = 0
+        var childLeft = paddingLeft //需要处理padding
         for(i in 0 until childCount){
             val childView = getChildAt(i)
             if(childView.visibility != View.GONE){
                 val childWidth = childView.measuredWidth
-                childView.layout(childLeft, 0, childLeft + childWidth, childView.measuredHeight)
-                childLeft += childWidth
+
+                //2. 额外处理margin属性
+                val childLayoutParams = childView.layoutParams as MarginLayoutParams
+                childLeft += childLayoutParams.leftMargin
+                childView.layout(childLeft,
+                        childLayoutParams.topMargin + paddingTop,
+                        childLeft + childWidth,
+                        childLayoutParams.topMargin  + paddingTop + childView.measuredHeight) //一定要根据margin处理好四个顶点坐标
+                childLeft += childWidth + childLayoutParams.rightMargin
             }
         }
     }
 
-    //1. 定义ViewGroup的布局测量过程
+    /**
+     * 2. 定义ViewGroup的布局测量过程(也需要额外处理margin)
+     */
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
 
@@ -430,24 +443,79 @@ class CustomViewByViewGroup(context: Context, attrs: AttributeSet?, defStyleAttr
         //2. 需要测量所有子View!
         measureChildren(widthMeasureSpec, heightMeasureSpec)
 
-        //3. 没有子View，根据本身LayoutParams获得自身测量宽/高
-        if(childCount <= 0){
-            measureWidth = layoutParams.width
-            measureHeight = layoutParams.height
+        //3. 本身宽高的模式均为wrap_content, 需要根据子View来获得
+        if(widthSpecMode == MeasureSpec.AT_MOST && heightSpecMode == MeasureSpec.AT_MOST){
+            for(i in 0 until childCount){
+                val childView = getChildAt(i)
+                measureWidth += childView.measuredWidth //测量出总宽度
+
+                //6. 处理marigin
+                val childLayoutParams = childView.layoutParams as MarginLayoutParams
+                measureWidth += childLayoutParams.leftMargin + childLayoutParams.rightMargin
+
+                val totalCurChildHeight = childView.measuredHeight + childLayoutParams.topMargin + childLayoutParams.bottomMargin
+                if(totalCurChildHeight > measureHeight){
+                    measureHeight = totalCurChildHeight //选取子View中高度最大的
+                }
+            }
+            //7. 处理padding
+            measureWidth += paddingLeft + paddingRight
+            measureHeight += paddingTop + paddingBottom
             setMeasuredDimension(measureWidth, measureHeight)
         }
-        //3. 本身宽高的模式均为wrap_content
-        else if(widthSpecMode == MeasureSpec.AT_MOST && heightSpecMode == MeasureSpec.AT_MOST){
+        //4. 仅有高度是wrap_content
+        else if(heightSpecMode == MeasureSpec.AT_MOST){
+            //获取所有子View最大的高度，宽度直接用给定的尺寸
+            for(i in 0 until childCount){
+                val childView = getChildAt(i)
+
+                // 处理高度(wrap_content)上marigin
+                val childLayoutParams = childView.layoutParams as MarginLayoutParams
+
+                val totalCurChildHeight = childView.measuredHeight + childLayoutParams.topMargin + childLayoutParams.bottomMargin
+                if(totalCurChildHeight > measureHeight){
+                    measureHeight = totalCurChildHeight //选取子View中高度最大的
+                }
+            }
+            measureHeight += paddingTop + paddingBottom //处理高度的padding
+            setMeasuredDimension(widthSpecSize, measureHeight)
+        }
+        //5. 仅有宽度是wrap_content
+        else if(widthSpecMode == MeasureSpec.AT_MOST){
             for(i in 0 until childCount){
                 val childView = getChildAt(i)
                 measureWidth += childView.measuredWidth
-                if(childView.measuredHeight > measureHeight){
-                    measureHeight = childView.measuredHeight
-                }
+
+                //  处理宽度(wrap_content)上marigin
+                val childLayoutParams = childView.layoutParams as MarginLayoutParams
+                measureWidth += childLayoutParams.leftMargin + childLayoutParams.rightMargin
             }
-            Log.i("View", "$measureWidth+$measureHeight")
-            setMeasuredDimension(measuredWidth, measuredHeight)
+            measureWidth += paddingLeft + paddingRight            //  处理宽度的padding
+            setMeasuredDimension(measureWidth, heightSpecSize)//高度直接用给定的尺寸
         }
+    }
+
+    /**
+     * 3. 要支持Margin功能，必须要重写方法，并实现自己LayoutParams
+     */
+    override fun generateDefaultLayoutParams() = MyLayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+    override fun generateLayoutParams(attrs: AttributeSet) = MyLayoutParams(context, attrs)
+    override fun generateLayoutParams(p: LayoutParams): MyLayoutParams{
+        when(p){
+            is LayoutParams -> return MyLayoutParams(p)
+            is MarginLayoutParams ->  return MyLayoutParams(p)
+            else -> return MyLayoutParams(p)
+        }
+    }
+
+    open class MyLayoutParams : MarginLayoutParams {
+        constructor(c: Context, attrs: AttributeSet) : super(c, attrs)
+        constructor(width: Int, height: Int) : super(width, height)
+        constructor(p: ViewGroup.LayoutParams) : super(p) {}
+        constructor(source: ViewGroup.MarginLayoutParams) : super(source)
     }
 }
 ```
+
+36、自定义View的思想
+>面对陌生的自定义View的时候，需要掌握基本功：View的弹性滑动、滑动冲突、绘制原理。个人理解就是处理好三大流程：测量、布局和绘制。
