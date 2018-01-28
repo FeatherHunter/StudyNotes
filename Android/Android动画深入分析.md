@@ -1,7 +1,10 @@
-#Android动画深入分析
+>1. 以面试提问形式总结Android动画所有知识点。适合学习或者复习。
+>2. 主要包括：View动画的定义和使用，属性动画的定义和使用以及插值器、估值器的作用，以及属性动画的原理
+>3. 代码部分用Kotlin/java方式实现。
 
-> 1.以面试提问形式总结Android动画所有知识点。适合学习或者复习。
-> 2.Java代码部分均用Kotlin方式实现。
+部分知识点参考自:http://blog.csdn.net/feather_wch/article/details/78625945#6-animationset
+
+#Android动画深入分析(37题)
 
 1、Android动画分为三种：
 >1. View动画(Animation)
@@ -206,6 +209,7 @@ animatorSet.setDuration(5000).start()
 ```
 
 19、XML中定义属性动画
+* 需要在res文件夹中创建animator文件夹, 并创建XML文件
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <set xmlns:android="http://schemas.android.com/apk/res/android"
@@ -245,27 +249,168 @@ set.start()
 >2. 作用是：根据时间流逝的百分比来计算出当前属性值改变的百分比
 >3. 系统预置了：LinearInterpolator(匀速动画)、AccelerateDecelerateInterpolator(动画两头慢中间快)、DecelerateInterpolator(动画越来越慢)等等
 
-15、
->1.
->2.
->3.
+22、估值器是什么?
+>1. TypeEvaluator：类型估值算法，也称为估值器
+>2. 作用: 根据当前属性改变的百分比来计算改变后的属性值
+>3. 系统预置：IntEvaluator(针对整型属性)、FloatEvaluator(针对浮点型)、ArgbEvaluator(针对Color属性)
+>4. TimeInterpolator和TypeEvaluator是实现非匀速动画的重要手段。
 
-15、
->1.
->2.
->3.
+23、插值器和估值器的实例解析
+>假设一种匀速动画，实现在40ms内，x属性实现从0到40的变换。
+>题：当t=20ms时，x的值应该是多少？
+>1. t=20ms时，时间流逝百分比为`50% = 20 / 40`，`线性插值器`的返回值和输入值一致，因此属性改变百分比为`50%`
+>3. 属性改变百分比当前为`50%`,根据`整型估值器`(开始值 + 属性改变百分比 * (结束值 - 开始值))，最终得到改变后的属性值`20=0 + 0.5 * (40 - 0)`
 
-15、
->1.
->2.
->3.
+24、属性动画要点
+>1. 属性动画要求该属性必须要有`set/get`方法
+>2. 插值器和估值器都可以自定义
+>3. 插值器自定义需要实现`Interpolator`或者`TimeInterpolator`
+>4. 估值器自定义需要实现`TypeEvaluator`接口
+>5. `int/float/Color`以外的类型必须要自定义`类型估值算法`
 
-15、
->1.
->2.
->3.
+25、属性动画监听器
+>1. AnimatorListener(必须要实现四个接口)
+```java
+animator.addListener(new Animator.AnimatorListener() {
+            @Override
+            public void onAnimationStart(Animator animation) {
+            }
+            @Override
+            public void onAnimationEnd(Animator animation) {
+            }
+            @Override
+            public void onAnimationCancel(Animator animation) {
+            }
+            @Override
+            public void onAnimationRepeat(Animator animation) {
+            }
+        });
+```
+>2. 此外提供AnimatorListenerAdapter用于选择性使用上面的方法
+```java
+animator.addListener(new AnimatorListenerAdapter() {
+    @Override //只使用一个方法
+    public void onAnimationStart(Animator animation) {
+        super.onAnimationStart(animation);
+    }
+});
+```
+>3. AnimatorUpdateListener，用于监听整个过程，每一帧动画，都会调用一次
+```java
+animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+    @Override
+    public void onAnimationUpdate(ValueAnimator animation) {
+    }
+});
+```
 
-15、
->1.
->2.
->3.
+26、对任意属性做动画：View动画和属性动画区别
+>1. View动画并不支持对控件宽高做动画, 即使进行放大，本质控件的文字等也会被拉伸
+>2. 属性动画就可以给任意属性做动画
+
+27、属性动画想要生效，必须满足两个条件
+>1. 该属性需要有`set`和`get`方法
+>2. `set`方法所做出的属性改变必须能通过UI等改变反映出来(`Button`的setWidth方法本质就不能改变空间的高度)
+
+28、TextView/Button改变宽高的动画为什么不能生效？
+>1. TextView以及子类的确有`getWidth/setWidth`方法，满足条件1，不满足条件2
+>2. 源码中`getWidth=mRight-mLeft`的确是View的高度`android:layout_width`，该条满足`条件1`
+>3. 而`setWidth`设置的是TextView的最大宽度和最小宽度，对应着`android:width`属性，并不是设置View的宽度，因此不满足`条件2`
+
+29、官方针对属性动画生效的条件问题，提供三种解决办法
+>1. 有权限的情况下，给对象加上`get/set`方法————一般难以做到，因为无权给SDK内部实现添加方法
+>2. 用类来包装原始对象，间接为其提供`get/set`方法
+>3. 采用`ValueAnimator`，监听动画过程，自己实现属性的改变
+
+30、用一个类包装原始对象，间接提供get和set方法
+```java
+private class WrapperView{
+    private View view;
+    public WrapperView(View view){
+        this.view = view;
+    }
+    public int getWidth(){
+        return view.getLayoutParams().width;
+    }
+    public void setWidth(int width){
+        view.getLayoutParams().width = width;
+        view.requestLayout();
+    }
+}
+```
+
+31、采用ValueAnimator，监听动画过程，自己实现属性的改变
+```kotlin
+fun performAnimate(target: View, start: Int, end: Int){
+    val valueAnimator = ValueAnimator.ofInt(1, 100)
+    //1. 设置每一帧画面的监听器，并且更改属性
+    valueAnimator.addUpdateListener(object : ValueAnimator.AnimatorUpdateListener{
+        private val mEvaluator = IntEvaluator()
+        override fun onAnimationUpdate(animation: ValueAnimator) {
+            // 当前动画的进度值，整型， 0~100之间
+            val currentValue = animation.animatedValue
+            // 当前进度所占整个动画过程的比例
+            val fraction = animation.getAnimatedFraction()
+            // 直接调用整型估值器，最后将计算出的宽度设置给View
+            target.layoutParams.width = mEvaluator.evaluate(fraction, start, end)
+            target.requestLayout()
+        }
+    })
+    //2. 开始动画
+    valueAnimator.setDuration(500).start()
+}
+```
+
+32、PropertyValuesHolder实现动画效果
+>类似于AnimationSet的作用，将多种效果共同作用于对象。
+
+```java
+PropertyValuesHolder pvh1 = PropertyValuesHolder.ofFloat("translationY", 200);
+PropertyValuesHolder pvh2 = PropertyValuesHolder.ofFloat("scaleX", 1f, 0, 1f);
+PropertyValuesHolder pvh3 = PropertyValuesHolder.ofFloat("scaleY", 1f, 0, 1f);
+ObjectAnimator.ofPropertyValuesHolder(imageView, pvh1, pvh2, pvh3).setDuration(1000).start();
+```
+
+33、ObjectAnimator.ofPropertyValuesHolder()解析
+```java
+public static ObjectAnimator ofPropertyValuesHolder(Object target,
+        PropertyValuesHolder... values) {
+    //1. 本质是创建ObjectAnimator对象，并将`PropertyValuesHolder`存入
+    ObjectAnimator anim = new ObjectAnimator();
+    anim.setTarget(target);
+    anim.setValues(values);
+    return anim;
+}
+```
+>1. 本质是创建ObjectAnimator对象，并将`PropertyValuesHolder`存入
+>2. ObjectAnimator.start()方法最底层本质就是通过`PropertyValuesHolder`的`setupValue`调用`get`方法，`setAnimatedValue方法`去`set`属性值
+
+## 属性动画原理
+34、属性动画为什么需要get/set方法？
+>1. 属性动画通过传递给`set`的值不一样，并且越来越接近最终值，最终实现动画效果
+>2. 如果动画时没有传递初始值，则需要通过`get`方法获取属性的初始值
+>3. 如果初始值已经有了，则不需要`get`方法
+
+35、ObjectAnimator的start()流程
+>1. `start()`会先判断：若当前东、等待的动画和延迟的动画中有和当前动画相同的动画，就会取消相同的动画；最终调用父类`ValueAnimator`的`start()`
+>3. `ValueAnimator`中属性动画需要运行在Looper线程中；最终会调用`AnimationHandler`的start方法，此AnimationHandler并不是Handler，而是Runnable
+>5. 该Runnable中涉及JNI层的交互，最终是进入到ValueAnimatior的`doAnimationFrame`方法
+>6. `doAnimationFrame`中最后调用`animationFrame()`方法，其内部调用`animateValue()`方法
+>7. `animateValue()`中`calculateValue()`用于计算每帧动画所对应的属性值。
+>8. 初始化时，若属性初始值没有提供，则调用`get`方法：`PropertyValuesHolder`中的`setupValue`,通过反射调用的`get`方法
+>9. 当动画下一帧动画到来时，`PropertyValuesHolder`中的`setAnimatedValue方法`会将新的属性值设置给对象，通过反射调用其`set`方法
+
+36、属性动画原理要点
+>1. 属性动画需要运行在Looper线程中
+>2. 初始化时，若没有提供属性初始值，`PropertyValuesHolder`的`setupValue`,通过反射调用的`get`方法
+>3. 当动画下一帧动画到来时，`PropertyValuesHolder`的`setAnimatedValue方法`会通过反射调用其`set`方法，设置新的属性值
+
+## 动画的注意事项
+37、动画使用的7个注意点
+>1. OOM：图片数量较多或者图片较大时容易出现OOM，且尽量避免帧动画
+>2. 内存泄露：属性动画中无限循环动画，需要在Acitivty退出后及时停止，否则会导致Activity无法释放。验证后发现View动画并不存在此问题。
+>3. 兼容性问题： 3.0以下系统上有兼容问题，需要适配
+>4. View动画的问题：View动画并不是真正改变View的状态，可能会动画之后View的setVisibility(GONE)失效，需要调用`view.clearAnimation()`清除View动画后才能解决
+>5. 不要使用px：要使用dp，px会导致不同设备上有不同效果
+>6. 动画元素的交互：3.0后，属性动画点击事件会跟随View而移动，View动画会停留在原位置
+>7. 硬件加速: 建议开启硬件加速，会提高动画的流畅性
