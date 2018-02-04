@@ -1,7 +1,9 @@
 # IPC-进程间通信(62题)
+版本：2018/2/4-1
 
 >选取总结自《Android开发艺术探索》。
 >文本包含两部分，1、对知识点就行归纳汇总 2、讲解IPC知识点
+>链接：http://blog.csdn.net/feather_wch/article/details/79190230
 
 问题汇总：
 1、什么是IPC？

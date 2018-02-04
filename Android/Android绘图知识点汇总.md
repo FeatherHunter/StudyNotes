@@ -1,0 +1,526 @@
+>本文介绍Android绘图相关知识点，包括：
+> 1. 2D绘图-Canvas、paint
+> 2. 如何用颜色矩阵处理bitmap
+> 3. 如何用像素点、颜色块处理bitmap
+> 4. 如何使用变换矩阵处理图片
+> 5. 如何使用画笔做特效处理
+
+# Android绘图机制(22题)
+版本：2018.1.30-2
+
+参考总结自: http://blog.csdn.net/feather_wch/article/details/78589840
+
+[TOC]
+
+1、屏幕尺寸信息有哪些？
+>1. 屏幕大小指的是屏幕对角线的长度，使用“寸”度量，4.7寸手机、5.5寸手机
+>2. PPI：每英寸像素(Pixels Per Inch)又被称为DPI，对角线的像素点数除以屏幕的大小得到的。
+>3. dp是独立像素密度: Android用mdpi即密度值为160的屏幕作为标准，在这个屏幕上1px = 1dp。例如100dp的长度，在mdpi中为100px，而在hdpi中为150px。因此dp用于屏幕适配最好。
+
+2、独立像素密度dp和像素px换算表
+|比例换算表|mdpi|hdpi|xhdpi|xxhdpi|
+|-----|:----:|:-----:|:-----:|:-----:|
+|dp|1|1|1|1|
+|px|1|1.5|2|3|
+
+3、Android如何进行2D绘图
+>1. 系统提供`Canvas`提供绘图方法。还提供了各种绘制图像的API。
+>2. `Canvas`提供各种绘制图像的API：如`drawPoint`点，`drawLine`线，矩形，多边形，弧，圆等。
+>3. `Paint`是系统提供的画笔，能提供`setAntiAlias()`设置锯齿效果，`setStyle()`设置画笔的风格等等
+
+4、2D绘图实例：
+```java
+public class TwoDActivity extends Activity {
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        /*将自定义控件设为ContentView-用于测试Canvas效果*/
+        setContentView(new CustomeView(this));
+    }
+    /**-----------------------------------------
+     *   自定义控件，重写draw方法，用于测试canvas
+     * -----------------------------------------*/
+    class CustomeView extends View{
+        public CustomeView(Context context){
+            super(context);
+        }
+        @Override
+        public void draw(Canvas canvas) {
+            /*---------------------------------
+            *   绘制实心矩形
+            * --------------------------------*/
+            Paint paint = new Paint();
+            paint.setStyle(Paint.Style.FILL); //画笔风格
+            paint.setColor(Color.BLACK);      //画笔颜色
+            canvas.drawRect(0, 0, 100, 100, paint);//绘制矩形
+            /*---------------------------------
+            *   绘制空心矩形
+            * --------------------------------*/
+            paint.setStyle(Paint.Style.STROKE); //画笔风格
+            paint.setColor(Color.BLACK);        //画笔颜色
+            canvas.drawRect(150, 0, 250, 100, paint);//绘制矩形
+            /*-----------------------------------------------------------------
+            *    在指定位置绘制文字-以(x,y)起点的水平直线为基准线，绘制直线Text
+            * -----------------------------------------------------------------*/
+            paint.setStyle(Paint.Style.FILL); //画笔风格
+            paint.setTextSize(80);
+            paint.setColor(Color.RED);        //画笔颜色
+            canvas.drawText("Hello World!", 300, 100, paint);
+            super.draw(canvas);
+        }
+    }
+}
+```
+
+5、Canvas中的四个重要方法：
+>1. Canvas.save():将之前绘制内容都保存起来，接下来的绘制就好像在新的图层进行绘制一样。
+>2. Canvas.restore():合并图层操作，将save之后的图像和save之前的图像合并起来。
+>3. Canvas.tanslate():平移，将坐标系进行平移，绘制都以之后的坐标系为参照。
+>4. Canvas.rotate():旋转，将坐标系进行旋转。避免了复杂运算，化繁为简。
+
+6、利用Canvas的旋转实现复杂效果：自定义时钟
+```java
+private int mCenterX = 550; //自定义圆心X
+    private int mCenterY = 800; //自定义圆心Y
+    private int mRadius = 500; //圆的半径
+    /**-----------------------------------------
+     *           自定义钟表
+     * -----------------------------------------*/
+    class ClockView extends View{
+        public ClockView(Context context){
+            super(context);
+        }
+        protected void onDraw(Canvas canvas) {
+            //绘制圆形
+            Paint paint = new Paint();
+            paint.setAntiAlias(true);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(5);
+            canvas.drawCircle(mCenterX, mCenterY, mRadius, paint);
+            /*--------------------------------------------
+            *  绘制刻度线: 1. 先在0点位置绘制竖线
+            *             2. 将坐标系旋转30度
+            *             3. 继续原样绘制竖线
+            *             4. 循环绘制，最终绘制出所有刻度线
+            * -------------------------------------------*/
+            paint = new Paint();
+            paint.setStrokeWidth(3);
+            for(int i = 0; i < 12; i++){
+                //大刻度线
+                if(i == 0 || i == 3 || i == 6 || i == 9){
+                    paint.setColor(Color.RED);
+                    paint.setStrokeWidth(5);
+                    canvas.drawLine(mCenterX, mCenterY-mRadius, mCenterX, mCenterY-mRadius+60, paint);
+                    String strTime = i+"";
+                    int textSize = 40;
+                    paint.setTextSize(textSize);
+                    canvas.drawText(strTime, mCenterX-textSize/3, mCenterY-mRadius+60+textSize, paint);
+                }else{
+                    paint.setColor(Color.BLACK);
+                    paint.setStrokeWidth(3);
+                    canvas.drawLine(mCenterX, mCenterY-mRadius, mCenterX, mCenterY-mRadius+30, paint);
+                    int textSize = 20;
+                    String strTime = i+"";
+                    paint.setTextSize(textSize);
+                    canvas.drawText(strTime, mCenterX-textSize/3, mCenterY-mRadius+30+textSize, paint);
+                }
+                //旋转
+                canvas.rotate(30, mCenterX, mCenterY);
+            }
+            super.onDraw(canvas);
+        }
+    }
+```
+
+7、Canvas中的图层概念
+>1. `saveLayer(),saveLayerAlpha()`将一个图层入栈。
+>2. `restore(), restoreToCount()`将一个图层出栈。
+>3. 入栈后，所有操作发生在该图层之上。
+>4. 出栈后，就会将图像绘制到上层Canvas上。
+
+8、Bitmap位图是什么
+>1. Android中最常用的就是位图Bitmap.
+>2. Bitmap包含了点阵和颜色值
+>3. 点阵就是包含像素的矩阵。
+>4. 颜色值就是ARGB-对应透明度、红色、绿色、蓝色。
+
+9、图像描述的三个角度
+>1. 色调-物体显示的颜色
+>2. 饱和度-颜色的纯度。0(灰度)到100%(饱和)来进行描述。
+>3. 亮度-颜色相对的明暗程度。
+>4. Android封装了一些API来快速调整这些参数，不用计算矩阵值。
+
+10、ColorMatrix是什么？
+>1. Android中的颜色矩阵
+
+11、实例：改变色光属性(色调、饱和度、亮度)
+```java
+public class BitmapActivity extends Activity implements SeekBar.OnSeekBarChangeListener{
+  /**==========================
+   * 省略seekbar初始化等不重要内容
+   *=========================*/
+    float mHue = 0; //色调初始值为0, 原图色调
+    float mSaturation = 1; //饱和度1，原图饱和度
+    float mLum = 1; //亮度1，原图亮度
+    //SeekBar的中间值
+    int MID_VALUE = 127;
+    //SeekBar的最大值
+    int MAX_VALUE = 255;
+    /**==========================
+     * 1. 获取色光属性-色调、饱和度、亮度
+     *     初始范围0~255
+     *=========================*/
+    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+        switch(seekBar.getId()){
+            case R.id.hue_seekbar:
+                mHue = (progress - MID_VALUE) * 1.0F / MID_VALUE * 180;
+                break;
+            case R.id.saturation_seekbar:
+                mSaturation = progress * 1.0F  / MID_VALUE;
+                break;
+            case R.id.lum_seekbar:
+                mLum =  progress * 1.0F  / MID_VALUE;
+                break;
+            default:break;
+        }
+        imageView.setImageBitmap(handleImageEffect(mHue, mSaturation, mLum));
+    }
+    /**----------------------------------------------------
+     * 处理图像的色调，饱和度，亮度。
+     *   因为Android中不能处理原Bitmap，需要处理Bitmap的副本，
+     *   因此使用原Bitmap创建副本，进行处理。
+     * ---------------------------------------------------*/
+    public Bitmap handleImageEffect(float hue, float saturation, float lum){
+        //1. 创建副本Bitmap
+        Bitmap bmp = BitmapFactory.decodeResource(getResources(), R.drawable.jide);
+        Bitmap bitmap = bmp.copy(Bitmap.Config.ARGB_8888,true);
+        //2. 创建画板、画笔
+        Canvas canvas = new Canvas(bitmap);
+        Paint paint = new Paint();
+        /*-----------------------------------
+        * 处理色调: setRotate中0,1,2代表R,G,B
+        * -----------------------------------*/
+        ColorMatrix hueColorMatrix = new ColorMatrix();
+        hueColorMatrix.setRotate(0, hue);
+        hueColorMatrix.setRotate(1, hue);
+        hueColorMatrix.setRotate(2, hue);
+        /*-----------------------------------
+        *  设置饱和度
+        * -----------------------------------*/
+        ColorMatrix saColorMatrix = new ColorMatrix();
+        saColorMatrix.setSaturation(saturation);
+        /*-------------------------------------------
+        * 设置亮度：将三原色相同比例混合显示出白色，以此提高亮度
+        * ------------------------------------------*/
+        ColorMatrix lumColorMatrix = new ColorMatrix();
+        lumColorMatrix.setScale(lum, lum, lum, 1);
+        /*---------------------------------
+        *  将矩阵作用效果混合, 叠加效果。
+        * --------------------------------*/
+        ColorMatrix colorMatrix = new ColorMatrix();
+        colorMatrix.postConcat(hueColorMatrix);
+        colorMatrix.postConcat(saColorMatrix);
+        colorMatrix.postConcat(lumColorMatrix);
+        /*-------------------------
+        *  设置矩阵, 进行绘制
+        * ------------------------*/
+        paint.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
+        canvas.drawBitmap(bitmap, 0, 0, paint);
+        return bitmap;
+    }
+}
+```
+12、Android颜色矩阵-ColorMatrix
+>1. 使用4X5颜色矩阵进行色彩处理。通过设置具体矩阵某元素来处理色彩。
+>2.
+```java
+/*--------------------------------------
+ *  将矩阵数组4x5(一维)通过ColorMatrix作用到图像上
+ *  以此对图片进行色彩处理
+ * ------------------------------------*/
+Bitmap bmp = Bitmap.createBitmap(bitmap.getWidth(),bitmap.getHeight(),Bitmap.Config.ARGB_8888);
+//1. 将颜色矩阵设置给ColorMatrix
+ColorMatrix colorMatrix = new ColorMatrix();
+colorMatrix.set(mColorMatrix);
+//2. 用颜色矩阵进行绘制
+Canvas canvas = new Canvas(bmp);
+Paint paint = new Paint();
+paint.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
+canvas.drawBitmap(bitmap,0, 0, paint);
+//3. 将改变后的Bitmap设置到ImageView上显示
+mImageView.setImageBitmap(bmp);
+```
+
+13、常用色彩处理矩阵
+>1. 有灰度、反转、怀旧等。
+>2.反转矩阵(其余不赘述，请查询资料)
+||||||
+|----|----|----|----|----|
+|-1|0|0|1|1|
+|0|-1|0|1|1|
+|0|0|-1|1|1|
+|0|0|0|1|0|
+
+14、像素点处理图片
+>1.可以通过改变每个像素点的ARGB值，进行色彩处理。
+>2.`Bitmap.getPixels(colorArray，省略...)`能提取整个图片的像素点，并保存到数组中。
+>3.AGBA获取：
+```java
+r = Color.red(colorArray);
+g = Color.green(colorArray);
+b = Color.blue(colorArray);
+a = Color.alpha(colorArray);
+```
+>4.获取到原ARGB后，通过计算得到新的ARGB。`r1 = i* r + j* g + k* b;`
+```java
+newPix[i] = Color.argb(a, r1, g1, b1);
+bitmap.setPixels(newPix, ...);
+```
+>5.使用不同参数，就能达到老照片、浮雕等效果。
+
+15、矩阵Matrix的作用
+>1. 图形变换类似于颜色变换。使用3X3变换矩阵进行变换。可以进行平移变换、缩放变换、旋转变换、错切变换。
+>2. 矩阵Matrix能对图片进行平移、缩放、旋转、错切变换。
+```java
+        static float data = 10f; //自定义的数据
+        Canvas canvas = new Canvas();
+        /*------------------------------------
+        * 使用矩阵处理图片
+        * -----------------------------------*/
+        float[] mImageMatrix = new float[9];
+        Matrix matrix = new Matrix();
+        matrix.setValues(mImageMatrix);//转为矩阵
+        canvas.drawBitmap(bitmap, matrix, null);
+        //set会覆盖整个矩阵
+        matrix.setRotate(data); //旋转
+        matrix.setTranslate(data, data);//平移
+        matrix.setScale(data, data); // 缩放
+        matrix.setSkew(data, data); //错切
+        /*------------------------------
+        * 矩阵混合
+        *  pre()前乘: 当前矩阵 X 该次使用的矩阵
+        *  post()后乘: 该次使用的矩阵 X当前矩阵
+        * ------------------------------*/
+        matrix.preRotate(data); //会用 当前矩阵 X 该次的旋转矩阵
+        matrix.postScale(data, data); // 本次缩放矩阵 X 当前矩阵
+        /*------------------------------
+        *  1.先旋转45度
+        *  2.再平移(200, 200)
+        * ------------------------------*/
+        //后乘: 旋转后平移
+        matrix.setRotate(45f);
+        matrix.postTranslate(200, 200);
+        //先乘: 平移前旋转
+        matrix.setTranslate(200, 200);
+        matrix.preRotate(45f);
+        /*---------------------
+        *         测试:
+        * --------------------*/
+        Bitmap bmp = Bitmap.createBitmap(bitmap.getWidth(),bitmap.getHeight(),
+                Bitmap.Config.ARGB_8888);        //创造bitmp的复制品bmp
+        canvas = new Canvas(bmp);                //用bmp创造画布
+        canvas.drawBitmap(bitmap, matrix, null); //根据bitmap以matrix变化后的图片, 在bmp上进行绘制
+        imageView.setImageBitmap(bmp);
+}
+```
+16、像素块处理
+>1. 将图片分为像素块，改变像素块来处理图片。
+>2. API：`canvas.drawBitmapMesh(bitmap,WIDTH,HEIGHT,verts,0,null,0,null);`,将第五个参数的坐标数组传入，bitmap会根据像素块数组，在WIDTH X HEIGHT网格中，每个焦点的坐标进行相应的修改。
+```java
+public class FlagImage extends View {
+    Bitmap bitmap;
+    //定义两个常量,这两个常量指定该图片横向20格,纵向上都被划分为10格
+    private final int WIDTH = 30;
+    private final int HEIGHT = 30;
+    //记录该图像上包含的231个顶点
+    private final int COUNT = (WIDTH +1) * (HEIGHT + 1);
+    //定义一个数组,记录Bitmap上的21*11个点的坐标
+    private  final  float[] verts = new float[COUNT * 2];
+    //定义一个数组,记录Bitmap上的21*11个点经过扭曲后的坐标
+    //对图片扭曲的关键就是修改该数组里元素的值
+    private  final  float[] orig = new float[COUNT * 2];
+
+    //振幅大小
+    private final float A = 10;
+    private float k = 0; //旗帜飞扬
+
+    public FlagImage(Context context, @Nullable AttributeSet attrs) {
+        super(context, attrs);
+        init();
+    }
+
+    private void init() {
+        bitmap = BitmapFactory.decodeResource(getResources(),R.drawable.jide);
+
+        float bitmapWidth = bitmap.getWidth();
+        float bitmapHeight = bitmap.getHeight();
+        int index = 0;
+        for(int y = 0; y <= HEIGHT; y++){
+            float fy = bitmapHeight * y / HEIGHT; //图像高度 乘以 y/总格数 可以获得 纵向y的坐标
+            for(int x = 0;x<= WIDTH;x ++){
+                float fx = bitmapWidth * x/WIDTH; //x的坐标值
+
+                orig [index * 2 + 0] = verts [index * 2 + 0] = fx; //[(x1,y1), (x2,y2), (...)...]一维数组依次存储
+                orig [index * 2 + 1] = verts [index * 2 + 1] = fy+100; //这里人为将坐标+100是为了让图像下移，避免扭曲后被屏幕遮挡。
+                index += 1;
+            }
+        }
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        flagWave();//旗帜飞扬
+        k += 0.1F;
+        //对bitmap按verts数组进行扭曲
+        //从第一个点(由第5个参数0控制)开始扭曲
+        canvas.drawBitmapMesh(bitmap,WIDTH,HEIGHT,verts,0,null,0,null);
+        invalidate();
+    }
+
+    private void flagWave(){
+        for(int j = 0; j <= HEIGHT; j++){
+            for (int i = 0; i <= WIDTH; i++){
+                verts[(j * (WIDTH + 1) + i) * 2 + 0] += 0; //x值不变
+                float offsetY = (float)Math.sin((float)i/WIDTH*2*Math.PI + Math.PI * k);
+                verts[(j * (WIDTH + 1) + i) * 2 + 1] = orig[(j*WIDTH+i)*2+1]+offsetY*A;
+            }
+        }
+    }
+
+    private void flagWave(float cx, float cy){
+        for(int i = 0; i < COUNT * 2; i += 2)
+        {
+            float dx = cx - orig[i + 0];
+            float dy = cy - orig[i + 1];
+            float dd = dx * dx + dy * dy;
+            //计算每个坐标点与当前点(cx,cy)之间的距离
+            float d = (float)Math.sqrt(dd);
+            //计算扭曲度，距离当前点(cx,cy)越远，扭曲度越小
+            float pull = 80000 / ((float)(dd * d));
+            //对verts数组(保存bitmap　上21 * 21个点经过扭曲后的坐标)重新赋值
+            if(pull >= 1)
+            {
+                verts[i + 0] = cx;
+                verts[i + 1] = cy;
+            }
+            else
+            {
+                //控制各顶点向触摸事件发生点偏移
+                verts[i + 0] = orig[i + 0] + dx * pull;
+                verts[i + 1] = orig[i + 1] + dx * pull;
+            }
+        }
+        //通知View组件重绘
+        invalidate();
+    }
+    public boolean onTouchEvent(MotionEvent event)
+    {
+//        //调用warp方法根据触摸屏事件的坐标点来扭曲verts数组
+//        flagWave(event.getX() , event.getY());
+          return true;
+    }
+}
+```
+
+17、PorterDuffXfermode的作用
+>1. 用于设置两个图像交际区域的显示方式。
+>2.
+
+18、PorterDuffXfermode绘制圆形图片
+>2. 先将画布变成圆角矩形。再将图片绘制到画布上。
+```java
+        Bitmap bitmap = BitmapFactory.decodeResource(getResources(), R.drawable.jide);
+        Bitmap outBmp = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), Bitmap.Config.ARGB_8888);
+        /**======================================================
+         * 用outbmp创建空白画布,并将outbmp的空白画布绘制成圆角长方形
+         *====================================================*/
+        Canvas canvas = new Canvas(outBmp); //用outbmp创建空白画布
+        Paint paint = new Paint();
+        paint.setAntiAlias(true);
+        canvas.drawRoundRect(0, 0, bitmap.getWidth(), bitmap.getHeight(), 80, 80, paint);//先画出圆角长方形
+        /**=========================================
+        *    将bitmap绘制到圆角矩形的画布上(outBmp)
+        *===========================================*/
+        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
+        canvas.drawBitmap(bitmap, 0, 0, paint);
+        roundImageView.setImageBitmap(outBmp);
+```
+
+19、PorterDuffXfermode绘制透明路径：刮刮卡效果
+>1. 准备背景bitmap
+>2. 准备灰色的bitmap
+>3. 在外层灰色bitmap上用透明画笔绘制出路径(PorterDuffXfermode会将透明度与灰色bitmap融合，使得灰色bitmap在路径上变成透明)
+>4. 在onDraw(Canvas canvas)整个View的canvas上先绘制背景bitmap，再绘制外层灰色bitmap
+```java
+public class CardImageView extends View {
+    Bitmap mBgBitmap,mFgBitmap;
+    Canvas mCanvas;
+    Paint mPaint;
+    Path mPath;
+    public CardImageView(Context context, @Nullable AttributeSet attrs) {
+        super(context, attrs);
+        initCardImage();
+    }
+    private void initCardImage() {
+        mPaint = new Paint();
+        mPaint.setAlpha(0);  //将画笔的透明度设为0
+        mPaint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.DST_IN)); //目标的透明路径 覆盖在 外层图层之上, 让外层图层也透明
+        mPaint.setStyle(Paint.Style.STROKE);
+        mPaint.setStrokeJoin(Paint.Join.ROUND); //让画的线圆滑
+        mPaint.setStrokeWidth(50);
+        mPaint.setStrokeCap(Paint.Cap.ROUND); //圆滑
+        mPath = new Path();
+
+        mBgBitmap = BitmapFactory.decodeResource(getResources(),R.drawable.jide); //内层图层：图片
+        mFgBitmap = Bitmap.createBitmap(mBgBitmap.getWidth(),mBgBitmap.getHeight(),Bitmap.Config.ARGB_8888);
+        mCanvas = new Canvas(mFgBitmap);
+        mCanvas.drawColor(Color.GRAY); //外层图层为灰色
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        switch (event.getAction()){
+            case MotionEvent.ACTION_DOWN:
+                mPath.reset();
+                mPath.moveTo(event.getX(),event.getY());
+                break;
+            case MotionEvent.ACTION_MOVE:
+                mPath.lineTo(event.getX(),event.getY());
+                break;
+        }
+        mCanvas.drawPath(mPath,mPaint); //给外层图层 画路径(路径画笔的透明色会让外层图层透明)
+        invalidate();
+        return  true;
+    }
+
+    @Override
+    protected void onDraw(Canvas canvas) {
+        canvas.drawBitmap(mBgBitmap,0,0,null); //1. 先绘制背景
+        canvas.drawBitmap(mFgBitmap,0,0,null); //2. 再绘制外层有透明路径的Bitmap
+    }
+}
+```
+20、Shader是什么？
+>1. 着色器、渐变器：用于渐变和渲染效果。
+>2. 主要有BitmapShader(位图)、LinearGradient(线性)、RadialGradient(光束)、SweepGradient(梯度)、ComposeShader(混合)
+
+21、BitmapShader使用实例
+```java
+BitmapShader shader = new BitmapShader(bitmap, Shader.TitleMode.CLAMP, Shader.TitleMode.CLAMP); //1. 初始化
+Paint paint = new Paint();
+paint.setShader(shader)； //2. 设置shader
+canvas.drawCircle(500, 250, 200, paint); //3. 绘制
+```
+
+22、PathEffect
+>1. 用想要的效果去绘制路径，比如让路径圆滑，出现噪点等:
+```java
+Path path = new Path(); //创造路径
+...
+PathEffect pe = new ComposePathEffect(...);
+path.setPathEffect(pe); //设置路径
+canvas.drawPath(path, paint); //绘制路径
+```
+
+## 参考资料
+1. CSDN layer详细讲解：http://blog.csdn.net/cquwentao/article/details/51423371
+2. Canvas类的最全面详解：https://www.jianshu.com/p/762b490403c3

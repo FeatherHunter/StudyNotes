@@ -1,4 +1,9 @@
-# Android中的多线程(40题)
+> 包含：线程与进程概念、Java中同步、阻塞队列、线程池和AsyncTask的详细解析
+> 链接：http://blog.csdn.net/feather_wch/article/details/79132183
+
+#   Android中的多线程(45题)
+
+版本：2018/2/4-1
 
 [TOC]
 
@@ -489,6 +494,113 @@ AsyncTask->AsyncTask: 11.onCancelled/OnPostExecute
 
 ```
 
+## HandlerThread
+
+41、Thread的run()和start()的区别
+>1. `start()`会让线程去排队(处于就绪状态)，之后会调用`run()`
+>2. `run()`是线程需要执行的内容
+
+42、HandlerThread是什么
+>1. `HandlerThread`与`Thread`不同支持在于，`run`方法内部创建了`消息队列`
+>2. 外界需要通过`Hanlder`的消息方式来通知`HandlerThread`来执行一个具体任务
+>3. `HandlerThread`的`run`方法是`无限循环`执行的，需要通过`HandlerThread`的`quit或quitSafely`方法来终止`线程的执行`
+>4. `HandlerThread`典型使用场景是`IntentService`
+
+## IntentService
+43、IntentService是什么?
+>1. 是一种特殊`Service`，为`抽象类`,必须创建`子类`才可以使用`IntentService`
+>2. 可用于执行后台耗时的任务，任务执行后会`自动停止`
+>3. 具有`高优先级`(服务的原因),优先级比单纯的`线程`高很多，适合`高优先级`的后台任务，且不容易被系统杀死。
+>4. 封装了`HandlerThread`和`Handler`
+
+44、IntentService的原理解析
+```java
+public abstract class IntentService extends Service {
+        private volatile Looper mServiceLooper;
+        private volatile ServiceHandler mServiceHandler;
+        ...省略...
+        //IntentService第一次启动调用
+        public void onCreate() {
+            super.onCreate();
+            //1. 创建一个HanlderThread
+            HandlerThread thread = new HandlerThread("IntentService[" + mName + "]");
+            thread.start();
+            //2. 通过HanlderThread的Looper来构建Handler对象mServiceHandler
+            mServiceLooper = thread.getLooper();
+            mServiceHandler = new ServiceHandler(mServiceLooper);
+        }
+        //IntentService每次启动都会调用
+        public int onStartCommand(Intent intent, int flags, int startId) {
+            //3. 直接调用onStart
+            onStart(intent, startId);
+            return mRedelivery ? START_REDELIVER_INTENT : START_NOT_STICKY;
+        }
+        public void onStart(Intent intent, int startId) {
+            //4. 通过mServiceHandler发送一个消息(该消息会在HanlderThread中处理)
+            Message msg = mServiceHandler.obtainMessage();
+            msg.arg1 = startId;
+            msg.obj = intent;
+            mServiceHandler.sendMessage(msg);
+        }
+        //ServiceHandler接收并处理onStart()方法中发送的Msg
+        private final class ServiceHandler extends Handler {
+            public ServiceHandler(Looper looper) {
+                super(looper);
+            }
+            @Override
+            public void handleMessage(Message msg) {
+                //1. 直接在onHandleIntent中处理(由子类实现)
+                onHandleIntent((Intent)msg.obj);
+                /**=================================================
+                 * 3. 尝试停止服务(会等待所有消息都处理完毕后，才会停止)
+                 *   不能采用stopSelf()——会立即停止服务
+                 *================================================*/
+                stopSelf(msg.arg1); //会判断启动服务次数是否与startId相等
+            }
+        }
+        //2. 该Intent与startService(intent)中的Intent完全一致
+        protected abstract void onHandleIntent(Intent intent);
+
+        public void onDestroy() {
+            mServiceLooper.quit();
+        }//销毁时会停止looper
+}
+```
+>1. `IntentService`通过发送消息的方式向`HandlerThread`请求执行任务
+>2. `HandlerThread`中的`looper`是顺序处理消息，因此有多个后台任务时，都会按照外界发起的顺序`排队执行`
+>3. 启动流程：onCreate()->onStartCommand()->onStart()
+>4. 消息处理流程：ServiceHandler.handleMessage()->onHandleIntent()
+
+45、IntentService实例:
+>1.自定义LocalIntentService继承自IntentService
+```java
+public class LocalIntentService extends IntentService{
+    public LocalIntentService(String name) {
+        super(name);
+    }
+    @Override
+    protected void onHandleIntent(@Nullable Intent intent) {
+        String action = intent.getStringExtra("task_action");
+        Log.d("IntentService", "receive task :" + action);
+        SystemClock.sleep(3000); //即使第一个任务休眠，后续的任务也会等待其执行完毕
+        if("com.example.action.TASK1".equals(action)){
+            Log.d("IntentService", "handle task :" + action);
+        }
+    }
+}
+```
+>2.开启IntentService
+```java
+Intent service = new Intent(this, LocalIntentService.class);
+service.putExtra("tast_action", "com.example.action.TASK1");
+startService(service);
+service.putExtra("tast_action", "com.example.action.TASK2");
+startService(service);
+service.putExtra("tast_action", "com.example.action.TASK3");
+startService(service);
+```
+
 #参考资料
 AsyncTask的缺陷和问题：http://blog.csdn.net/goodlixueyong/article/details/45895997
 AsyncTask的解析：https://www.cnblogs.com/yanyojun/archive/2017/02/20/6414919.html
+IntentService的使用:https://www.jianshu.com/p/332b6daf91f0
