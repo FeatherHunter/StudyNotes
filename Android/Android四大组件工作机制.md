@@ -2,7 +2,7 @@
 >2. 所有知识点以面试题形式汇总，便于学习和复习背诵
 
 # Android四大组件机制详解
-版本：2018.2.3-2
+版本：2018.2.5-1
 
 [TOC]
 
@@ -927,3 +927,201 @@ public Cursor query(String callingPkg, Uri uri, String[] projection, ......) {
         ...
     }
 ```
+
+## 序列图解析四大组件流程
+
+18、Activity的启动
+```sequence
+Activity->Activity:1.startActivity
+Activity->Activity:2.startActivityForResult
+Activity->Activity:3.mInstrumentation.\nexecStartActivity
+Activity->ActivityManagerService:【IPC】4.ActivityManager.\ngetService()
+ActivityManagerService->ActivityManagerService:5.startActivity()
+Activity->Activity:6.checkStartActivityResult
+ActivityManagerService->ActivityStackSupervisor:7.realStartActivityLocked()
+ActivityStackSupervisor->ActivityThread:【IPC】8.app.thread.\nscheduleLaunchActivity
+ActivityThread->ActivityThread:9.sendMessage(H.LAUNCH_ACTIVITY)
+ActivityThread->ActivityThread:10.Handler H
+ActivityThread->ActivityThread:11.handleMessage()
+ActivityThread->ActivityThread:12.handleLaunchActivity()
+ActivityThread->ActivityThread:13.WindowManagerGlobal.\ninitialize()\n(12)
+ActivityThread->ActivityThread:14.performLaunchActivity()\n(12)
+ActivityThread->ActivityThread:15.handleResumeActivity()\n(12)
+ActivityThread->ActivityThread:16.getPackageInfo()\n(14)
+ActivityThread->ActivityThread:17.newActivity()\n(14)
+ActivityThread->ActivityThread:18.makeApplication()\n(14)
+ActivityThread->ActivityThread:19.createBaseContextForActivity()\n(14)
+ActivityThread->ActivityThread:20.activity.attach()\n(14)
+ActivityThread->ActivityThread:21.callActivityOnCreate()\n(14)
+ActivityThread->ActivityThread:22.attachBaseContext()\n(20)
+ActivityThread->ActivityThread:23.new PhoneWindow()\n(20)
+ActivityThread->ActivityThread:24.mWindow.\nsetWindowManager()\n(20)
+ActivityThread->ActivityThread:25.保存WM到Activity内部\n(20)
+```
+>13.创建Activity前初始化WindowManagerGlobal
+>14.完成Activity对象的创建和启动过程
+>15.调用Activity的onResume这一生命周期
+>17.通过类加载器来创建Activity对象
+>18.通过LoadedApk的makeApplication方法创建Application对象(唯一)，并会调用`onCreate()`
+>19.创建ContextImpl，并调用attach
+>20.关联了Context和Activity，并且创建Window加载WM等初始化工作
+>21.调用Activity的onCreate方法
+
+19、Service的启动
+`AT: ActivityThread`
+```sequence
+AT[Service进程]->AT[Service进程]:null
+Activity[客户端]->Activity[客户端]: 1.启动
+Activity[客户端]->Activity[客户端]: 2.startService()\n-ContextWrapper
+Activity[客户端]->Activity[客户端]: 3.mBase.startService()\n-ContextImpl
+Activity[客户端]->ActivityManagerService: 【IPC】\n4.ActivityManager.getService()
+ActivityManagerService->ActivityManagerService: 5.startService()
+ActivityManagerService->ActiveServices: 6.mService.\nstartServiceLocked()
+ActiveServices->ActiveServices: 7.bringUpServiceLocked()
+ActiveServices->ActiveServices: 8.realStartServiceLocked()
+ActiveServices->AT[Service进程]: 【IPC】9.app.thread.scheduleCreateService()-ApplicationThread的方法
+AT[Service进程]->AT[Service进程]: 10.sendMessage\n(H.CREATE_SERVICE)
+AT[Service进程]->AT[Service进程]: 11.handleCreateService()
+AT[Service进程]->AT[Service进程]: 12.类加载器创建Service对象
+AT[Service进程]->AT[Service进程]: 13.makeApplication
+AT[Service进程]->AT[Service进程]: 14.service.attach(context...)
+AT[Service进程]->AT[Service进程]: 15.service.onCreate();\nmServices.put()
+ActiveServices->AT[Service进程]: 【IPC】16.sendServiceArgsLocked()
+AT[Service进程]->AT[Service进程]: 17.handleServiceArgs()
+AT[Service进程]->AT[Service进程]: 18.s.onStartCommand
+```
+>11.Handler H接受并且处理消息，最终调用handleCreateService()
+>13.makeApplication(创建Application对象并调用onCreate()-若已经存在则不创建)
+>14.创建ContextImpl并调用attach方法-建立ContextImpl和Service的联系
+>15.service.onCreate()，并将Service添加到ActivityThread内部的Service列表中
+>16.sendServiceArgsLocked()-内部最终调用Service的其他方法(onStartCommand等)
+
+20、Service的绑定
+```sequence
+ActivityThread[客户端]->Activity: 1.启动Activity
+Activity->ContextImpl: 2.bindService()
+ContextImpl->ContextImpl: 3.bindServiceCommon()
+ContextImpl->ContextImpl: 4.mPackageInfo.\ngetServiceDispatcher
+ContextImpl->AMS: 【IPC】5.ActivityManager.\ngetService()
+AMS->AMS: 6.bindService()
+AMS->ActiveServices: 7.mService.\nbindServiceLocked()
+ActiveServices->ActiveServices: 8.requestServiceBindingLocked()
+ActiveServices->ActiveServices: 9.realStartServiceLocked()
+ActiveServices->ActivityThread[Service端]: 【IPC】10.app.thread.scheduleBindService()
+ActivityThread[Service端]->ActivityThread[Service端]: 11.handleBindService()
+ActivityThread[Service端]->ActivityThread[Service端]: 12.s.onBind(data.intent)
+ActivityThread[Service端]->AMS: 【IPC】13.ActivityManager.\ngetService()
+AMS->ActiveServices: 14.publishService()
+ActiveServices->ActiveServices: 15.publishServiceLocked()
+ActiveServices->ActivityThread[客户端]: 【IPC】16.c.conn.connected()
+ActivityThread[客户端]->ActivityThread[客户端]: 17.mActivityThread.\npost()
+ActivityThread[客户端]->ActivityThread[客户端]: 18.doConnected()
+ActivityThread[客户端]->ActivityThread[客户端]: 19.mConnection.\nonServiceConnected
+```
+>2 最终是会调用ContextImpl的bindServiceCommon方法
+>4.ServiceConnection需要借助binder才能让远程服务回调自己的方法(借助于ServiceDispatcher.InnerConnection)
+>10.scheduleBindService会发送消息，最终由handleBindService处理
+>12.调用Service的onBind方法-绑定成功
+>13.绑定成功后需要通知客户端：最终调用客户端ServiceConnection中的onServiceConnected
+>16.c.conn是ServiceDispatcher.InnerConnection(ServiceConnection的Binder中转对象)，最终调用ServiceDispatcher的connected
+>17.mActivityThread就是ActivityThread的Hanlder H
+>18.通过post最终运行在主线程
+>19.调用客户端的onServiceConnected方法
+
+21、广播的动态注册
+
+```sequence
+Activity->ContextImpl: 1.registerReceiver()
+ContextImpl->ContextImpl: 2.registerReceiverInternal()
+ContextImpl->ContextImpl: 3.mPackageInfo.getReceiverDispatcher()
+ContextImpl->ContextImpl: 4.new LoadedApk.\nReceiverDispatcher().\ngetIIntentReceiver()
+ContextImpl->ActivityManagerService: 5.ActivityManager.getService()
+ActivityManagerService->ActivityManagerService: 6.registerReceiver()
+ActivityManagerService->ActivityManagerService: 7.mRegisteredReceivers.\nput(receiver.asBinder());
+ActivityManagerService->ActivityManagerService: 8.存储IntentFiler对象
+```
+>1.动态注册从ContextWrapper开始，之后直接交给ContextImpl完成
+>3.已有，从mPackageInfo获取IIntentReceiver对象
+>4.没有则新建IIntentReceiver对象，本质是为了IPC通信需要进行中转，ReceiverDispatcher中同时保存了 BroadcastReceiver和InnerReceiver
+>7.存储远程的InnerReceiver对象(本地的BroadcastReceiver对应的对象)
+
+21、广播的发送和接收
+
+```sequence
+ActivityThread[接收方]->ActivityThread[接收方]: null
+Activity->Activity: 1.sendBroadcast()-\nContextImpl
+Activity->ActivityManagerService: 【IPC】2.ActivityManager.\ngetService()
+ActivityManagerService->ActivityManagerService: 3.broadcastIntent()
+ActivityManagerService->ActivityManagerService: 4.broadcastIntentLocked()
+ActivityManagerService->ActivityManagerService: 4-1.intent.addFlags()
+ActivityManagerService->ActivityManagerService: 4-2.根据intent-filter查找出\n匹配的广播接收者
+ActivityManagerService->ActivityManagerService: 4-3.将满足条件的广播接收者\n添加到BroadcastQueue
+ActivityManagerService->BroadcastQueue: 4-4.queue.\nscheduleBroadcastsLocked()
+BroadcastQueue->BroadcastQueue: 5.mHandler.sendMessage
+BroadcastQueue->BroadcastQueue: 6.processNextBroadcast()
+BroadcastQueue->BroadcastQueue: 6-1.mParallelBroadcasts.remove(0)
+BroadcastQueue->BroadcastQueue: 6-2.r.receivers.get(i)遍历接收者
+BroadcastQueue->BroadcastQueue: 6-3.deliverToRegisteredReceiverLocked()
+BroadcastQueue->BroadcastQueue: 7.performReceiveLocked()
+BroadcastQueue->ActivityThread[接收方]: 【IPC】8.app.thread.scheduleRegisteredReceiver()
+ActivityThread[接收方]->ActivityThread[接收方]: LoadedApk的内部类:\nReceiverDispatcher中
+ActivityThread[接收方]->ActivityThread[接收方]: 9.receiver.\nperformReceive()
+ActivityThread[接收方]->ActivityThread[接收方]: 10.mActivityThread.\npost(args.getRunnable())
+ActivityThread[接收方]->ActivityThread[接收方]: 11.receiver.\nonReceive();
+```
+>5.默认FLAG_EXCLUDE_STOPPED_PACKAGES-广播不会发送给已经停止的应用
+>4-4.BroadcastQueue就会将广播发送给相应的广播接收者
+>6.接收消息并且处理
+>6-1.取出无序广播列表中的广播
+>8.通过`InnerReceiver`实现广播的接收, 内部会调用ReceiverDispatcher的performReceive方法
+>10.通过Hanlder H的post方法来执行args中的逻辑
+>11.LoadedApk.java内部类ReceiverDispatcher的内部类Args，主要是执行BroadcastReceiver的接收方法
+
+23、ContentProvider的机制
+```sequence
+ContextImpl[使用者]->ContextImpl[使用者]: 1.getContentResolver().\nquery()
+ContextImpl[使用者]->ContextImpl[使用者]: 2.acquireProvider()
+ContextImpl[使用者]->ActivityThread: 3.mMainThread.\nacquireProvider()
+ActivityThread->ActivityThread: 4.acquireExistingProvider()\n存在直接返回provider
+ActivityThread->AMS: 【IPC】5.ActivityManager.\ngetService()
+AMS->AMS: 6.getContentProvider()
+AMS->AMS: 7.getContentProviderImpl()
+AMS->AMS: 8.startProcessLocked()
+AMS->ActivityThread[新]: 【新进程入口】9.main
+ActivityThread[新]->ActivityThread[新]: 9-1.new ActivityThread()
+ActivityThread[新]->ActivityThread[新]: 9-2.thread.\nattach(false)
+ActivityThread[新]->ActivityThread[新]: 9-3.Looper.\nprepareMainLooper()
+ActivityThread[新]->ActivityThread[新]: 10.attach()
+ActivityThread[新]->AMS: 【IPC】11.ActivityManager.\ngetService()
+AMS->AMS: 12.attachApplication()
+AMS->AMS: 13.attachApplicationLocked()
+AMS->ActivityThread[新]: 【IPC】14.thread.bindApplication()
+ActivityThread[新]->ActivityThread[新]: 15.sendMessage\n(H.BIND_APPLICATION)
+ActivityThread[新]->ActivityThread[新]: 16.handleBindApplication
+ActivityThread[新]->ActivityThread[新]: 16-1.创建ContextImpl对象
+ActivityThread[新]->ActivityThread[新]: 16-2.创建Instrumentation
+ActivityThread[新]->ActivityThread[新]: 16-3.makeApplication()
+ActivityThread[新]->ActivityThread[新]: 16-4.installContentProviders()
+ActivityThread[新]->ActivityThread[新]: 16-5.mInstrumentation.\ncallApplicationOnCreate()
+ActivityThread[新]->ActivityThread[新]: 17.installContentProviders()
+ActivityThread[新]->ActivityThread[新]: 17-1.installProvider()
+ActivityThread[新]->ActivityThread[新]: 18.localProvider.attachInfo()
+ActivityThread[新]->AMS: 【IPC】17-2.ActivityManager.getService()
+AMS->AMS: 19.publishContentProviders()
+
+```
+>1.获得ContextImpl的内部类：ApplicationContentResolver
+>5.不存在ContentProvider让MAS启动需要的ContentProvider
+>8.通过Process的start方法来完成新进程的启动
+>9-1.首先会创建ActivityThread实例
+>9-2.然后调用attach-进行一系列初始化
+>9-3.然后开始消息循环
+>12.将`ApplicationThread`传输给AMS
+>15. 发送消息给Handler H
+>16. 完成了Application的创建以及ContentProvider的创建
+>16-3. makeApplication()创建Application对象
+>16-4. 启动ContentProvider并调用onCreate方法
+>16-5. 调用Application的onCreate方法
+>17-1. 遍历当前进程的Provider列表并调用installProvider()
+>18.创建ContentProvider对象,并调用onCreate方法
+>19.将已经启动的ContentProvider保存在AMS的ProviderMap中，外部调用者就可以直接从AMS中获取ContentProvider
