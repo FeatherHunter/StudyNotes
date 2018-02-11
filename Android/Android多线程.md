@@ -1,9 +1,11 @@
+转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79132183
 > 包含：线程与进程概念、Java中同步、阻塞队列、线程池和AsyncTask的详细解析
-> 链接：http://blog.csdn.net/feather_wch/article/details/79132183
 
 #   Android中的多线程(45题)
 
 版本：2018/2/4-1
+
+---
 
 [TOC]
 

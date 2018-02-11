@@ -1,11 +1,13 @@
-# View的工作原理
-
 标签： Android View
 
----
-
+转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79080571
 >View所有工作原理的知识点。
 >本文总结归纳View工作原理的所有知识点，以类似面试提问的形式进行记录,适合初次学习或者作为复习面试的材料。
+
+# View的工作原理
+版本：2018/2/8-1
+
+---
 
 [TOC]
 

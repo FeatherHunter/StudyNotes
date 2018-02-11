@@ -1,10 +1,17 @@
+转载请注明链接: http://blog.csdn.net/feather_wch/article/details/79153727
+
 >1. 以面试提问形式总结Android动画所有知识点。适合学习或者复习。
 >2. 主要包括：View动画的定义和使用，属性动画的定义和使用以及插值器、估值器的作用，以及属性动画的原理
 >3. 代码部分用Kotlin/java方式实现。
 
-部分知识点参考自:http://blog.csdn.net/feather_wch/article/details/78625945#6-animationset
-
 #Android动画深入分析(37题)
+版本: 2018/2/11-1
+
+---
+
+[TOC]
+
+部分知识点参考自:http://blog.csdn.net/feather_wch/article/details/78625945#6-animationset
 
 1、Android动画分为三种：
 >1. View动画(Animation)

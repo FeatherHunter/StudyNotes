@@ -1,8 +1,14 @@
 关键字：RemoteView、通知栏、桌面小部件
+
+转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79175518
+
 >本文包含RemoteView在通知栏和桌面小部件上的使用、RemoteViews的内部原理、RemoteViews的意义。
 >所有知识点都以面试提问的形式总结。
 
 #RemoteViews应用与原理：通知栏和桌面小部件
+版本：2018/2/11
+
+---
 
 [TOC]
 

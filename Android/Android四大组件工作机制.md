@@ -1,3 +1,4 @@
+转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79219316
 >1. 直接从源码角度分析四大组件的机制
 >2. 所有知识点以面试题形式汇总，便于学习和复习背诵
 

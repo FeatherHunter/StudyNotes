@@ -1,15 +1,19 @@
+转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79124608
 >本文要点：
 >1. 介绍Android中Drawable的相关知识点，并且介绍如何自定义Drawable。
 >2. Drawable能实现缩放、渐变、逐帧动画、静态矢量图、矢量图动画等功能
 >3. Drawable提供一种比自定义View更轻量级的解决办法，用于实现特定的效果
->4. 布局使用`xml`，代码采用`kotlin`实现
+>4. 布局使用`xml`，代码采用`kotlin/java`实现
+
+
+# Android的Drawable(36题)
+版本：2018/2/11
+
+---
 
 [TOC]
 
 >个人总结的知识点外，部分知识点选自《Android开发艺术探索》-第六章 Drawable
-
-# Android的Drawable(28题)
->包含：Drawable的层次，Drawable的分类，自定义Drawable
 
 1、Drawable是什么？
 > 1. 一种可以在Canvas上进行绘制的抽象的概念
@@ -419,4 +423,155 @@ class CustomDrawable(color: Int) : Drawable(){
         return PixelFormat.TRANSLUCENT
     }
 }
+```
+
+## SVG矢量图
+29、SVG是什么?(Scalable Vetor Graphics)
+>1. 可伸缩矢量图(Android 5.0推出)
+>2. 定义用于网络的基于矢量的图形(在Web上应用非常广泛)
+>3. 使用XML格式定义图形
+>4. 图像缩放不会影响质量
+>5. 万维网联盟标准(与DOM和XSL之类的W3C标准是一个整体）
+
+30、SVG和Bitmap区别
+>1. SVG是一个绘图标准。
+>2. Bitmap是通过每个像素点上存储色彩信息来表示图像。
+>3. SVG放大不会失真, Bitmap会失真。
+>4. Bitmap需要为不同分辨率设计多套图表，SVG绘制一张图就能适配不同分辨率。
+
+31、静态矢量图SVG-VectorDrawable
+>1. 基于XML的静态矢量图
+>2. 采用标签`vector`
+>3. `vector`中`path`是最小单位，创建SVG-用指令绘制SVG图形
+>4. `vector`中`group`将不同`path`组合起来
+
+32、VectorDrawable的`vector`标签有哪些属性
+```xml
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"  // SVG的具体大小
+    android:height="200dp"
+    android:viewportWidth="100" //将宽度分为多少份，与path配合(50份等于100dp)
+    android:viewportHeight="100">
+    <group>   //将不同`path`组合起来
+        <path    //SVG树形结构的最小单位，用指令绘制SVG图形
+            android:name="path1" //该path的名称
+            android:pathData="M 20,80 L 50,80 80,80"
+            android:strokeColor="@color/colorAccent"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"/>
+        <path
+            .../>
+    </group>
+</vector>
+```
+
+33、VectorDrawable的`path`标签的全部指令
+
+|指令|含义|
+|---|---|
+|M = `moveto(M X, Y)`|将画笔移动到指定的坐标位置，但并未绘制|
+|L = `lineto(L X, Y)`|画直线到指定的坐标位置|
+|H = `horizontal lineto(H X)`|画水平线到指定X坐标位置|
+|V = `vertical lineto(V Y)`|画水平线到指定Y坐标位置|
+|C = `curveto(C X1, Y1, X2, Y2, ENDX, ENDY)`|三次贝赛曲线|
+|S = `smooth curveto(S X2, Y2, ENDX, ENDY)`|三次贝赛曲线|
+|Q = `quadratic Belzier curve(Q X, Y, ENDX, ENDY)`|二次贝赛曲线|
+|T = `smooth quadratic Belzier curveTO(T  ENDX, ENDY)`|映射前面路径后的终点|
+|A = `elliptical Arc(A RX, RY, XROTATION, FLAG1, FLAG2, X, Y)`|弧线(RX/RY：椭圆半轴大小 XROTATION：椭圆X轴与水平方向顺时针方向夹角)|
+|Z = closepath()|关闭路径|
+>1. 坐标轴以(0, 0)为中心， X轴水平向右， Y轴水平向下
+>2. 指令大写-绝对定位，参考全局坐标系；指令小写-相对定位，参考父容器坐标系
+>3. 指令和数据间空格可以省略
+>4. 同一指令出现多次，可以只用一个。
+>5. A的参数：RX/RY：椭圆半轴大小 XROTATION：椭圆X轴与水平方向顺时针方向夹角 FLAG1：1-大角度弧线 0-小角度弧线 FLAG2：起点到终点的方向，1-顺时针，2-逆时针 X/Y：终点坐标
+
+34、VectorDrawable实例
+```xml
+//1. 使用`vector`标签定义矢量图VectorDrawable(ic_black_24dp.xml)
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+        android:width="24dp"
+        android:height="24dp"
+        android:viewportWidth="24.0"
+        android:viewportHeight="24.0">
+        <group
+           android:name="test"> //该组的名称：可以在AnimatedVectorDrawable中指定动画效果
+           <path
+              android:fillColor="#FF000000"
+              android:pathData="M12,6c1.11,0 2,-0.9 2,-2 0,-0.38 -0.1,-0.73 -0.29,-1.03L12,0l-1.71,2.97c-0.19,0.3 -0.29,0.65 -0.29,1.03 0,1.1 0.9,2 2,2zM16.6,15.99l-1.07,-1.07 -1.08,1.07c-1.3,1.3 -3.58,1.31 -4.89,0l-1.07,-1.07 -1.09,1.07C6.75,16.64 5.88,17 4.96,17c-0.73,0 -1.4,-0.23 -1.96,-0.61L3,21c0,0.55 0.45,1 1,1h16c0.55,0 1,-0.45 1,-1v-4.61c-0.56,0.38 -1.23,0.61 -1.96,0.61 -0.92,0 -1.79,-0.36 -2.44,-1.01zM18,9h-5L13,7h-2v2L6,9c-1.66,0 -3,1.34 -3,3v1.54c0,1.08 0.88,1.96 1.96,1.96 0.52,0 1.02,-0.2 1.38,-0.57l2.14,-2.13 2.13,2.13c0.74,0.74 2.03,0.74 2.77,0l2.14,-2.13 2.13,2.13c0.37,0.37 0.86,0.57 1.38,0.57 1.08,0 1.96,-0.88 1.96,-1.96L20.99,12C21,10.34 19.66,9 18,9z"/>
+        </group>
+</vector>
+//2. 使用矢量图
+<ImageView
+    android:layout_width="0dp"
+    android:layout_height="match_parent"
+    android:layout_weight="1"
+    android:src="@drawable/ic_black_24dp"/>
+```
+
+35、矢量图动画-AnimatedVectorDrawable
+>1. 针对`静态矢量图-VectorDrawable`来做动画
+>2. `xml`标签为`animated-vector`
+>3. 在`target`子标签下指明`VectorDrawable`的名字(都是`android:name="..."`属性指明)，并指定动画效果`android:animation="@animator/..."`
+
+36、AnimatedVectorDrawable实例
+```xml
+//1. 静态矢量图-VectorDrawable(vector_two_line.xml)
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="100"
+    android:viewportHeight="100">
+    <group>
+        <path
+            android:name="path1" //路径1的名称
+            android:pathData="M 20,80 L 50,80 80,80"
+            android:strokeColor="@color/colorAccent"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"/>
+        <path
+            android:name="path2" //路径2的名称
+            android:pathData="M 20,20 L 50,20 80,20"
+            android:strokeColor="@color/colorAccent"
+            android:strokeWidth="3"
+            android:strokeLineCap="round"/>
+    </group>
+</vector>
+
+//2. 轨迹动画效果-属性动画ObjectAnimator(res/animator/trimpath_animator)
+<?xml version="1.0" encoding="utf-8"?>
+<objectAnimator xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="1000"
+    android:propertyName="trimPathEnd"
+    android:valueFrom="0"
+    android:valueTo="1"
+    android:valueType="floatType"
+    android:interpolator="@android:interpolator/accelerate_decelerate">
+</objectAnimator>
+
+//3. 粘合静态SVG和属性动画：AnimatedVectorDrawable(vector_trimpath_anim.xml)
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/vector_two_line"> //静态SVG
+   <target
+       android:animation="@animator/trimpath_animator" //属性动画
+       android:name="path1"> //静态SVG中路径1的名称
+   </target>
+   <target
+       android:animation="@animator/trimpath_animator" //属性动画
+       android:name="path2"> //静态SVG中路径2的名称
+   </target>
+</animated-vector>
+
+//4. 布局中使用AnimatedVectorDrawable
+<ImageView
+            android:id="@+id/trimpath_anim_imageview"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:src="@drawable/vector_trimpath_anim"/> //动画矢量图
+```
+>代码中开启动画：
+```
+ImageView imageView = (ImageView) findViewById(R.id.trimpath_anim_imageview);
+((Animatable)imageView.getDrawable()).start();
 ```

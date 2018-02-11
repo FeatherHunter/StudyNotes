@@ -1,11 +1,16 @@
 关键字：Window WindowManager Android
 
+转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79186967
+
 >1. 以面试题形式总结Window、WindowManager所有知识点
 >2. 总结Window和WindowManager的基本使用以及概念
 >3. 分析Window的内部机制
 >4. 分析Activity、Dialog、Toast的Window创建过程
 
 #Window和WindowManager
+版本：2018/2/9-1
+
+---
 
 [TOC]
 
@@ -316,3 +321,181 @@ if (cb != null && !isDestroyed()) {
 >1. `Toast`也是基于`Window`来实现的
 > 2. `Toast`具有定时取消功能，系统采用`Handler`实现
 > 3. `Toast`内部有两类IPC过程：1-Toast访问NotificationManagerService；2-NotificationManagerService回调`Toast`的`TN`接口
+
+21、Toast的show()方法原理分析
+```java
+/**
+ * Toast.java中显示和隐藏都是IPC过程
+ */
+public void show() {
+    if (mNextView == null) {
+        throw new RuntimeException("setView must have been called");
+    }
+    //1. 获取NotificaitonMnagerService
+    INotificationManager service = getService();
+    String pkg = mContext.getOpPackageName();
+    //2. TN是Binder类，NotificationManagerService处理Toast显示时，会跨进程回调TN中的方法
+    //3. TN运行在Binder线程池中，需要通过Hanlder将其切换到(发送Toast请求的)线程中
+    //4. 使用Hanlder意味着Toast无法在没有Looper的线程中弹出
+    TN tn = mTN;
+    tn.mNextView = mNextView;
+    try {
+        //5. NotificationManagerService进行toast
+        service.enqueueToast(pkg, //当前应用包名
+                tn,
+                mDuration);
+    } catch (RemoteException e) {
+        // Empty
+    }
+}
+
+//NotificationManagerService
+public void enqueueToast(String pkg, ITransientNotification callback, int duration)
+{
+    ...参数合法性判断...
+    ...省略...
+    synchronized (mToastQueue) {
+        .......
+        try {
+            //1. 将Toast请求封装为`ToastRecord`
+            ToastRecord record;
+            int index = indexOfToastLocked(pkg, callback);
+            //2. 如果ToastRecord已经在队列中(mToastQueue)，则直接更新
+            if (index >= 0) {
+                record = mToastQueue.get(index);
+                record.update(duration);
+            } else {
+                /**=================================================================
+                 *3. 限制非系统应用，队列最多能存50个(MAX_PACKAGE_NOTIFICATIONS)。
+                 *   防止DOS(Denail of Service)攻击：
+                 *    如果一个应用大量连续弹出Toast，会导致其他应用没有机会弹出Toast
+                 *===============================================================*/
+                if (!isSystemToast) {
+                    int count = 0;
+                    final int N = mToastQueue.size();
+                    for (int i=0; i<N; i++) {
+                        final ToastRecord r = mToastQueue.get(i);
+                        if (r.pkg.equals(pkg)) { //同一个包
+                            count++;
+                            if (count >= MAX_PACKAGE_NOTIFICATIONS) {
+                                Slog.e(TAG, "Package has already posted " + count
+                                        + " toasts. Not showing more. Package=" + pkg);
+                                return;
+                            }
+                        }
+                    }
+                }
+                //4. 将Toast存放到队列中
+                record = new ToastRecord(callingPid, pkg, callback, duration);
+                mToastQueue.add(record);
+                ......
+            }
+            /**===========================================================
+             * 5. 用于显示当前Toast
+             *  Toast显示由ToastRecord的callback(Toast的TN对象的远程Binder)完成
+             *  通过CallBack调用了TN中的方法，该方法运行在Toast请求方的Binder线程池中
+             *===========================================================*/
+            //5. 用于显示当前Toast。
+            if (index == 0) {
+                showNextToastLocked(); //Toast显示由ToastRecord的callback(Toast的TN对象的远程Binder)完成
+            }
+        } finally {
+            Binder.restoreCallingIdentity(callingId);
+        }
+    }
+}
+
+//NotificationManagerService.java
+void showNextToastLocked() {
+    ToastRecord record = mToastQueue.get(0);
+    while (record != null) {
+         ...省略...
+        try {
+            //1. 跨进程调用Toast中TN内部的show()方法进行展示
+            record.callback.show();
+            /**===========================================================
+             * 2. 会发送一个延时消息(取决于Toast的时长)。
+             *  1-Message最终会由NotificationMaService中的WorkerHandler处理
+             *  2-调用handleTimeout->cancelToastLocked->`record.callback.hide();
+             *  3-最终调用TN中的hide方法并且将ToastRecord从队列中移除
+             *===========================================================*/
+            scheduleTimeoutLocked(record);
+            return;
+        } catch (RemoteException e) {
+            ...省略...
+        }
+    }
+}
+```
+
+21、Toast的cancel()方法原理分析
+>1. 内部调用`NotificationManagerService`的cancelToast方法()
+>2. cancelToast方法()->cancelToastLocked()->record.callback.hide();
+>3. record.callback.hide()通过IPC调用TN中的hide方法
+>4. 最后将ToastRecord移除队列
+```java
+//Toast.java
+public void cancel() {
+    mTN.hide();
+
+    try {
+        getService().cancelToast(mContext.getPackageName(), mTN);
+    } catch (RemoteException e) {
+        // Empty
+    }
+}
+```
+
+22、Toast的TN(Binder)内部机制
+```java
+//Toast.java TN
+private static class TN extends ITransientNotification.Stub {
+    ...省略...
+    WindowManager mWM;
+    TN() { ...省略... }
+    //1. 开启了mShow的Runnable
+    public void show() {
+        mHandler.post(mShow);
+    }
+    //2. 开启了mHide的Runnable
+    public void hide() {
+        if (localLOGV) Log.v(TAG, "HIDE: " + this);
+        mHandler.post(mHide);
+    }
+    //3. 调用handleShow()进行显示
+    final Runnable mShow = new Runnable() {
+        public void run() {
+            handleShow();
+        }
+    };
+    //4. 调用handleHide()进行显示
+    final Runnable mHide = new Runnable() {
+        public void run() {
+            handleHide();
+            mNextView = null;
+        }
+    };
+    //5. 真正完成显示功能
+    public void handleShow() {
+        ......
+        //7. 将Toast视图添加到Window中
+        mWM = (WindowManager)context.getSystemService(Context.WINDOW_SERVICE);
+        ......
+        mWM.addView(mView, mParams);
+        ......
+    }
+    //6. 真正完成隐藏功能
+    public void handleHide() {
+        if (mView != null) {
+            //8. 将Toast视图从Window中移除
+            if (mView.getParent() != null) {
+                mWM.removeView(mView);
+            }
+            mView = null;
+        }
+    }
+    private void trySendAccessibilityEvent() {
+        ......
+    }
+}
+```

@@ -1,3 +1,4 @@
+转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79190230
 # IPC-进程间通信(62题)
 版本：2018/2/4-1
 

@@ -1,3 +1,4 @@
+转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79263855
 >介绍Handler、Looper、MessageQueue、ThreadLocal和主线程ActivityThread等内容
 
 #Android的消息机制
