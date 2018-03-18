@@ -44,7 +44,7 @@
 ><!doctype html>
 ><html>
 >  <head>
->  @*<script type="text/javascript" src="afile.js></script>*@  
+>  @*<script type="text/javascript" src="afile.js></script>*@    //注释
 >  @*<script type="text/javascript" src="bfile.js></script>*@
 >  </head>
 >  <body>
@@ -56,7 +56,7 @@
 >```
 
 4、延迟脚本：defer属性
-> defer属性：脚本会延迟到整个页面都解析完成后再执行(先下载，延迟执行，按照原先的顺序执行)。
+> 1.defer属性：脚本会延迟到整个页面都解析完成后再执行(先下载，延迟执行，按照原先的顺序执行)。
 >- 浏览器不适配，有的浏览器会忽略这个属性，因此，建议js引用放在页面底部。
 
 5、异步脚本
@@ -70,7 +70,7 @@
 >```
 
 6、在XHTML中的用法(XHTML：可扩展超文本标记语言)
-> 1.有特殊的规则确定<script>元素中哪些内容可以被解析；
+> 1.有特殊的规则确定`<script>`元素中哪些内容可以被解析；
 > 例如：比较运算符"<"会在XHTML中当做一个新的标签(标签后跟空格会出现语法错误)，
 > 解决方法：
 > 1. 用`&lt`来代替；
@@ -96,3 +96,29 @@
 **注：最初的两种模式主要影响CSS内容的呈现，准标准模式主要体现在处理图片间隙的时候。**
 > 2.文档开头没有发现任何文档类型的声明，浏览器会默认开启混杂模式；
 > 3.开启标准模式：
+>```
+><!DOCTYPE html>    //HTML5
+>```
+> 4.准标准模式，可以通过过渡型(transitional)和框架型(frameset)文档类型来触发；
+>```
+><!DOCTYPE HTML PUBLIC       //html 4.01过渡型
+>"-//W3C//DTD HTML 4.01 Transitional//EN"
+>"http://www.w3.org/TR/html4/loose.dtd">
+><!DOCTYPE HTML PUBLIC       //html 4.01框架集型
+>"-//W3C//DTD HTML 4.01 Frameset//EN"
+>"http://www.w3.org/TR/html4/frameset.dtd">
+>```
+
+9、<noscript>元素
+> 1.作用：当浏览器不支持JavaScript时，显示其替代的内容。
+> 2.作用域：可以包含能够出现在<body>中的任何元素（除了`<script>`元素）
+>```
+><body>
+>  <noscript>
+>    <p>本页面需要浏览器支持</p>
+>  </noscript>
+></body>
+>```
+> 3.触发条件：
+> 1. 浏览器不支持脚本；
+> 2. 浏览器支持脚本，但脚本被禁用；
