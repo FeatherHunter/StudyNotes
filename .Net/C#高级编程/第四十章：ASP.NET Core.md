@@ -523,7 +523,7 @@ JSON格式的mime类型是application/json，可以通过HttpResponse的ContentT
 > ```
 
 11、使用中间件
-> `ASP.NET Core`很容易创建在调用控制器之前调用的模块。这可以用于添加标题信息、验证令牌、构建缓存、创建日志跟踪等。一个中间件链接另一个中间件模块，知道调用所有连接的中间件类型为止。在一个中间件类型中，创建构造函数，接收对下一个中间件类型的引用。RequestDelegate是一个委托，它接收HttpContext作为参数，并返回一个Task。
+> `ASP.NET Core`很容易创建在调用控制器之前调用的模块。这可以用于添加标题信息、验证令牌、构建缓存、创建日志跟踪等。一个中间件链接另一个中间件模块，直到调用所有连接的中间件类型为止。在一个中间件类型中，创建构造函数，接收对下一个中间件类型的引用。RequestDelegate是一个委托，它接收HttpContext作为参数，并返回一个Task。
 
 12、会话状态
 > 使用中间件实现的服务是会话状态。会话状态允许在服务器上暂时记忆客户端的数据。用户第一次从服务器请求页面时，会启动会话状态。用户在服务器上保持页面一直打开时，会话状态会继续到超时(通常是10分钟)为止。用户导航到新页面时，为了仍在服务器上保持状态，可以把状态写入一个会话。超时后，会话数据会被删除。为了识别会话，可在第一个请求上创建一个带会话标识符的临时cookies。这个cookie与每个请求一起从客户端返回到服务器，在浏览器关闭后，就删除cookie。
@@ -597,4 +597,4 @@ JSON格式的mime类型是application/json，可以通过HttpResponse的ContentT
 >         }
 > ```
 > >- **注意：用户密钥存储在特定的文件中**
-> > > 这里直接调用AddUserSecrets方法会产生一个错误，会告诉我们找不到UserSecretsId。此时，我们需要在.csproj文件中配置，UserSecretsId的值是VS2017自动生成的，保存在C:\Users\admin\AppData\Roaming\Microsoft\UserSecrets\17d2ccdb-ef09-4020-90bf-5ba654f433dc，其中17d2ccdb-ef09-4020-90bf-5ba654f433dc就是UserSecretsId的值。（找文件夹更简单的方式，直接右键项目，点击"Manage User Secrets"，就可以找到文件路径）。
+> > > 这里直接调用AddUserSecrets方法会产生一个错误，会告诉我们找不到UserSecretsId。此时，我们需要在.csproj文件中配置，UserSecretsId的值是VS2017自动生成的，保存在`C:\Users\admin\AppData\Roaming\Microsoft\UserSecrets\17d2ccdb-ef09-4020-90bf-5ba654f433dc`，其中17d2ccdb-ef09-4020-90bf-5ba654f433dc就是UserSecretsId的值。（找文件夹更简单的方式，直接右键项目，点击"Manage User Secrets"，就可以找到文件路径）。
