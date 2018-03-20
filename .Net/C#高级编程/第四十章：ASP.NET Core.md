@@ -450,9 +450,10 @@ JSON格式的mime类型是application/json，可以通过HttpResponse的ContentT
 > > ```
 > > services.AddTransient<ISampleService, DefaultSampleService>();  //在startup.cs中的ConfigureServices方法中实现
 > > ```
-> > >- 1、AddTransient方法：每次注入服务时，都会实例化新的服务；
+> > >- 1、AddTransient方法：每次注入服务时，都会实例化新的服务，得到全新的实例；
 > > >- 2、AddSingleton方法：服务只实例化一次，每次注入都使用相同的实例；
 > > >- 3、AddInstance方法：需要实例化一个服务，并将实例传递给该方法。
+> > >- 4、AddScoped方法：如果创建了若干个"Scope"，依赖注入会确保在同一个Scope里，得到同一个实例；不同的Scope里的实例是不同的。
 > > > ```
 > > > var sampleService = new DefaultSampleService();
 > > > services.AddInstance<ISampleService>(sampleService);

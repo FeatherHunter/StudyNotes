@@ -229,3 +229,125 @@
 >    </ul>
 >}
 >```
+
+16、部分视图
+> 1.定义：定义视图内的内容，没有布局。
+
+17、使用服务器端代码中的部分视图
+> 1.创建一个模型；
+>```
+>public class EventsAndMenusContext     //要先创建Event类，定义其字段
+>{
+>    private IEnumerable<Event> events = null;
+>    public IEnumerable<Event> Events =>
+>        events ?? (events = new List<Event>()
+>        {
+>            new Event
+>            {
+>                Id =1,
+>                Text ="Formula 1 G.P. Australia, Melbourne",
+>                Day=new DateTime(2016, 4, 3)
+>            },
+>            new Event
+>            {
+>                Id =2,
+>                Text ="Formula 1 G.P. China, Shanghai",
+>                Day = new DateTime(2016, 4, 10)
+>            }
+>        });
+>}
+>```
+> 2.依赖注入启动代码；
+>```
+>public void ConfigureServices(IServiceCollection services)  //在startup.cs文件中注册服务
+>{
+>    services.AddScoped<EventsAndMenusContext>();
+>}
+>```
+> 3.通过控制器的构造函数注入模型；
+>```
+>private EventsAndMenusContext _context;
+>public ViewsDemoController(EventsAndMenusContext context)
+>{
+>    _context = context;
+>}
+>```
+> 4.在控制器中创建方法，返回模型视图；
+>- 显示部分视图的方法：
+> 1. Html.PartialAsync()：异步方法，返回Task<HtmlString>。第一个参数接受部分视图的名称，第二个参数是允许传递的模型。
+> 2. Html.Partial()：同步变体，返回htmlString的扩展方法。
+> 3. html.RenderPartialAsync()：HTML的辅助方法，返回Task。该方法的部分视图的内容直接写入响应流，可以在Razor代码块中使用RenderPartialAsync了。
+>```
+>public IActionResult UseAPartialView1() => View(_context);
+>
+>@model MVCSampleApp.Models.EventsAndMenusContext   //UseAPartialView1.cshtml文件中
+>@{
+>    ViewBag.Title = "Use a Partial View";
+>    ViewBag.EventsTitle = "Live Events";
+>}
+><h2>Use a Partial View</h2>
+><div>This is the main view</div>
+><div>
+>    @await Html.PartialAsync("ShowEvents", Model.Events)  
+></div>
+>```
+> 5.创建部分视图。
+> 1. 可以访问模型；
+> 2. 可以使用ViewBag属性访问字典；
+>```
+>@using MVCSampleApp.Models    //在ShowEvents.cshtml文件中
+>@model IEnumerable<Event>
+><h2>
+>    @ViewBag.EventsTitle
+></h2>
+><table>
+>    @foreach (var item in Model)
+>    {
+>        <tr>
+>            <td>@item.Day.ToString("d")</td>
+>            <td>@item.Text</td>
+>        </tr>
+>    }
+></table>
+>```
+
+18、从控制器中返回部分视图
+> 1.在控制器中创建一个方法，返回标准视图；
+>```
+>public ActionResult UseAPartialView2() => View();
+>
+>@model MVCSampleApp.Models.EventsAndMenusContext   //标准视图
+>@{
+>    Layout = null;
+>    ViewBag.Title = "Use a Partial View";
+>}
+><script src="~/lib/jquery/dist/jquery.js"></script>
+><script>
+>    $(function () {
+>        $("#getEvents").click(function () {
+>            $("#events").load("/ViewsDemo/ShowEvents");
+>        });
+>    });
+></script>
+><h2>Use a Partial View</h2>
+><div>this is the main view</div>
+><button id="getEvents">Get Events</button>
+><div id="events"></div>
+>```
+> 2.在控制器中创建一个方法，返回部分视图；
+>```
+>public ActionResult ShowEvents()
+>{
+>    ViewBag.EventsTitle = "Live Events";
+>    return PartialView(_context.Events);  //返回部分视图
+>}
+>```
+
+19、视图组件与部分视图的区别
+> 1.视图组件与控制器无关。
+
+20、视图组件的应用
+> 1.独立于单个控制器：
+> 1. 有菜单的动态导航；
+> 2. 登录面板；
+> 3. 博客的侧栏功能等。
