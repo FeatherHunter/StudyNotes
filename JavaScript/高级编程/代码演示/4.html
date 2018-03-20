@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+  <head>
+  </head>
+  <body>
+    <!-- 这里放内容 -->
+    <button type="button" onclick="myClick()">nihao</button>
+
+    <script>
+      function myClick(){
+        var person = new Object();
+        person.name="John";
+        console.log(person.name);
+
+        var name = "Hello";
+        name.age=12;
+        console.log(name.age);
+
+        var person=new Object();
+        setName(person);
+        console.log(person.name);
+      }
+      function setName(obj){
+        obj.name="Niky";
+        obj = new Object();
+        obj="Kitty";
+      }
+
+    </script>
+  </body>
+</html>
