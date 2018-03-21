@@ -61,6 +61,7 @@
 |7|Bolts|Bolts是一个面向iOS和Android的底层库集合，分别为Bolts-iOS和Bolts-Android，由Facebook和Parse共同设计完成，于2014年1月基于BSD许可协议开源，其所有源码均托管到GitHub上。Bolts能够让移动应用开发变得更加简单，其组件与Parse及Facebook服务完全无关，因此，开发者无需拥有Parse或Facebook开发者账户即可直接使用。||
 |8|Infer|Infer是一个静态分析工具，用来检测安卓和苹果系统应用发布前的缺陷。如果你给Infer一些Objective-C，Java或C代码，它会生成一个潜在的缺陷列表。Infer工具也有助于防止系统崩溃和性能下降。Infer的目标是空指针异常、资源漏洞、内存溢出之类的致命缺陷。||
 |9|shimmer-android|可以用一个简单灵活的方法在你的安卓 APP 上做出闪光效果。|
+|10|KeyFrames|KeyFrames 由 Facebook 开源的图形库，其中包含一个脚本，它可以从 AE 文件中提取动画数据，然后为 Android 和 iOS 提供渲染库。|
 
 ###Yalantis
 |序号|开源库名称|简介|教程|
@@ -96,6 +97,11 @@
 |2|Sophix|阿里巴巴热修复框架||
 |3|Atlas|阿里巴巴组件化框架||
 
+###腾讯
+|序号|开源库名称|简介|教程|
+|---|---|---|---|
+|1|Tinker|微信开源的 Android 热修复框架，支持在无需升级APK的前提下更新 dex, library and resources 文件。||
+
 ##开源大神
 ###JakeWharton
 |序号|开源库名称|简介|教程|
@@ -109,7 +115,20 @@
 xBus - xBus - 简洁的EventBus实现。
 Small - 做最轻巧的跨平台插件化框架，目前已支持Android、iOS以及html5插件。并且三者之间可以通过同一套javascript接口进行通信。
 
+###开发工具库
+
+1. [AndroidUtilsCode](https://www.jianshu.com/p/677856023d0c)
+2. [Codota](https://www.codota.com/)-搜索最好的 Android 代码
+
 ###UI
+|开源库名称|简介|教程|
+|---|---|---|
+|FlexboxLayout|Android 排版库FlexboxLayout 是 Android 上实现了类似 CSS Flexible Box Layout Module 效果的界面排版。||
+|InfiniteCycleViewPager|InfiniteCycleViewPager 具有双向定位和交互效果，可以水平和垂直滚动。||
+|Android 库 Epoxy|Epoxy 是一个基于 RecyclerView 实现复杂屏幕效果的 Android 库。Epoxy 通过将 ViewHolder、项目类型、项目Id、列数等等抽象成模板，以简化与多视图类型构建屏幕效果。此外，Epoxy 还增加了对于保存视图状态以及自动区分项目变化的支持。||
+|ViewPagerCards|ViewPagerCards，这是一个简单的实现卡片式 ViewPager 效果的 DEMO。该项目支持“碎片”和标准视图，可查看 CardPagerAdapter 和 CardFragmentPagerAdapter 类。||
+|StylishMusicPlayer|采用了RxJava开发的本地音乐播放器，UI 图标都是 https://material.io 上找的。||
+
 1. awesome-android-ui: 里面网罗了所有你见过的、没见过的各种 UI 效果，涉及 Material、Layout、Button、List、ViewPager、Dialog、Menu、Parallax、Progress 等等，而且有相对应的截图、gif 展示，以后应对设计师各种效果的时候有很大的参考帮助作用。
 
 1. SlidingMenu: Google的侧滑菜单`NavigationDrawer`出来之后就被放弃了。
@@ -146,12 +165,13 @@ Android-ObservableScrollView
 2. android-volley： 这个框架把AsyncHttpClient 和 Universal-Image-Loader 的优点集于了一身，既可以像 AsyncHttpClient一样非常简单地进行 HTTP 通信，也可以像 Universal-Image-Loader 一样轻松加载网络上的图片， 这个库并不是官方的，只是托管同步在 Maven, 官方只提供的 Jar 包
 
 
-###开发工具库
-
-1. [AndroidUtilsCode](https://www.jianshu.com/p/677856023d0c)
-2. [Codota](https://www.codota.com/)-搜索最好的 Android 代码
+###算法
+|开源库名称|简介|教程|
+|---|---|---|
+|awesome-java-leetcode|现在面试大公司，不可避免的需要面试算法题，算法的能力其实是可以锻炼的，很好的一个途径就是Leetcode，为了高效的练习，可以关注下该库，包含解题思路，代码等。|https://github.com/Blankj/awesome-java-leetcode|
 
 #参考资料
+1. [2018年开发者不可错过的开源工具 —— Android 篇](http://mp.weixin.qq.com/s/SPUPGSufDFs5eBhlAkK4vw)
 1. [github中排名前100的Android库](https://www.cnblogs.com/Free-Thinker/p/7423033.html)
 1. [Android开源库和资料汇总](http://blog.csdn.net/wu996489865/article/details/53585433)
 1. [Google最热门60款开源项目](https://www.cnblogs.com/svili/p/7889436.html)
@@ -159,3 +179,5 @@ Android-ObservableScrollView
 1. [github: 最常见开源库汇总](http://blog.csdn.net/wu996489865/article/details/53585433)
 1. [阿里巴巴、百度等公司开源](http://blog.csdn.net/wh211212/article/details/70147572)
 1. [Yalantis 酷炫开源UI项目](http://blog.csdn.net/u013812939/article/details/45718431)
+2. [推荐3个开源项目](http://mp.weixin.qq.com/s/2VQsf4icbLzPPzQT8z1SjA)
+3. [国内可用的第三方库-百度翻译等等](https://mp.weixin.qq.com/s/xmAvD9r4ocWTxhfO2w1YmQ)
