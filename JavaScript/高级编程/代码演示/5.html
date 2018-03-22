@@ -1,0 +1,65 @@
+<!doctype html>
+<html>
+  <head>
+  </head>
+  <body>
+    <!-- 这里放内容 -->
+    <button type="button" onclick="myClick()">测试</button>
+
+    <script>
+      function myClick(){
+        var colors = ["red","green","blue"];
+        console.log(colors.toString());
+        console.log(colors.valueOf());
+        console.log(colors.toLocaleString());
+
+        var person1={
+          toLocaleString:function(){
+            return "Nick";
+          },
+          toString:function(){
+            return "Nich"
+          }
+        };
+        var person2={
+          toLocaleString:function(){
+            return "Grid"
+          },
+          toString:function(){
+            return "Gred"
+          }
+        };
+        var person = [person1,person2];
+
+        console.log(person.toString());
+        console.log(person.toLocaleString());
+
+        var colors = ["red","blue","green"];
+        console.log(colors.join(","));
+        console.log(colors.join("||"));
+        console.log(colors.join());
+        console.log(colors.join(undefined));
+
+        var colors = new Array();
+        var count = colors.push("red","blue");
+        console.log(count);
+        count = colors.push("green");
+        console.log(colors);
+        console.log(colors.length);
+        var item = colors.pop();
+        console.log(item);
+        console.log(colors.length);
+
+        var colorss = ["red","green","blue","yellow","purple"];
+        var color2 = colorss.slice(1);
+        var color3 = colorss.slice(1,4);
+        console.log(color2);
+        console.log(color3);
+        removed = colorss.splice(1,1,"red","purple");
+        console.log(colorss);
+        console.log(removed);
+      }
+
+    </script>
+  </body>
+</html>
