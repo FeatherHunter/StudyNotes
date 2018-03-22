@@ -58,6 +58,13 @@
         removed = colorss.splice(1,1,"red","purple");
         console.log(colorss);
         console.log(removed);
+
+        var pattern = new RegExp("\\[bc\\]at","i");
+        alert(pattern.global);         //false
+        alert(pattern.ignoreCase);     //true
+        alert(pattern.multiline);      //false
+        alert(pattern.lastIndex);      //0
+        alert(pattern.source);         
       }
 
     </script>
