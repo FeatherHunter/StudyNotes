@@ -59,14 +59,76 @@
         console.log(colorss);
         console.log(removed);
 
-        var pattern = new RegExp("\\[bc\\]at","i");
-        alert(pattern.global);         //false
-        alert(pattern.ignoreCase);     //true
-        alert(pattern.multiline);      //false
-        alert(pattern.lastIndex);      //0
-        alert(pattern.source);         
-      }
+        var text = "cat,bat,sat,cat";
+        var pattern1 = /.at/;
+        var matches = pattern1.exec(text);
+        console.log(matches.index);
+        console.log(matches[0]);
+        console.log(pattern1.lastIndex);
 
+        matches = pattern1.exec(text);
+        console.log(matches.index);
+        console.log(matches[0]);
+        console.log(pattern1.lastIndex);
+
+        var text1 = "this has been a short summer";
+        var pattern = /(.)hort/g;
+        if(pattern.test(text1)){
+          console.log("测试RegExp构造函数属性");
+          console.log(RegExp.input);
+          console.log(RegExp.leftContext);
+          console.log(RegExp.rightContext);
+          console.log(RegExp.lastMatch);
+          console.log(RegExp.lastParen);
+          console.log(RegExp.multiline);
+          console.log("短属性名");
+          console.log(RegExp["$_"]);
+          console.log(RegExp["$&"]);
+        }
+        var pattern = /(..)or(.)/g;
+        if(pattern.test(text1)){
+          console.log("捕获组属性");
+          console.log(RegExp.$1);
+          console.log(RegExp.$2);
+        }
+
+        function createComparisonFunction(propertyName){
+          return function(object1,object2){
+            var value1=object1[propertyName];
+            var value2=object2[propertyName];
+            if(value1<value2){
+              return -1;
+            }else if(value1>value2){
+              return 1;
+            }else{
+              return 0;
+            }
+          }
+        }
+
+        var data = [{name:"Wello",age:10},{name:"John",age:21}];
+        data.sort(createComparisonFunction("name"));
+        console.log("测试函数值传递");
+        console.log(data[0].name);
+
+        window.color = "red";
+        var o = {color:"blue"};
+        function sayColor(){
+          console.log(this.color);
+        }
+        console.log("测试this的作用");
+        sayColor();
+        o.say = sayColor;
+        o.say();
+
+        function outer(){
+          console.log("被inner函数引用");
+        }
+        function inner(){
+          console.log(arguments.callee.caller);
+        }
+        outer();
+      }
     </script>
   </body>
 </html>
