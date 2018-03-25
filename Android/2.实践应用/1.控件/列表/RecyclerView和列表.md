@@ -5,7 +5,7 @@
 2. RecyclerView给出最基本的步骤，和最简单的实现方法。
 
 #列表和RecyclerView
-版本:2018/3/20-1
+版本:2018/3/23-1(18:10)
 
 ##ListView
 比较简单，四步骤：
@@ -43,7 +43,7 @@ convertView+ViewHolder是重写getView()的最好办法，能减少`findViewById
 >3. 继承并实现`RecyclerView.Adapter`(ViewHolder的实现，`点击事件`的实现，定义`列表等数据结构`用于存储数据)
 >4. 给`RecyclerView`设置`Adapter`, 并且设置监听器
 
-5、RecyclerView的具体实现
+5、RecyclerView的最简单实现
 >1-Activity的布局和`Item`的布局
 ```xml
 //activity_recler_view.XMML
@@ -62,14 +62,13 @@ convertView+ViewHolder是重写getView()的最好办法，能减少`findViewById
 //reclerview_item.xml
 <LinearLayout
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical"
-    tools:layout_editor_absoluteY="25dp">
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
 
     <TextView
         android:id="@+id/item_text"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="50dp"
         android:gravity="center"
         android:text="TextView"
         android:textColor="@color/colorAccent"
@@ -114,7 +113,7 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter{
     //4. 通过Item的布局创建ViewHolder
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
-        return new ViewHolder(mInflater.inflate(R.layout.reclerview_item, null));
+        return new ViewHolder(mInflater.inflate(R.layout.reclerview_item, parent, false)));
     }
     //5. 完成类似于getView里面显示数据的功能
     @Override
@@ -160,7 +159,6 @@ public class ReclerViewActivity extends Activity {
         //1. 布局
         LinearLayoutManager linearLayoutManager = new LinearLayoutManager(this);
         mRecyclerView.setLayoutManager(linearLayoutManager);
-        mRecyclerView.setHasFixedSize(true);
         //2. 适配器
         mRecyclerViewAdapter = new RecyclerViewAdapter(this, arrayList);
         mRecyclerViewAdapter.setOnItemClickListener(new RecyclerViewAdapter.ItemClickListener() {
@@ -174,5 +172,49 @@ public class ReclerViewActivity extends Activity {
 }
 ```
 
+6、RecyclerView的基本使用
+```java
+mRecyclerView = findView(R.id.id_recyclerview);
+//1. 设置布局管理器
+mRecyclerView.setLayoutManager(layout);
+//2. 设置adapter
+mRecyclerView.setAdapter(adapter)
+//3. 设置Item增加、移除动画
+mRecyclerView.setItemAnimator(new DefaultItemAnimator());
+//4. 添加分割线
+mRecyclerView.addItemDecoration(new DividerItemDecoration(getActivity(), DividerItemDecoration.HORIZONTAL_LIST));
+
+```
+
+###分割线定制：ItemDecoration
+7、ItemDecoration的使用和主要方法的要点(可以参考官方提供的`DividerItemDecoration`的内部实现)
+>1. `ItemDecoration`是抽象类
+>2. 使用方法；`mRecyclerView.addItemDecoration() `
+>3. 四个方法：`onDraw()\onDrawOver()\getItemOffsets\getItemOffsets`
+>4. `addItemDecoration()`后，绘制顺序`onDraw()->onDrawOver()`-复写其中一个即可。
+>5. `getItemOffsets` 可以通过`outRect.set()`为每个Item设置一定的偏移量，主要用于`绘制Decorator`。
+```java
+mRecyclerView = findViewById(R.id.activity_imageview_recyclerview);
+mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+mRecyclerView.setAdapter(mRVAdapter = new RVAdapter(this, cityNames));
+//1. 这里设置分割线
+mRecyclerView.addItemDecoration(new DividerItemDecoration(this, DividerItemDecoration.VERTICAL));
+```
+
+8、LayoutManager的布局管理器
+>系统提供的布局管理器有三种:
+```java
+//1. LinearLayoutManager
+mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+//2.GridLayoutManager
+mRecyclerView.setLayoutManager(new GridLayoutManager(this, 4));
+//3. StaggeredGridLayoutManager: 瀑布流
+mRecyclerView.setLayoutManager(new StaggeredGridLayoutManager(4, StaggeredGridLayoutManager.VERTICAL));
+```
+
+
 ##参考资料
-1. [ListView、RecyclerView全面解析](https://www.jianshu.com/p/4e8e4fd13cf7)
+1. [RecyclerView学习链接列表](http://www.wanandroid.com/article/query?k=recyclerview)
+1. [ Android RecyclerView 使用完全解析](https://blog.csdn.net/lmj623565791/article/details/45059587)
+1. [clipToPadding解决列表滚动无法触及到Padding的问题](https://blog.csdn.net/litefish/article/details/52471273)
+2. [深入理解 RecyclerView 系列之一：ItemDecoration](https://blog.piasy.com/2016/03/26/Insight-Android-RecyclerView-ItemDecoration/#fn:add-together)
