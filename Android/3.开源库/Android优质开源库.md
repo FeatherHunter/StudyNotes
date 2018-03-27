@@ -22,7 +22,7 @@
 
 |序号|开源库名称|简介|教程|
 |---|---|---|---|
-|1|[glide](https://github.com/bumptech/glide)|Android的图片加载缓存库||
+|1|[glide-Bump Technologies出品](https://github.com/bumptech/glide)|Android的图片加载缓存库||
 |2|[zxing](https://github.com/zxing/zxing)|二维码||
 |3|Dagger2|Dagger2是Dagger的升级版，是一个依赖注入框架，现在由Google接手维护。|[Dagger2从入门到放弃再到恍然大悟](https://www.jianshu.com/p/39d1df6c877d)|
 |4|[gson](https://github.com/google/gson)|Java对象和JSON互相转换||
@@ -52,7 +52,7 @@
 
 |序号|开源库名称|简介|教程|
 |---|---|---|---|
-|1|Fresco|Fresco 是一个强大的图片加载组件， 支持加载 Gif 图和 WebP 格式， 支持 Android2.3(API level 9) 及其以上系统||
+|1|[Fresco](https://github.com/facebook/fresco)|Fresco 是一个强大的图片加载组件， 支持加载 Gif 图和 WebP 格式， 支持 Android2.3(API level 9) 及其以上系统|[Fresco官方中文教程](https://www.fresco-cn.org/docs/index.html)|
 |2|React Native||
 |3|Stetho|一个强大的 Android 调试工具，使用该工具你可以在 ChromeDeveloper Tools 查看 App 的布局， 网络请求(仅限使用 Volley， okhttp 的网络请求库)， sqlite,preference, 一切都是可视化的操作，无须自己在去使用 adb, 也不需要 root 你的设备||
 |4|Rebound|Facebook弹性动画库, 可以让动画看起来真实自然， 像真实世界的物理运动， 带有力的效果， 使用的参数则是 Facebook 的 origami 中使用的||
@@ -123,6 +123,7 @@ Small - 做最轻巧的跨平台插件化框架，目前已支持Android、iOS�
 ###UI
 |开源库名称|简介|教程|
 |---|---|---|
+|[Glide Transformations](https://github.com/wasabeef/glide-transformations)|基于Glide的开源库，能够进行强大的图片变化：裁剪，缩放，模糊化等||
 |FlexboxLayout|Android 排版库FlexboxLayout 是 Android 上实现了类似 CSS Flexible Box Layout Module 效果的界面排版。||
 |InfiniteCycleViewPager|InfiniteCycleViewPager 具有双向定位和交互效果，可以水平和垂直滚动。||
 |Android 库 Epoxy|Epoxy 是一个基于 RecyclerView 实现复杂屏幕效果的 Android 库。Epoxy 通过将 ViewHolder、项目类型、项目Id、列数等等抽象成模板，以简化与多视图类型构建屏幕效果。此外，Epoxy 还增加了对于保存视图状态以及自动区分项目变化的支持。||
