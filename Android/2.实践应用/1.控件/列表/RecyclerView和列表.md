@@ -5,7 +5,9 @@
 2. RecyclerView给出最基本的步骤，和最简单的实现方法。
 
 #列表和RecyclerView
-版本:2018/3/23-1(18:10)
+版本:2018/3/28-1(22:10)
+
+[TOC]
 
 ##ListView
 比较简单，四步骤：
@@ -202,19 +204,170 @@ mRecyclerView.addItemDecoration(new DividerItemDecoration(this, DividerItemDecor
 ```
 
 8、LayoutManager的布局管理器
->系统提供的布局管理器有三种:
+
+###拖拽和滑动删除
+
+9、RecyclerView的拖拽和滑动删除如何实现？
+> 1. 都是通过`ItemTouchHelper`实现
+> 2. 拖拽与滑动需要在`getMovementFlags`中进行开关
+> 3. 拖拽的实现在`onMove()`中完成
+> 4. 滑动删除是在`onSwiped()`中实现
 ```java
-//1. LinearLayoutManager
-mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-//2.GridLayoutManager
-mRecyclerView.setLayoutManager(new GridLayoutManager(this, 4));
-//3. StaggeredGridLayoutManager: 瀑布流
-mRecyclerView.setLayoutManager(new StaggeredGridLayoutManager(4, StaggeredGridLayoutManager.VERTICAL));
+        //1. 帮助快速处理拖拽和滑动删除的类
+        ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.Callback() {
+            /**====================================
+             * 2、通过返回值设置是否处理拖拽或者滑动事件
+             *=======================================*/
+            @Override
+            public int getMovementFlags(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder) {
+                if(recyclerView.getLayoutManager() instanceof GridLayoutManager){
+                    //1. Grid布局中上下左右都可以拖拽
+                    int dragFlags = ItemTouchHelper.UP | ItemTouchHelper.DOWN
+                            | ItemTouchHelper.LEFT | ItemTouchHelper.RIGHT;
+                    int swipeFlags = 0;
+                    return makeMovementFlags(dragFlags, swipeFlags);
+                }else{
+                    //2. 列表只有UP/DOWN两种方式
+                    int dragFlags = ItemTouchHelper.UP | ItemTouchHelper.DOWN;
+                    //3. 滑动删除只有两个方向
+                    int swipeFlags = ItemTouchHelper.START | ItemTouchHelper.END;
+                    return makeMovementFlags(dragFlags, swipeFlags);
+                }
+            }
+            /**====================================
+             * 3、在拖拽过程中会不断回调
+             *=======================================*/
+            @Override
+            public boolean onMove(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder, RecyclerView.ViewHolder target) {
+                //1. 获取到当前Item和目标Item的下标
+                int fromPosition = viewHolder.getAdapterPosition();
+                int toPosition = target.getAdapterPosition();
+                if(fromPosition < toPosition){
+                    for(int i = fromPosition; i < toPosition; i++){
+                        Collections.swap(mAdapter.getDatas(), i, i + 1);
+                    }
+                }else{
+                    for(int i = fromPosition; i > toPosition; i--){
+                        Collections.swap(mAdapter.getDatas(), i, i - 1);
+                    }
+                }
+                mAdapter.notifyItemMoved(fromPosition, toPosition);
+                return true;
+            }
+
+            //长按Item开始拖拽的时候调用
+            @Override
+            public void onSelectedChanged(RecyclerView.ViewHolder viewHolder, int actionState) {
+                //设置为灰色
+                if(actionState != ItemTouchHelper.ACTION_STATE_IDLE){
+                    viewHolder.itemView.setBackgroundColor(Color.LTGRAY);
+                }
+                super.onSelectedChanged(viewHolder, actionState);
+            }
+            //拖拽结束松开手指的时候调用
+            @Override
+            public void clearView(RecyclerView recyclerView, RecyclerView.ViewHolder viewHolder) {
+                super.clearView(recyclerView, viewHolder);
+                viewHolder.itemView.setBackgroundColor(Color.WHITE);
+            }
+
+            /**==============================
+             * 滑动删除的回调
+             *==========================*/
+            @Override
+            public void onSwiped(RecyclerView.ViewHolder viewHolder, int direction) {
+                //彻底删除目标Item
+                int targetPostion = viewHolder.getAdapterPosition();
+                mAdapter.notifyItemRemoved(targetPostion);
+                mAdapter.getDatas().remove(targetPostion);
+            }
+        });
+        itemTouchHelper.attachToRecyclerView(mRecyclerView);
+```
+
+10、RecyclerView如何自定义ItemView的拖拽效果(如第一个Item禁止拖拽)？
+>1.需要在`ItemTouchHelper`中的`isLongPressDragEnabled()`禁止有所Item的拖拽
+```java
+/**
+ *  默认禁止所有Item的拖拽，并给RecyclerView设置长按监听事件，并进行处理
+ */
+@Override
+public boolean isLongPressDragEnabled() {
+      return false;
+}
+```
+>2.给RecyclerView设置`ItemTouchListener(本质通过手势探测器GestureDetectorCompat完成)`-在长按事件中用`ItemTouchHelper`的`startDrag`方法进行拖拽
+```java
+mRecyclerView.addOnItemTouchListener(new OnRecyclerItemClickListener(mRecyclerView) {
+            @Override
+            public void onItemClick(RecyclerView.ViewHolder viewHolder) {
+                //TODO 点击事件
+            }
+
+            @Override
+            public void onLongClick(RecyclerView.ViewHolder viewHolder) {
+                if(viewHolder.getLayoutPosition() != 0){
+                    itemTouchHelper.startDrag(viewHolder);
+                }
+            }
+        });
+```
+>3-Item点击事件监听器的具体实现：
+```java
+public abstract class OnRecyclerItemClickListener implements RecyclerView.OnItemTouchListener{
+    private RecyclerView mRecyclerView;
+    private GestureDetectorCompat mGestureDetectorCompat; //手势探测器
+
+    public OnRecyclerItemClickListener(RecyclerView recyclerView){
+        mRecyclerView = recyclerView;
+        //手势探测器
+        mGestureDetectorCompat = new GestureDetectorCompat(mRecyclerView.getContext(), new GestureDetector.SimpleOnGestureListener(){
+            //1. 普通点击操作
+            @Override
+            public boolean onSingleTapUp(MotionEvent e) {
+                View curItemView = mRecyclerView.findChildViewUnder(e.getX(), e.getY());
+                if(curItemView != null){
+                    RecyclerView.ViewHolder viewHolder = mRecyclerView.getChildViewHolder(curItemView);
+                    onItemClick(viewHolder);
+                }
+                return true;
+            }
+            //2. 长按操作
+            @Override
+            public void onLongPress(MotionEvent e) {
+                View curItemView = mRecyclerView.findChildViewUnder(e.getX(), e.getY());
+                if(curItemView != null){
+                    RecyclerView.ViewHolder viewHolder = mRecyclerView.getChildViewHolder(curItemView);
+                    onLongClick(viewHolder);
+                }
+            }
+        });
+    }
+
+    @Override
+    public boolean onInterceptTouchEvent(RecyclerView rv, MotionEvent e) {
+        return mGestureDetectorCompat.onTouchEvent(e);
+    }
+
+    @Override
+    public void onTouchEvent(RecyclerView rv, MotionEvent e) {
+        mGestureDetectorCompat.onTouchEvent(e);
+    }
+
+    @Override
+    public void onRequestDisallowInterceptTouchEvent(boolean disallowIntercept) {
+    }
+
+    public abstract void onItemClick(RecyclerView.ViewHolder viewHolder);
+    public abstract void onLongClick(RecyclerView.ViewHolder viewHolder);
+}
 ```
 
 
 ##参考资料
-1. [RecyclerView学习链接列表](http://www.wanandroid.com/article/query?k=recyclerview)
 1. [ Android RecyclerView 使用完全解析](https://blog.csdn.net/lmj623565791/article/details/45059587)
 1. [clipToPadding解决列表滚动无法触及到Padding的问题](https://blog.csdn.net/litefish/article/details/52471273)
-2. [深入理解 RecyclerView 系列之一：ItemDecoration](https://blog.piasy.com/2016/03/26/Insight-Android-RecyclerView-ItemDecoration/#fn:add-together)
+1. [用RecyclerView做一个小清新的Gallery效果](https://juejin.im/post/5a30fe5a6fb9a045132ab1bf)
+1. [RecyclerView 梳理：点击&长按事件、分割线、拖曳排序、滑动删除](https://blog.csdn.net/shedoor/article/details/77326167)
+1. [【wanandroid】RecyclerView资料列表](http://www.wanandroid.com/article/query?k=recyclerview)
+1. [RecyclerView进阶(一)RecyclerView实现双列表联动](https://www.jianshu.com/p/5864db231ed5)

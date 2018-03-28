@@ -172,6 +172,7 @@ Android-ObservableScrollView
 |awesome-java-leetcode|现在面试大公司，不可避免的需要面试算法题，算法的能力其实是可以锻炼的，很好的一个途径就是Leetcode，为了高效的练习，可以关注下该库，包含解题思路，代码等。|https://github.com/Blankj/awesome-java-leetcode|
 
 #参考资料
+1. [2017年底前100Android开源库](http://www.cnblogs.com/jincheng-yangchaofan/articles/7018780.html)
 1. [2018年开发者不可错过的开源工具 —— Android 篇](http://mp.weixin.qq.com/s/SPUPGSufDFs5eBhlAkK4vw)
 1. [github中排名前100的Android库](https://www.cnblogs.com/Free-Thinker/p/7423033.html)
 1. [Android开源库和资料汇总](http://blog.csdn.net/wu996489865/article/details/53585433)
