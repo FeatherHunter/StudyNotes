@@ -128,6 +128,55 @@
           console.log(arguments.callee.caller);
         }
         outer();
+
+        var num = 10.004;
+        console.log("数值格式化");
+        console.log(num.toFixed(2));
+
+        var num = 99;
+        console.log("数值格式化Precision");
+        console.log(num.toPrecision(1));
+        console.log(num.toPrecision(2));
+        console.log(num.toPrecision(3));
+
+        var stringValue = "hello";
+        console.log("拼接字符串");
+        console.log(stringValue.concat("world"));
+
+        var stringValue = "hello world";
+        console.log("操作字符串");
+        console.log(stringValue.slice(3));
+        console.log(stringValue.substring(3));
+        console.log(stringValue.substr(3));
+        console.log(stringValue.slice(3,7));
+        console.log(stringValue.substring(3,7));
+        console.log(stringValue.substr(3,7));
+
+        var stringValue = "hello world";
+        console.log("操作字符串(负值)");
+        console.log(stringValue.slice(-3));
+        console.log(stringValue.substring(-3));
+        console.log(stringValue.substr(-3));
+        console.log(stringValue.slice(3,-4));
+        console.log(stringValue.substring(3,-4));
+        console.log(stringValue.substr(3,-4));
+
+        var text = "cat,bat,sat,fat";
+        var pattern = /.at/i;
+        console.log("字符串模式匹配方法match");
+        var matches = text.match(pattern);
+        console.log(matches.index);
+        console.log(matches[0]);
+        console.log(pattern.lastIndex);
+
+        var text = "cat,bat,sat,fat";
+        console.log("测试Replace方法");
+        console.log(text.replace("at","ond"));
+        console.log(text.replace(/at/g,"ond"));
+
+        var text = "cat,bat,sat,fat"
+        console.log(text.replace(/(.at)/g,"word ($1)"));
+
       }
     </script>
   </body>
