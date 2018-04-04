@@ -4,10 +4,11 @@
   </head>
   <body>
     <!-- 这里放内容 -->
-    <button type="button" onclick="myClick()">测试</button>
+    <button type="button" onclick="myClick1()">测试1</button>
+    <button type="button" onclick="myClick2()">测试2</button>
 
     <script>
-      function myClick(){
+      function myClick1(){
         var colors = ["red","green","blue"];
         console.log(colors.toString());
         console.log(colors.valueOf());
@@ -176,7 +177,46 @@
 
         var text = "cat,bat,sat,fat"
         console.log(text.replace(/(.at)/g,"word ($1)"));
+      }
 
+      function myClick2(){
+        function htmlEscape(text){
+          return text.replace(/[<>"&]/g,function (match,pos,originalText){
+            switch (match) {
+              case "<":{
+                return "&lt;";
+                break;
+              }
+              case ">":{
+                return "&gt;";
+                break;
+              }
+              case "&":{
+                return "&amp;";
+                break;
+              }
+              case "\"":{
+                return "&quot;";
+                break;
+              }
+            }
+          });
+        }
+        console.log(htmlEscape("<p class=\"greeting\">Hello World!</p>"));
+
+        var colorText = "red,blue,green,yellow";
+        console.log("split用法");
+        var color1 = colorText.split(",");
+        var color2 = colorText.split(",",2);
+        var color3 = colorText.split(/[^\,]+/);
+        console.log(color1);
+        console.log(color2);
+        console.log(color3);
+
+        var uri = "http://localhost:51531/ chuanshanqu.html";
+        console.log("URI编码");
+        console.log(encodeURI(uri));
+        console.log(encodeURIComponent(uri));
       }
     </script>
   </body>
