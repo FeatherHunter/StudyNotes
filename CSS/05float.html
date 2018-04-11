@@ -1,0 +1,74 @@
+<html>
+<head>
+  <style type="text/css">
+  *{
+    margin: 0px;
+    padding: 0px;
+  }
+  #nav{
+    height: 40px;
+    border-bottom: 1px solid #339;
+  }
+  #nav ul{
+    list-style: none;
+  }
+  #nav ul li{
+    border: 1px solid #339;
+    width:130px;
+    height: 40px;
+    float: left;
+    text-align: center;
+    border-right: 1px solid #339;
+    border-bottom: 0px;
+  }
+  #nav ul li a{
+    position: relative;
+    top: 5px;
+  }
+  #nav ul li a:link,#nav ul li a:visited{
+    text-decoration: none;
+    font-size: 14px;
+    color: black;
+  }
+  #nav ul li a:visited{
+    color: red;
+  }
+  #nav ul li a:hover{
+    color: orange;
+    text-decoration: underline;
+  }
+  #container{
+    width:1100px;
+    height: 500px;
+    border: 1px solid #239;
+    position: absolute;
+    left:50%;
+    margin-left: -550px;
+  }
+  #head{
+    height: 50px;
+    background: #00f;
+  }
+  #content{
+    height: 60px;
+    clear:both;
+  }
+  </style>
+</head>
+<body>
+<div id="container">
+  <div id="head">导航图片</div>
+  <div id="nav">
+    <ul>
+      <li><a href="#">返回首页</a></li>
+      <li><a href="#">政策法规</a></li>
+      <li><a href="#">工作动态</a></li>
+      <li><a href="#">联系我们</a></li>
+      <li><a href="#">网站帮助</a></li>
+    </ul>
+  </div>
+  <div id="content">内容管理</div>
+  <div id="bottom"></div>
+</div>
+</body>
+</html>
