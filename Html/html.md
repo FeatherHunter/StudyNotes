@@ -1,3 +1,5 @@
+转载请注明链接：https://blog.csdn.net/feather_wch/article/details/79793596
+
 1、html分为head和body标签
 
 2、head标签存放标题以及meta数据,meta可以存放关键字、作者等数据
@@ -189,3 +191,46 @@
 18、html中表单是什么意思？
 >1. `表单`的英文为`form`
 >2. `html表单`是用于`收集`不同类型的用户输入。
+```html
+<form action="https://blog.csdn.net/feather_wch">
+    用户名: <input type="text"><br/>
+    <input type="submit"><br/>
+    注册：<input type="button" value="Button">
+</form>
+```
+>`提交`或者`回车`后会进入`action`指明的页面中。
+
+19、表单中的单选框
+>1. `name`属性进行分组。
+```html
+<form>
+    性别:<input type="radio" value="男" name="sex">男
+    <input type="radio" value="女" name="sex">女
+</form>
+```
+20、表单的多选框
+```html
+<form>
+    城市:<input type="checkbox" value="sh" name="city">上海
+    <input type="checkbox" value="bj" name="city">北京
+    <input type="checkbox" value="nj" name="city">南京
+    <input type="checkbox" value="sz" name="city">深圳
+</form>
+```
+
+21、下拉框
+```html
+<form>
+    月份:<select>
+      <option value="1">Ja</option>
+      <option value="2">Fe</option>
+      <option value="3">Ma</option>
+      <option value="4">Ap</option>
+    </select>
+</form>
+```
+
+22、多文本输入
+```html
+<textarea cols="50" rows="10"></textarea>
+```
