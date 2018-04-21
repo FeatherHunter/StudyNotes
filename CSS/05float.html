@@ -4,22 +4,26 @@
   *{
     margin: 0px;
     padding: 0px;
+    font-size: 12px;
   }
   #nav{
     height: 40px;
     border-bottom: 1px solid #339;
+    border: 1px solid #239;
   }
   #nav ul{
     list-style: none;
   }
-  #nav ul li{
-    border: 1px solid #339;
-    width:130px;
+  li.nav_li{
+    width:160px;
     height: 40px;
     float: left;
     text-align: center;
     border-right: 1px solid #339;
     border-bottom: 0px;
+  }
+  li.nav_last{
+    border: none;
   }
   #nav ul li a{
     position: relative;
@@ -39,8 +43,6 @@
   }
   #container{
     width:1100px;
-    height: 500px;
-    border: 1px solid #239;
     position: absolute;
     left:50%;
     margin-left: -550px;
@@ -48,10 +50,70 @@
   #head{
     height: 50px;
     background: #00f;
+    font-size: 16px;
   }
   #content{
-    height: 60px;
     clear:both;
+    float: left;
+    margin-top: 4px;
+  }
+  #con_left{
+    float: left;
+    width: 255px;
+  }
+  #con_right{
+    float: left;
+    width: 835px;
+  }
+  dl.article_list{
+    border: 1px solid #999;
+    width: 240px;
+    margin-top: 4px;
+  }
+  dl.index_right{
+    width:390px;
+    float: left;
+    margin-left: 20px;
+  }
+  dl.article_list dt{
+    background:#228;
+    height: 30px;
+  }
+  dl.article_list dt span{
+    color: #ff0;
+    font-size: 14px;
+    font-weight: bold;
+    position: relative;
+    top: 5px;
+    left: 10px;
+  }
+  dl.article_list dd{
+    border-bottom: 1px dotted #aaa;
+    height: 30px;
+    background: url("2.png") no-repeat;
+    background-position: 2px 7px;
+  }
+  dl.article_list dd a{
+    position: relative;
+    left: 25px;
+    top: 6px;
+  }
+  a.article_href:link,a.article_href:visited{
+    text-decoration: none;
+    color: #555;
+  }
+  a.article_href:hover{
+    text-decoration: underline;
+    color: #a33;
+  }
+  #bottom{
+    height: 30px;
+    width: 100%;
+    border-top: 1px solid #999;
+    margin-top: 10px;
+    clear: both;
+    float: left;
+    text-align: center;
   }
   </style>
 </head>
@@ -60,15 +122,74 @@
   <div id="head">导航图片</div>
   <div id="nav">
     <ul>
-      <li><a href="#">返回首页</a></li>
-      <li><a href="#">政策法规</a></li>
-      <li><a href="#">工作动态</a></li>
-      <li><a href="#">联系我们</a></li>
-      <li><a href="#">网站帮助</a></li>
+      <li class="nav_li"><a href="#">返回首页</a></li>
+      <li class="nav_li"><a href="#">政策法规</a></li>
+      <li class="nav_li"><a href="#">工作动态</a></li>
+      <li class="nav_li"><a href="#">联系我们</a></li>
+      <li class="nav_li nav_last"><a href="#">网站帮助</a></li>
     </ul>
   </div>
-  <div id="content">内容管理</div>
-  <div id="bottom"></div>
+  <div id="content">
+    <div id="con_left">
+      <dl class="article_list">
+        <dt><span>通知信息</span></dt>
+        <dd><a href="#" class="article_href">关于。。。。。。。的信息</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的信息</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的信息</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的信息</a></dd>
+      </dl>
+      <dl class="article_list">
+        <dt><span>意见建议</span></dt>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+      </dl>
+      <dl class="article_list">
+        <dt><span>交流互动</span></dt>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+      </dl>
+    </div>
+    <div id="con_right">
+      <dl class="article_list index_right">
+        <dt><span>通知信息</span></dt>
+        <dd><a href="#" class="article_href">关于。。。。。。。的信息</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的信息</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的信息</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的信息</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的信息</a></dd>
+      </dl>
+      <dl class="article_list index_right">
+        <dt><span>意见建议</span></dt>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+      </dl>
+      <dl class="article_list index_right">
+        <dt><span>交流互动</span></dt>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+      </dl>
+      <dl class="article_list index_right">
+        <dt><span>交流互动</span></dt>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+        <dd><a href="#" class="article_href">关于。。。。。。。的意见</a></dd>
+      </dl>
+    </div>
+  </div>
+  <div id="bottom">
+    &copy;Copyright:2018-2019
+  </div>
 </div>
 </body>
 </html>
