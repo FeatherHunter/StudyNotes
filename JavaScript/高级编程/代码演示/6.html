@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+  <head>
+  </head>
+  <body>
+    <button type="button" onclick="outputNumbers(10)">测试“模仿块级作用域”</button>
+    <button type="button" onclick="outputNumbers1(10)">测试“私有作用域”</button>
+    <script type="text/javascript">
+      function outputNumbers(count){
+        for(var i = 0; i < count; i++){
+          console.log(i);
+        }
+        var i;
+        console.log(i);
+      }
+
+      function outputNumbers1(count){
+        (function(){
+          for(var i = 0; i < count; i++){
+            console.log(i);
+          }
+        })();
+        console.log(i);
+      }
+    </script>
+  </body>
+</html>
