@@ -251,6 +251,84 @@ app:layout_constraintVertical_bias="0.8"
     app:layout_constraintBaseline_toBaselineOf="@id/ll_cl_aa"/>
 ```
 
+## 实例：
+> 1. 三个ImageView平分水平方向
+> 2. 三个ImageView的间隔为10dp
+> 3. ImageView宽高比为3:4
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingLeft="5dp"
+    android:paddingRight="5dp">
+
+    <android.support.constraint.ConstraintLayout
+        android:id="@+id/cla"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="5dp"
+        android:layout_marginRight="5dp"
+        android:background="@color/colorAccent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toLeftOf="@+id/clb">
+
+        <ImageView
+            android:id="@+id/aaa"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#2b8"
+            app:layout_constraintDimensionRatio="3:4"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent" />
+
+    </android.support.constraint.ConstraintLayout>
+
+    <android.support.constraint.ConstraintLayout
+        android:id="@+id/clb"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="5dp"
+        android:layout_marginRight="5dp"
+        android:background="@color/colorPrimary"
+        app:layout_constraintLeft_toRightOf="@+id/cla"
+        app:layout_constraintRight_toLeftOf="@+id/clc">
+
+        <ImageView
+            android:id="@+id/bbb"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#3cf"
+            app:layout_constraintDimensionRatio="3:4"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent" />
+    </android.support.constraint.ConstraintLayout>
+
+    <android.support.constraint.ConstraintLayout
+        android:id="@+id/clc"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="5dp"
+        android:layout_marginRight="5dp"
+        android:background="@color/colorAccent"
+        app:layout_constraintLeft_toRightOf="@+id/clb"
+        app:layout_constraintRight_toRightOf="parent">
+
+        <ImageView
+            android:id="@+id/ccc"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:background="#2b8"
+            app:layout_constraintDimensionRatio="3:4"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent" />
+    </android.support.constraint.ConstraintLayout>
+
+
+</android.support.constraint.ConstraintLayout>
+```
+
 
 ##参考和学习资料
 1. [ConstraintLayout 完全解析 快来优化你的布局吧](https://blog.csdn.net/lmj623565791/article/details/78011599)
