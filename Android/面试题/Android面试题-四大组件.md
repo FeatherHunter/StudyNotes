@@ -4,7 +4,7 @@ Android面试题之四大组件+Fragment，包括Activity、Service、广播、C
 >转载请注明链接：https://blog.csdn.net/feather_wch/article/details/81136168
 
 # Android面试题-四大组件(12题)
-版本：2018/7/31-1
+版本：2018/8/1-1(1800)
 
 [TOC]
 
@@ -194,9 +194,12 @@ graph TD;
 >2. `attach()`在`ActivityThread`的`performLaunchActivity`中执行。
 
 15、onCreate在哪里被调用？
->1. p
+>1. performLaunchActivity通过`Instrumentation`调用
 
-8、Activity的startActivity机制分析
+16、onStart、onCreate在哪里被调用？
+>1. `handleResumeActvity`中
+
+17、Activity的startActivity源码流程详解
 ```java
 //Activity.java
 //1. 所有`startActivity()`方法最终会调用`startActivityForResult()`方法：
@@ -426,114 +429,71 @@ final void performResume() {
 
 ## Service-3题
 
-1、Activity与Service间的通信方式
->1. Activity通过调用bindService，在ServiceConnection的onServiceConnected可以获取到Service的对象实例，然后就可以访问`Service`中的方法.(如果需要`Service`去主动通知`Activity`，可以通过`回调`来实现---在Activity的ServicConnection的onServiceConnected中去给Service设置实现的接口，该接口会在Service中被调用。)
->2. 通过`广播`
->3. 通过`EventBus`
-
-2、Service的启动方式有什么区别
->1. `startService`：Service与组件的生命周期无关，即使组件退出，Service依然存在。耗电，占内存。
->2. `bindService`：调用者退出后，Service也会退出。
-
-3、Service的生命周期
->1. 仅仅是`startService`：onCreate()->onStartCommand()->onDestory()
->2. 仅仅是`bindService`：onCreate()->onBind()->onUnbind（）->onDestory()
->3. 同时使用`startService`开启服务与`bindService`绑定服务：onCreate()->onStartCommand()->onBind()->onUnbind（）->onDestory()
-
-## Broadcast-5题
-
-1、广播分为几种
->1. 普通广播
->2. 有序广播
-
-2、普通广播是什么？
->1. 调用`sendBroadcast()`发送
-
-3、有序广播是什么？
->1. 调用`sendOrderedBroadcast()`发送
->2. 广播接收者会按照`priority优先级`从大到校进行排序
->3. `优先级`相同的广播，`动态注册`的广播优先处理
->4. 广播接收者还能对`广播`进行`截断和修改`
-
-4、广播两种注册方式的区别
->1. `静态注册`：常驻系统，不受组件生命周期的影响，耗电，占内存
->2. `动态注册`：非常驻系统，组件结束，广播就结束。但是在组件结束前，一定要释放广播，避免内存泄露和崩溃。
-
-5、广播的发送和接收原理
->1. 继承BroadcastReceiver,在`onReceive()`中实现接收到广播后应该进行的操作。
->2. 通过`Binder机制`向`ActivityManagerService`注册广播。
->3. 通过`Binder机制`向`ActivityManagerService`发送广播。
->4. `ActivityManagerService`会查找符合`广播`条件(`IntentFilter/Permission`)的`BroadcastReceiver`,将广播发送到`BroadcastReceiver`的`消息队列`中。
->5. `BroadcastReceiver`取出`广播`，并回调其`onReceive()`方法。
-
-6、BroadcasReceiver和LocalBroadcastReceiver
->1. `BroadcasReceiver`是跨应用广播，利用`Binder机制`实现。
->2. `LocalBroadcastReceiver`是`应用内广播`，利用`Handler`实现。利用`IntentFilter`的`match`功能，提供消息的发布与接收，实现应用内通信，效率较高。
-
-7、本地广播的优点
->1. 效率更改。
->2. 发送的广播不会离开我们的应用，不会泄露关键数据。
->3. 其他程序无法将广播发送到我们程序内部，不会有安全漏洞。
-
-## Fragment-1题
-1、Fragment的常见问题，以及如何处理？
->1. `getActivity()空指针`：常见于进行异步操作的时候，此时如果`Fragment已经onDetach()`,就会遇到。解决办法：在`Fragment`里面使用一个`全局变量mActivity`，可能会导致内存泄露。但是比`崩溃`更好。
->2. `视图重叠`：主要是因为`Fragment`的`onCreate()`中没有判断`saveInstanceSate == null`，导致重复加载了同一个`Fragment`
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79219316
->1. 直接从源码角度分析四大组件的机制
->2. 所有知识点以面试题形式汇总，便于学习和复习背诵
-
-# Android四大组件机制详解
-版本：2018.2.5-1
-
-[TOC]
-
-##参考和学习资料
-1. [剖析Activity、Window、ViewRootImpl和View之间的关系](http://mp.weixin.qq.com/s/-5lyASIaSFV6wG3wfMS9Yg)
-
-3、Service是什么?
->1. 一种`计算型组件`，用于在后台执行一系列计算任务。
+18、Service是什么?
+>1. 一种`计算型组件`，用于在后台执行一系列计算任务(处理网络事务、播放音乐、文件读写、或者与ContentProvider交互)。
 >2. `Service`具有两种状态：`启动状态`和`绑定状态`
 >3. 启动状态: 进行后台任务，`Service`本身运行在`主线程`，因此耗时操作需要在`新线程`中处理
 >4. 绑定状态: 内部同样可以进行后台运算，但是此时`外界`可以很方便与`Service`通信
 >5. `Service`的停止需要灵活采用`stopService和unBindService`才能完全停止
 
-4、BroadcastReceiver是什么？
->1. 一种`消息型组件`，用于在不同组件甚至不同应用间传递消息
->2. `静态注册`: 在AndroidManifest中注册广播，会在`应用安装时被系统解析`，不需要启动应用就可以接收到相应广播
->3. `动态注册`: `Context.registerReceiver()`进行注册，`Context.unRegisterReceiver()`解除注册. 需要APP启动才能注册并且接收广播。
->4. 广播发送通过`Context`的一系列`send`方法完成
->5. `发送和接收`过程的匹配通过广播接收者的`intent-filter`来描述
+19、Activity与Service间的通信方式
+>1. Activity通过调用bindService，在ServiceConnection的onServiceConnected可以获取到Service的对象实例，然后就可以访问`Service`中的方法.(如果需要`Service`去主动通知`Activity`，可以通过`回调`来实现---在Activity的ServicConnection的onServiceConnected中去给Service设置实现的接口，该接口会在Service中被调用。)
+>2. 通过`广播`
+>3. 通过`EventBus`
 
-5、ContentProvider是什么？
->1. 一种`数据共享型组件`
->2. 内部需要实现`增删改查`四种操作
->3. 内部的`insert\delete\update\query`方法需要处理好线程同步，因为这些方法都在`Binder线程池`中调用
+20、Service的启动方式有什么区别
+>1. `startService`：Service与组件的生命周期无关，即使组件退出，Service依然存在。耗电，占内存。
+>2. `bindService`：调用者退出后，Service也会退出。
 
-## Service
-7、Service的启动方法
+21、Service的生命周期
+>1. 仅仅是`startService`：onCreate()->onStartCommand()->onDestory()
+>2. 仅仅是`bindService`：onCreate()->onBind()->onUnbind（）->onDestory()
+>3. 同时使用`startService`开启服务与`bindService`绑定服务：onCreate()->onStartCommand()->onBind()->onUnbind（）->onDestory()
+
+22、Service的分类
+>1. 本地服务
+>2. 远程服务
+
+23、本地服务是什么？
+>1. 该类服务依赖在主进程上而不是独立的进程，一定程度上节约资源。
+>2. 本地服务因为在同一进程内，不需要IPC和AIDL进行交互。`bindService`也方便很多。
+>3. 缺点：限制性大，`主进程`被杀死后，`服务便会终止`。
+>4. 应用场景：需要姨父某个进程的服务，比如音乐播放。
+
+24、远程服务是什么？
+>1. 该服务是`独立的进程`，进程名为`所在包名 + android:process指定的字符串`。
+>2. 定义方式：用`android:process=".service"`
+>3. 特点: 主进程被杀死后，该服务依然存在，不受其他进城影响，能为多个进程提供服务，具有灵活性。
+>4. 会消耗更多资源，并且使用AIDL进行IPC比较麻烦，一般用于系统Service。
+
+25、startService
+>1. Service无论调用多少次`startService`，`onCreate`只会调用一次，`onStartCommand`会调用相应次数。
+>2. Service无论调用多少次`startService`，只存在`一个Service实例`
+>3. 结束Service只需要调用一次`stopService或者stopSelf`
+>4. Activity的退出并不会导致Service的退出---除非在onDestoyr里面调用stopService，但是`退出APP会导致Service1的退出！`
+>5. 系统资源不足的时候，服务可能会被`Kill`
+
+26、bindService
+>1. Service通过`bindService`启动，无论调用多少次，`onCreate`只会调用一次，且`onStartCommand`不会被调用。
+>2. 如果调用`Service`的组件退出，如Activity，Service就会被停止。
+>3. `bindService`开启的Service的通信比较方便，不需要AIDL和IPC
+
+27、startService且同时bindService
+>1. `onCreate`之调用一次。
+>1. `startService`调用几次，`onStartCommand`会调用相同次数。
+>1. `bindService`不会调用`onStartCommand`
+>1. 调用`unBindService`不会停止`Service`，必须调用`stopService`和Service自身的`stopSelf`来停止。
+>1. 如果想停止这种Service，`unBindeService`和`stopService`都需要调用，缺一不可。
+
+28、同时开启和绑定有什么作用？
+>1. 能让`Service`一直处于后台运行的状态，即使组件已经推出。
+>2. 同时通过`bindService`能方便地与`Service`通信
+>3. 相比于`广播`的方式，性能更高。
+
+29、Service的注意点
+>1. 手机发生旋转时，Activity的重新创建，会导致之前`bindService`建立的连接断开，`Service`会因为COntext的销毁而自动停止。
+
+30、Service的启动方法
 ```java
 Intent intent = new Intent(this, MyService.class);
 startService(intent);
@@ -541,7 +501,89 @@ startService(intent);
 >1. Service有`启动状态`和`绑定状态`
 >2. `两个状态可以共存`，Service可以既处于启动状态又处于绑定状态
 
-8、Service的启动过程详解
+31、Service的startService过程流程图和要点？
+```mermaid
+graph TD;
+    1(1.startService);
+    2(2.mBase.startService);
+    3(3.startServiceCommon);
+    4(4.ActivityManager.getService.startService);
+    5(5.mServices.startServiceLocked);
+    6(6.bringUpServiceLocked);
+    7(7.realStartServiceLocked);
+    8(8.app.thread.scheduleCreateService);
+    9(9.sendServiceArgsLocked);
+    10(10.handleMessage);
+    11(11.handleCreateService);
+    16(16.app.thread.scheduleServiceArgs);
+    17(17.handleMessage);
+    18(18.handleServiceArgs);
+    19(19.onStartCommand);
+    1-->2;
+    2-->3;
+    3-->4;
+    4-->5;
+    5-->6;
+    6-->7;
+    7-->8;
+    7-->9;
+    8-->10;
+    10-->11;
+    9-->16;
+    16-->17;
+    17-->18;
+    18-->19;
+```
+>1. startService(`ContextWrapper.java`):Activity层层继承自`ContextWrapper`;内部交由`ContextImpl`的`startSertvice()`;典型的桥接模式
+>2. mBase.startService(`ContextImpl.java`): 交给ContextImpl执行。
+>3. startServiceCommon(`ContextImpl.java`): 通过`ActivityManagerService`启动服务;IPC
+>4. startService(`ActivityManagerService.java`):通过`ActiveServices`进行后续工作---调用`mServices.startServiceLocked`。
+>5. startServiceLocked(`ActiveServices.java`):  bringUpServiceLocked
+>6. bringUpServiceLocked(`ActiveServices.java`)： realStartServiceLocked
+>7. realStartServiceLocked(`ActiveServices.java`): 1、app.thread.scheduleCreateService 2、sendServiceArgsLocked
+>8. app.thread.scheduleCreateService(`ActivityThread.java`):1. 创建Service 2. 发送消息`CREATE_SERVICE`给Handler H
+>9. sendServiceArgsLocked(): 用Service的其他方法(如onStartCommand)-IPC通信
+>10. handleMessage(`ActivityThread.java`): 处理消息
+>11. handleCreateService(`ActivityThread.java`): 处理`第12、13、14、15 四步的工作`, 进行Service的创建工作
+>16. 16.app.thread.scheduleServiceArgs: IPC让ActivityThread只去执行其他的生命周期回调。发送消息给Handler H
+>17. 17.handleMessage: 调用`handleServiceArgs`
+>18. 18.handleServiceArgs: 执行其他的生命周期，如`onStartCommand`
+>19. 19.onStartCommand: Service的回调方法
+
+```mermaid
+graph TD;
+    11(11.handleCreateService);
+    12(12.cl.loadClass);
+    13(13.makeApplication);
+    14(14.service.attach);
+    15(15.service.onCreate);
+    11-->12;
+    11-->13;
+    11-->14;
+    11-->15;
+```
+>11. handleCreateService(`ActivityThread.java`): 处理`第12、13、14、15 四步的工作`
+>12. cl.loadClass().newInstance(): 类加载器创建Service实例。
+>13. packageInfo.makeApplication: 用`LoadedApk`创建`Application实例`
+>14. service.attach： 创建ContextImpling建立Context和Service的联系。
+>15. service.onCreate()： Service的onCreate(), 并且将Service对象存储到ActivityThread中的一个列表中
+
+32、ActiveServices是什么？
+>1. 辅助ActivityManagerService进行Service管理
+>2. 包括：启动、绑定、停止等
+
+33、ServiceRecord是什么？
+>1. 描述一个Service记录，官场整个启动过程
+
+32、ContextWrapper是什么？
+>1. ContextWrapper是Context实现类ContextImpl的包装类
+>2. Activity、Service等都是直接或者间接继承自`ContextWrapper`
+
+33、ContextWrapper为什么是典型桥接模式？
+
+34、桥接模式和代理模式的区别？
+
+35、Service的启动过程源码详细分析
 ```java
    /**
      * ======================================
@@ -827,6 +869,78 @@ public void doConnected(ComponentName name, IBinder service, boolean dead) {
     }
 }
 ```
+
+## Broadcast-5题
+
+1、广播分为几种
+>1. 普通广播
+>2. 有序广播
+
+2、普通广播是什么？
+>1. 调用`sendBroadcast()`发送
+
+3、有序广播是什么？
+>1. 调用`sendOrderedBroadcast()`发送
+>2. 广播接收者会按照`priority优先级`从大到校进行排序
+>3. `优先级`相同的广播，`动态注册`的广播优先处理
+>4. 广播接收者还能对`广播`进行`截断和修改`
+
+4、广播两种注册方式的区别
+>1. `静态注册`：常驻系统，不受组件生命周期的影响，耗电，占内存
+>2. `动态注册`：非常驻系统，组件结束，广播就结束。但是在组件结束前，一定要释放广播，避免内存泄露和崩溃。
+
+5、广播的发送和接收原理
+>1. 继承BroadcastReceiver,在`onReceive()`中实现接收到广播后应该进行的操作。
+>2. 通过`Binder机制`向`ActivityManagerService`注册广播。
+>3. 通过`Binder机制`向`ActivityManagerService`发送广播。
+>4. `ActivityManagerService`会查找符合`广播`条件(`IntentFilter/Permission`)的`BroadcastReceiver`,将广播发送到`BroadcastReceiver`的`消息队列`中。
+>5. `BroadcastReceiver`取出`广播`，并回调其`onReceive()`方法。
+
+6、BroadcasReceiver和LocalBroadcastReceiver
+>1. `BroadcasReceiver`是跨应用广播，利用`Binder机制`实现。
+>2. `LocalBroadcastReceiver`是`应用内广播`，利用`Handler`实现。利用`IntentFilter`的`match`功能，提供消息的发布与接收，实现应用内通信，效率较高。
+
+7、本地广播的优点
+>1. 效率更改。
+>2. 发送的广播不会离开我们的应用，不会泄露关键数据。
+>3. 其他程序无法将广播发送到我们程序内部，不会有安全漏洞。
+
+## Fragment-1题
+1、Fragment的常见问题，以及如何处理？
+>1. `getActivity()空指针`：常见于进行异步操作的时候，此时如果`Fragment已经onDetach()`,就会遇到。解决办法：在`Fragment`里面使用一个`全局变量mActivity`，可能会导致内存泄露。但是比`崩溃`更好。
+>2. `视图重叠`：主要是因为`Fragment`的`onCreate()`中没有判断`saveInstanceSate == null`，导致重复加载了同一个`Fragment`
+
+
+
+
+
+
+
+
+
+转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79219316
+>1. 直接从源码角度分析四大组件的机制
+>2. 所有知识点以面试题形式汇总，便于学习和复习背诵
+
+# Android四大组件机制详解
+版本：2018.2.5-1
+
+[TOC]
+
+4、BroadcastReceiver是什么？
+>1. 一种`消息型组件`，用于在不同组件甚至不同应用间传递消息
+>2. `静态注册`: 在AndroidManifest中注册广播，会在`应用安装时被系统解析`，不需要启动应用就可以接收到相应广播
+>3. `动态注册`: `Context.registerReceiver()`进行注册，`Context.unRegisterReceiver()`解除注册. 需要APP启动才能注册并且接收广播。
+>4. 广播发送通过`Context`的一系列`send`方法完成
+>5. `发送和接收`过程的匹配通过广播接收者的`intent-filter`来描述
+
+5、ContentProvider是什么？
+>1. 一种`数据共享型组件`
+>2. 内部需要实现`增删改查`四种操作
+>3. 内部的`insert\delete\update\query`方法需要处理好线程同步，因为这些方法都在`Binder线程池`中调用
+
+## Service
+
 
 10、广播的静态注册过程:
 >1. 安装应用时由系统自动完成注册
@@ -1417,3 +1531,11 @@ AMS->AMS: 19.publishContentProviders()
 >17-1. 遍历当前进程的Provider列表并调用installProvider()
 >18.创建ContentProvider对象,并调用onCreate方法
 >19.将已经启动的ContentProvider保存在AMS的ProviderMap中，外部调用者就可以直接从AMS中获取ContentProvider
+
+
+##参考和学习资料
+1. [剖析Activity、Window、ViewRootImpl和View之间的关系](http://mp.weixin.qq.com/s/-5lyASIaSFV6wG3wfMS9Yg)
+1. [Service 启动和绑定解析](https://www.jianshu.com/p/5d73389f3ab2)
+1. [Service](https://www.jianshu.com/p/e04c4239b07e)
+1. [桥接模式和代理模式的区别](https://blog.csdn.net/see__you__again/article/details/51996797)
+1. [代理模式与桥接模式 备忘](https://blog.csdn.net/agezhc/article/details/38735985)
