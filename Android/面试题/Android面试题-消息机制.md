@@ -5,8 +5,8 @@ Android面试题之Handler消息机制，包括Handler、MessageQueue、Looper�
 本文是我一点点归纳总结的干货，但是难免有疏忽和遗漏，希望不吝赐教。
 
 
-# Android面试题-Handler消息机制(22题)
-版本：2018/7/20-1
+# Android面试题-Handler消息机制(23题)
+版本：2018/8/5-1(2300)
 
 [TOC]
 
@@ -325,7 +325,32 @@ private boolean enqueueMessage(MessageQueue queue, Message msg, long uptimeMilli
 >2. `MessageQueue`的`next`方法就会返回这条消息交给`Looper`
 >3. 最终`Looper`会把消息交给`Handler`的`dispatchMessage`
 
-20、Handler的消息处理源码
+20、Handler的postDelayed源码分析
+```java
+    //Handler.java---层层传递，和一般的post调用的同一个底层方法.
+    public final boolean postDelayed(Runnable r, long delayMillis)
+    {
+        return sendMessageDelayed(getPostMessage(r), delayMillis);
+    }
+    //xxxxxx
+    //Handler.java
+    private boolean enqueueMessage(MessageQueue queue, Message msg, long uptimeMillis) {
+        ...
+        return queue.enqueueMessage(msg, uptimeMillis);
+    }
+    //MessageQueue.java
+    boolean enqueueMessage(Message msg, long when) {
+        //会直接加进队列
+    }
+```
+> 1. postDelayed和post调用的底层sendMessage系列方法，只不过前者有延迟，后者延迟参数=0。
+> 2. 最终会直接将Msg加入到队列中。
+> 3. MessageQueue.next()在取出Msg时，如果发现消息A有延迟且时间没到，会阻塞消息队列。
+> 4. 如果此时有非延迟的新消息B，会将其加入消息队列, 且处于消息A的前面，并且唤醒阻塞的消息队列。
+> 5. 唤醒后会拿出队列头部的消息B，进行处理。然后会继续因为消息A而阻塞。
+> 6. 如果达到了消息A延迟的时间，会取出消息A进行处理。
+
+21、Handler的消息处理源码
 ```java
 //Handler.java
 public void dispatchMessage(Message msg) {
@@ -357,7 +382,7 @@ public interface Callback {
 }
 ```
 
-21、Handler的特殊构造方法
+22、Handler的特殊构造方法
 >1. `Handler handle = new Handler(callback);`-不需要派生Handler
 >2. 通过特定`Looper`构造`Handler`
 ```java
@@ -383,7 +408,7 @@ public Handler(Callback callback, boolean async) {
 
 ## 主线程的消息循环
 
-22、主线程ActivityThread的消息循环
+23、主线程ActivityThread的消息循环
 ```java
 //ActivityThread.java
 public static void main(String[] args) {

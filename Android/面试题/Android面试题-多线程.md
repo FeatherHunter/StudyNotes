@@ -5,9 +5,9 @@ Android面试题之多线程，包括线程、Java同步问题、阻塞队列、
 
 有帮助的话请点个赞！万分感谢！
 
-# Android面试题-多线程(72题)
+# Android面试题-多线程(73题)
 
-2018/7/26(15:45)
+2018/8/5(23:45)
 
 [TOC]
 
@@ -15,7 +15,6 @@ Android面试题之多线程，包括线程、Java同步问题、阻塞队列、
 1、什么是进程
 >1. 系统分配资源的最小单位
 >2. 进程就是程序运行的实体
-
 
 ## 线程
 
@@ -48,7 +47,7 @@ Android面试题之多线程，包括线程、Java同步问题、阻塞队列、
 >2. 线程一旦`得到锁`会返回到`可运行状态`
 
 
-* 如下题目中的`Object.wait()`是指具体对象调用`wait等方法---someObject.wait()`，`Thread.join`是指具体线程调用该方法---`childThread.join()`
+> 如下题目中的`Object.wait()`是指具体对象调用`wait等方法---someObject.wait()`，`Thread.join`是指具体线程调用该方法---`childThread.join()`
 
 
 7、线程如何从`可运行状态`切换到`等待状态`
@@ -759,8 +758,19 @@ startService(service);
 >1. `start()`会让线程去排队(处于就绪状态)，之后会调用`run()`
 >2. `run()`是线程需要执行的内容
 
-#参考资料
-[1. AsyncTask的缺陷和问题](http://blog.csdn.net/goodlixueyong/article/details/45895997)
-[2. AsyncTask的解析](https://www.cnblogs.com/yanyojun/archive/2017/02/20/6414919.html)
-[3. IntentService](ttps://www.jianshu.com/p/332b6daf91f0)
-[4. volatile有什么用？如何解决的DLC问题？](https://blog.csdn.net/hxpjava1/article/details/55188908)
+73、Synchronized三种应用的锁是什么？
+>* Java中每一个对象都可以作为锁，这是synchronized实现同步的基础：
+>    1. 普通同步方法，锁是当前实例对象
+>    2. 静态同步方法，锁是当前类的class对象
+>    3. 同步方法块，锁是括号里面的对象
+
+## Java并发进阶
+
+
+## 参考资料
+1. [AsyncTask的缺陷和问题](http://blog.csdn.net/goodlixueyong/article/details/45895997)
+1. [AsyncTask的解析](https://www.cnblogs.com/yanyojun/archive/2017/02/20/6414919.html)
+1. [IntentService](ttps://www.jianshu.com/p/332b6daf91f0)
+1. [volatile有什么用？如何解决的DLC问题？](https://blog.csdn.net/hxpjava1/article/details/55188908)
+1. [Java并发编程深入理解-Synchronized和volatile原理](https://www.cnblogs.com/paddix/p/5367116.html)
+2. [深入理解Synchronized](https://blog.csdn.net/shandian000/article/details/54927876/)

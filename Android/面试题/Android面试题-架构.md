@@ -11,8 +11,7 @@ Android面试题，架构MVC/MVP/MVVM，包括MVC、MVP、MVVM的介绍和优缺
 [TOC]
 
 
-
-##MVC
+## MVC
 
 1、Android中MVC是什么？特点？
 >1. `Model`:针对业务模型建立的数据结构和类（与View无关，只与业务相关）
@@ -26,7 +25,7 @@ Android面试题，架构MVC/MVP/MVVM，包括MVC、MVP、MVVM的介绍和优缺
 >1. `Activity`并不是`MVC`中标准的`Controller`，既有`Controller`的职责也有`View`的职责，导致`Activity`的代码过于臃肿。
 >2. `View层`和`Model层`互相耦合，`耦合过重`,`代码量过大`，不易于开发和维护。
 
-##MVP
+## MVP
 
 3、Android中的MVP模式
 >1. `MVP(Model-View-Presenter)`
@@ -158,7 +157,7 @@ public class LoginFragment extends SupportFragment implements LoginMVPContract.I
 >1. 采用`泛型`定义契约类，将`model、view、presenter`定义在一个`契约类中`
 >2. 结构清晰，一个`契约类`对应一个`业务模块`。
 
-##MVVM
+## MVVM
 10、MVVM模式的作用和特点？
 >1. `Model-View-ViewModel`，将`Presenter`替换为`ViewModel`。
 >2. `ViewModel`和`Model/View`进行了双向绑定。
@@ -171,7 +170,7 @@ public class LoginFragment extends SupportFragment implements LoginMVPContract.I
 
 
 
-##模块化和组件化
+## 模块化和组件化
 11、什么是模块化
 >1. 一种`软件设计技术`
 >2. 将`项目`的功能拆分为`独立`、`可交换`的模块
@@ -200,7 +199,7 @@ public class LoginFragment extends SupportFragment implements LoginMVPContract.I
 >1. 可以自己实现但比较麻烦
 >2. 建议用`阿里巴巴`的开源库。
 
-##参考和学习资料
+## 参考和学习资料
 1. [认清Android框架 MVC，MVP和MVVM](https://blog.csdn.net/jdsjlzx/article/details/51174396#t2)
 1. [Data Binding](https://blog.csdn.net/feather_wch/article/details/79789597)
 1. [组件化开源方案-详细总结](https://blog.csdn.net/cdecde111/article/details/79322846)

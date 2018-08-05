@@ -1,12 +1,13 @@
-Android面试题之Window和WindowManager，包括View的事件分发、三大流程、滑动、滑动冲突等内容。
+Android面试题之Window和WindowManager，包括Window的添加、删除、更新
+Dialog源码、Toast源码等。
 
 >本文是我一点点归纳总结的干货，但是难免有疏忽和遗漏，希望不吝赐教。
->转载请注明链接：
+>转载请注明链接：https://blog.csdn.net/feather_wch/article/details/81437056
 
 有帮助的话请点个赞！万分感谢！
 
-# Window和WindowManager
-版本：2018/8/5-1(14:0)
+# Android面试题-Window和WindowManager(26题)
+版本：2018/8/5-1(23:0)
 
 ---
 
@@ -246,29 +247,28 @@ mButton.setOnTouchListener(new View.OnTouchListener() {
         ...
     }
 ```
->1. `WindowManager`是一个接口，真正实现类是`WindowManagerImpl`，并最终以代理模式交给`WindowManagerGlobal`实现
->1. addView: 1-创建ViewRootImpl；2-将ViewRoor、DecorView、布局参数保存到WM的内部列表中；3-ViewRoot.setView()建立ViewRoot和DecorView的联系
+>1. `WindowManager`是一个接口，真正实现类是`WindowManagerImpl`，并最终以代理模式交给`WindowManagerGlobal`实现。
+>1. addView: 1-创建ViewRootImpl；2-将ViewRoor、DecorView、布局参数保存到WM的内部列表中；3-ViewRoot.setView()建立ViewRoot和DecorView的联系。
 >2. setView：1-进行View绘制三大流程；2-会通过`WindowSession`完成Window的添加过程(一次IPC调用)
 >3. requestLayout：内部调用scheduleTraversals(), 底层通过mChoreographer去监听下一帧的刷新信号。
 >4. mWindowSession.addToDisplay: 执行`WindowManangerService`的addWindow
 >5. addWindow: 检查参数等设置;检查Token;将Token、Window保存到WMS中;将WindowState保存到Session中。
 
-
-
-14、Window的删除过程`removeView`
->1. 如同`addView`一样最终由`WindowManagerGlobal`实现
-```Java
+14、Window的remove源码与解析
+```java
+    //WindowManagerGlobal.java
     public void removeView(View view, boolean immediate) {
+        ...
+        synchronized (mLock) {
+            //1. 查询待删除的View的索引
+            int index = findViewLocked(view, true);
+            View curView = mRoots.get(index).getView();
+            //2. 进行进一步删除
+            removeViewLocked(index, immediate);
             ...
-            synchronized (mLock) {
-                //1. 查询待删除的View的索引
-                int index = findViewLocked(view, true);
-                View curView = mRoots.get(index).getView();
-                //2. 进行进一步删除
-                removeViewLocked(index, immediate);
-                ...
-            }
+        }
     }
+    //WindowManagerGlobal.java
     private void removeViewLocked(int index, boolean immediate) {
         ViewRootImpl root = mRoots.get(index);
         View view = root.getView();
@@ -283,19 +283,72 @@ mButton.setOnTouchListener(new View.OnTouchListener() {
             }
         }
     }
+    //ViewRootImpl.java
+    boolean die(boolean immediate) {
+        // 1. 同步删除时直接调用
+        if (immediate && !mIsInTraversal) {
+            doDie();
+            return false;
+        }
+        // 2. 异步删除会发送MSG
+        mHandler.sendEmptyMessage(MSG_DIE);
+        return true;
+    }
+
+    //ViewRootImpl.java内部类: ViewRootHandler
+    final class ViewRootHandler extends Handler {
+        @Override
+        public void handleMessage(Message msg) {
+            switch (msg.what) {
+                // 1. 执行doDie()
+                case MSG_DIE:
+                    doDie();
+                    break;
+                ...
+            }
+        }
+    }
+
+    //ViewRootImpl.java
+    void doDie() {
+        checkThread();
+        ...
+        // 1. 真正删除View
+        dispatchDetachedFromWindow();
+        // 2. 刷新数据，将Window对应的所有对象从列表中删除
+        WindowManagerGlobal.getInstance().doRemoveView(this);
+    }
+
+    //ViewRootImpl.java
+    void dispatchDetachedFromWindow() {
+        if (mView != null && mView.mAttachInfo != null) {
+            mAttachInfo.mTreeObserver.dispatchOnWindowAttachedChange(false);
+            /**==============================
+             * 1. 回调onDetachedFromWindow: 在View被移除时调用，可以进行一些终止动画、线程之类的操作
+             * 2. 回调onDetachedFromWindowInternal
+             *=====================================*/
+            mView.dispatchDetachedFromWindow();
+        }
+        // 3. 垃圾回收相关操作
+        mView = null;
+        mAttachInfo.mRootView = null;
+        mSurface.release();
+        ...
+        // 4. 通过Session的remove()删除Window---会调用WMS的removeWindow方法
+        mWindowSession.remove(mWindow);
+        // 5. 通过Choreographer移除监听器
+        unscheduleTraversals();
+    }
 ```
->2. `WindowManager`中提供了两种删除接口：`removeView`异步删除、`removeViewImmediate`同步删除(不建议使用)
->3. `die()`中如果是异步删除，会发送`MES_DIE`小心，`ViewRootImpl`的Hnalder会处理此消息，并调用`doDie()`方法(均为`ViewRootImpl`的方法)
->4. `die()`中如果是同步删除, 不会发送消息，直接调用`doDie()`方法
->5. `doDie()`会调用`dispatchDetachedFromWindow`真正删除View
+> 1. `WindowManager`中提供了两种删除接口：`removeView`异步删除、`removeViewImmediate`同步删除(不建议使用)
+> 1. 调用WMGlobal的removeView
+> 2. 调用到WMGlobal的removeViewLocked进行真正的移除
+> 3. 执行ViewRoot的die方法(): 1-同步方法直接调用doDie 2-异步方法直接发送Message
+> 4. doDie(): 调用`dispatchDetachedFromWindow()`和`WindowManagerGlobal.getInstance().doRemoveView(this)`
+> 5. dispatchDetachedFromWindow: 1-回调onDetachedFromeWindow；2-垃圾回收相关操作；3-通过Session的remove()在WMS中删除Window；4-通过Choreographer移除监听器
+>
 
-15、`ViewRootImpl`的`dispatchDetachedFromWindow`方法的主要操作
->1. 垃圾回收相关操作
->2. 通过`Session`的`remove()`删除Window, 这也是IPC操作，最终会调用`WindowManagerService`的`removeWindow`方法
->3. 调用View的`dispacthDetachedFromWindow`，内部会调用`onDetachedFromWindow()`以及`onDetachedFromWindowInternal()`方法：onDetachedFromWindow在View被移除时调用，可以进行一些终止动画、线程之类的操作
->4. 调用`WindowManagerGlobal`的`doRemoveView`刷新数据，将Window对应的所有对象从列表中删除
-
-16、Window的更新过程`updateViewLayout`
+15、Window的更新过程`updateViewLayout`
 ```java
     public void updateViewLayout(View view, ViewGroup.LayoutParams params) {
         ...
@@ -321,7 +374,7 @@ mButton.setOnTouchListener(new View.OnTouchListener() {
 
 ![wm](https://img-blog.csdn.net/20170710120350347?watermark/2/text/aHR0cDovL2Jsb2cuY3Nkbi5uZXQvbHUxMDI0MTg4MzE1/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70/gravity/Center)
 
-17、Activity的启动过程
+16、Activity的启动过程
 >1. 最终会由`ActivityThread`中的`performLauchActivity`来完成整个启动过程
 >2. `performLauchActivity`内部会通过`类加载器`创建Activity的实例对象
 >3. 并为Activity的实例对象调用`attach`方法，为其关联运行过程中所以来的上下文环境变量
@@ -329,7 +382,7 @@ mButton.setOnTouchListener(new View.OnTouchListener() {
 >5. `Window`对象的创建是通过`PolicyManager`的`makeNewWindow`方法实现。
 >6. `Activity`实现了`window`的`callback接口`，因此外界状态改变时会回调Activity的方法(onAttachedToWindow、dispatchTouchEvent等等)
 
-18、PolicyManager是什么
+17、PolicyManager是什么
 >1. 是一个策略类
 >2. Activity的`Window`就是通过`PolicyManager`的一个工厂方法创建
 >3. `PolicyManager`实现的工厂方法全部在策略接口`IPolicy`中声明
@@ -341,40 +394,51 @@ public Window makeNewWindow(Context context){
 }
 ```
 
-19、Activity的视图如何附加到Window上？
->1. `Activity`的视图由`setContentView`方法提供
->2. `setContentView`中直接将实现交给`Window`处理`getWindow().setContentView(layoutResID)`, 因此只需要看`PhoneWindow`的`setContentView`方法
->3. `PhoneWindow`中的`setContentView`最终将View视图附加到Window上
-
-20、`PhoneWindow`的`setContentView`方法中创建`DecorView`的原理
->1. `DecorView`是一个FrameLayout
-> 2. `DecorView`是Activity中的顶级View，内不包含标题栏(根据主题可以没有)和内部栏(id是android.R.id.content)
-> 3. `DecorView`的创建由`installDecor()`中的`generateDecor()`方法完成
-> 4. `installDecor()`中`PhoneWindow`还需套通过`generateLayout`方法加载具体的布局文件到`DecorView`中
-
-21、`PhoneWindow`的`setContentView`方法中添加View到DecorView的原理
->1. 将`Activity`的视图添加到`DecorView`的`mContentParent`中
->2. `mContentParent`就是`DecorView`中的内容栏(android.R.id.content)
+18、Activity的视图加载的源码分析
 ```java
-mLayoutInflater.inflate(layoutResID, mContentParent);
-```
+    // Activity.java
+    public void setContentView(@LayoutRes int layoutResID) {
+        // 1. 交给Window(PhoneWindow)处理
+        getWindow().setContentView(layoutResID);
+        // 2. 创建ActionBar
+        initWindowDecorActionBar();
+    }
 
-22、`PhoneWindow`的`setContentView`方法中回调`Activity的onContentChanged()`方法
->1. 用于通知Activity视图已经发生改变
-> 2. 表示`Activity`的布局文件已经添加到`DecorView`的`mContentParent`中
-> 3. `Activity`中`onContentChanged()`是空实现，可以自定义处理该回调
-```java
-final Callback cb = getCallback(); //Activity实现了Window的Callback接口
-if (cb != null && !isDestroyed()) {
-      cb.onContentChanged();
-}
-```
+    //PhoneWindow.java
+    public void setContentView(int layoutResID) {
+        // 1. 如果不存在ContentView,就创建
+        if (mContentParent == null) {
+            installDecor();
+        }
+        // 2. 加载setContentView参数所指定的布局，加载到ContentView中
+        mLayoutInflater.inflate(layoutResID, mContentParent);
+        // 3. 回调Activity的onContentChanged()接口---该接口是空实现, 用于通知Activity视图已经发生改变.
+        final Window.Callback cb = getCallback();
+        if (cb != null && !isDestroyed()) {
+            cb.onContentChanged();
+        }
+    }
 
-23、`DecorView`何时才被`WindowManager`真正添加到`Window`中？
+    //PhoneWindow.java
+    private void installDecor() {
+        // 1. 不存在DecorView就创建
+        if (mDecor == null) {
+            mDecor = generateDecor(-1);
+        }
+        // 2. 不存在ContentView就创建，布局为android.R.id.content
+        if (mContentParent == null) {
+            mContentParent = generateLayout(mDecor);
+        }
+    }
+```
+> 1. Activity.setContentView(): 1-交给PhoneWindow处理 2-设置ActionBar
+> 2. PhoneWindow.setContentView(): 1-创建ContentView(mContentParent就是布局为android.R.id.content的ContentView) 2-加载布局到ContentView中 3-回调Activity的onContentChanged()接口
+> 3. onContentChanged()：用于通知Activity视图已经发生改变
+
+19、`DecorView`何时才被`WindowManager`真正添加到`Window`中？
 >1. 即使Activity的布局已经成功添加到`DecorView`中，`DecorView`此时还没有添加到`Window`中
 >2. `ActivityThread`的`handleResumeActivity`方法中，首先会调用`Activity`的`onResume`方法，接着调用`Activity`的`makeVisible()`方法
 >3. `makeVisible()`中完成了`DecorView`的添加和显示两个过程
-
 ```java
     void makeVisible() {
       //1. 将`DecorView`添加到`Window`中(通过WindowManager)
@@ -388,28 +452,34 @@ if (cb != null && !isDestroyed()) {
     }
 ```
 
+
+20、DecorView是什么？
+> 1. `DecorView`是一个FrameLayout
+> 2. `DecorView`是Activity中的顶级View，内不包含标题栏(根据主题可以没有)和内部栏(id是android.R.id.content)
+
+
 ## Dialog
 
-24、 Dialog的Window创建过程
+21、 Dialog的Window创建过程
 >1. 创建Window——同样是通过`PolicyManager`的`makeNewWindow`方法完成，与Activity创建过程一致
 > 2. 初始化`DecorView`并将`Dialog`的视图添加到`DecorView`中——和Activity一致(setContentView)
 > 3. 将`DecorView`添加到`Window`中并显示——在`Dialog`的`show`方法中，通过`WindowManager`将`DecorView`添加到`Window`中(mWindowManager.addView(mDecor, 1))
 > 4. `Dialog`关闭时会通过`WindowManager`来移除`DecorView`：`mWindowManager.removeViewImmediate(mDecor)`
 > 5. `Dialog`必须采用`Activity`的`Context`，因为有应用`token`(`Application`的`Context`没有应用token)，也可以将`Dialog`的`Window`通过`type`设置为系统Window就不再需要token。
 
-25、为什么Dialog不能用Application的Context？
+22、为什么Dialog不能用Application的Context？
 >1. Dialog本身的Token为null，在初始化时如果是使用Application或者Service的Context，在获取到WindowManager时，获取到的token依然是null。
 > 2. Dialog如果采用Activity的Context，获取到的WindowManager是在activity.attach()方法中创建，token指向了activity的token。
 > 3. 因为通过Application和Service的Context将无法获取到Token从而导致失败。
 
 ## Toast
 
-26、Toast的内部机制介绍
+23、Toast的内部机制介绍
 >1. `Toast`也是基于`Window`来实现的
 > 2. `Toast`具有定时取消功能，系统采用`Handler`实现
 > 3. `Toast`内部有两类IPC过程：1-Toast访问NotificationManagerService；2-NotificationManagerService回调`Toast`的`TN`接口
 
-27、Toast的show()方法原理分析
+24、Toast的show()方法原理分析
 ```java
 /**
  * Toast.java中显示和隐藏都是IPC过程
@@ -515,7 +585,7 @@ void showNextToastLocked() {
 }
 ```
 
-28、Toast的cancel()方法原理分析
+25、Toast的cancel()方法原理分析
 >1. 内部调用`NotificationManagerService`的cancelToast方法()
 >2. cancelToast方法()->cancelToastLocked()->record.callback.hide();
 >3. record.callback.hide()通过IPC调用TN中的hide方法
@@ -533,7 +603,7 @@ public void cancel() {
 }
 ```
 
-29、Toast的TN(Binder)内部机制
+26、Toast的TN(Binder)内部机制
 ```java
 //Toast.java TN
 private static class TN extends ITransientNotification.Stub {

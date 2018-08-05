@@ -1,9 +1,15 @@
-转载请注明链接：https://blog.csdn.net/feather_wch/article/details/79720907
+Android面试题之刷新机制，包括View是如何在16.7ms内完成画面刷新、注册监听ASYNC信号、同步屏障等。
 
-以提问形式讲解View是如何在16.7ms内完成画面刷新的知识点和原理，以及相关源码的解析。
+>本文是我一点点归纳总结的干货，但是难免有疏忽和遗漏，希望不吝赐教。
+>转载请注明链接：https://blog.csdn.net/feather_wch/article/details/81437689
 
-# Android的刷新机制详解
-版本:2018/3/27-1(18:19)
+有帮助的话请点个赞！万分感谢！
+
+# Android面试题-刷新机制详解(9题)
+
+版本:2018/8/5-1(23:23)
+
+---
 
 [TOC]
 
