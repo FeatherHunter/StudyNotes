@@ -657,6 +657,19 @@ private static class TN extends ITransientNotification.Stub {
 }
 ```
 
+## 进阶题
+
+1、UI线程一定是主线程吗？
+> 1. WindowManager的addView方法中会创建ViewRootImpl。 ViewRootImpl在创建时会将所在线程指定为UI线程。
+> 1. 也就是说调用WM的addView方法的线程就是UI线程。
+> 1. UI操作会在`ViewRootImpl`的checkThread中进行线程检测。
+> 1. 对于Activity的启动：UI线程 = 主线程。
+> 2. 对于WM的addView： 在哪个线程调用，哪个线程就是新建的Window的UI线程。
+
+2、子线程操作UI一定会崩溃吗？
+>1. 在onCreate()里面创建子线程进行UI操作(线程中不能有延迟)，就不会崩溃。因为在handleResumeActivity内部执行WM.addView时才创建了ViewRoot并进行UI线程检测。
+>2. 在荣耀Play(Android 8.1 API27)的手机上，通过子线程操作UI不会有问题。
+
 ## 参考资料
 1. [Dialog为什么不能用Application的context](https://www.jianshu.com/p/628ac6b68c15)
 2. [WMS之Token](https://blog.csdn.net/u012702547/article/details/53179957)

@@ -4,7 +4,7 @@ Android面试题之四大组件+Fragment，包括Activity、Service、广播、C
 >转载请注明链接：https://blog.csdn.net/feather_wch/article/details/81136168
 
 # Android面试题-四大组件(73题)
-版本：2018/8/3-1(2113)
+版本：2018/8/6-1(1113)
 
 [TOC]
 
@@ -1798,10 +1798,28 @@ AMS->AMS: 19.publishContentProviders()
 >18.创建ContentProvider对象,并调用onCreate方法
 >19.将已经启动的ContentProvider保存在AMS的ProviderMap中，外部调用者就可以直接从AMS中获取ContentProvider
 
+## 补充题
+1、如何实现一个应用没有界面和图标只有后台Service的需求？
+> 1. 启动一个没有启动页面和图标的Activity然后去开启Service
+> 2. AndroidManifest中有属性能设置。
 
-##参考和学习资料
+2、如何在Service中启动一个Activity
+> 1-需要添加Flag:`FLAG_ACTIVITY_NEW_TASK`---荣耀Play没有崩溃、红米Note3崩溃
+```
+android.util.AndroidRuntimeException: Calling startActivity() from outside of an Activity  context requires the FLAG_ACTIVITY_NEW_TASK flag. Is this really what you want?
+```
+> 2-给Activity设置:`android:excludeFromRecents=“true”`---在特定机型会出现最近任务列表有两个app的情况。也可以用于从最近任务列表中隐藏。
+
+3、为什么在Service中启动Activity(不设置Flag)会崩溃？
+> 1. 执行顺序：service.startActivity()->ContextWrapper.startActivity()->ContextImpl.startActivity()
+> 2. 在ContextImpl.startActivity()中会对`FLAG_ACTIVITY_NEW_TASK`进行检查。
+> 3. Activity不会出现该原因，是因为对startActivity进行了重写。
+
+## 参考和学习资料
 1. [剖析Activity、Window、ViewRootImpl和View之间的关系](http://mp.weixin.qq.com/s/-5lyASIaSFV6wG3wfMS9Yg)
 1. [Service 启动和绑定解析](https://www.jianshu.com/p/5d73389f3ab2)
 1. [Service](https://www.jianshu.com/p/e04c4239b07e)
 1. [桥接模式和代理模式的区别](https://blog.csdn.net/see__you__again/article/details/51996797)
 1. [代理模式与桥接模式 备忘](https://blog.csdn.net/agezhc/article/details/38735985)
+1. [无界面Activity或者APP的实现](https://blog.csdn.net/cqx13763055264/article/details/80037162)
+1. [Android 在Service中启动Activity的崩溃问题详解](https://blog.csdn.net/fang323619/article/details/74388804)
