@@ -6,7 +6,7 @@ Android面试题之Handler消息机制，包括Handler、MessageQueue、Looper�
 
 
 # Android面试题-Handler消息机制(23题)
-版本：2018/8/5-1(2300)
+版本：2018/8/8-1(1100)
 
 [TOC]
 
@@ -68,7 +68,7 @@ Log.d("ThreadLocal", "[Thread#main]" + mBooleanThreadLocal.get());
 new Thread("Thread#1"){
     @Override
     public void run(){
-        mBooleanThreadLocal.set(true);
+        mBooleanThreadLocal.set(false);
         Log.d("ThreadLocal", "[Thread#1]" + mBooleanThreadLocal.get());
     }
 }.start();
