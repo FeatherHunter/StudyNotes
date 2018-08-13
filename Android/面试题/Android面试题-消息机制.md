@@ -5,8 +5,10 @@ Android面试题之Handler消息机制，包括Handler、MessageQueue、Looper�
 本文是我一点点归纳总结的干货，但是难免有疏忽和遗漏，希望不吝赐教。
 
 
-# Android面试题-Handler消息机制(23题)
-版本：2018/8/8-1(1100)
+# Android面试题-Handler消息机制(24题)
+版本：2018/8/13-1(2346)
+
+---
 
 [TOC]
 
@@ -199,10 +201,82 @@ Message next() {
 }
 ```
 
+14、MessageQueue的next源码详解
+```java
+    Message next() {
+        int nextPollTimeoutMillis = 0;
+        for (;;) {
+            /**======================================================================
+             * 1、精确阻塞指定时间。第一次进入时因为nextPollTimeoutMillis=0，因此不会阻塞。
+             *   1-如果nextPollTimeoutMillis=-1，一直阻塞不会超时。
+             *   2-如果nextPollTimeoutMillis=0，不会阻塞，立即返回。
+             *   3-如果nextPollTimeoutMillis>0，最长阻塞nextPollTimeoutMillis毫秒(超时)，如果期间有程序唤醒会立即返回。
+             *====================================================================*/
+            nativePollOnce(ptr, nextPollTimeoutMillis);
+
+            synchronized (this) {
+                // 当前时间
+                final long now = SystemClock.uptimeMillis();
+                Message msg = mMessages;
+                /**=======================================================================
+                 * 2、当前Msg为消息屏障
+                 *   1-说明有重要的异步消息需要优先处理
+                 *   2-遍历查找到异步消息并且返回。
+                 *   3-如果没查询到异步消息，会continue，且阻塞在nativePollOnce直到有新消息
+                 *====================================================================*/
+                if (msg != null && msg.target == null) {
+                   // 遍历寻找到异步消息，或者末尾都没找到异步消息。
+                    do {
+                        msg = msg.next;
+                    } while (msg != null && !msg.isAsynchronous());
+                }
+                /**================================================================
+                 *  3、获取到消息
+                 *    1-消息时间已到，返回该消息。
+                 *    2-消息时间没到，表明有个延时消息，会修正nextPollTimeoutMillis。
+                 *    3-后面continue，精确阻塞在nativePollOnce方法
+                 *===================================================================*/
+                if (msg != null) {
+                    // 延迟消息的时间还没到，因此重新计算nativePollOnce需要阻塞的时间
+                    if (now < msg.when) {
+                        nextPollTimeoutMillis = (int) Math.min(msg.when - now, Integer.MAX_VALUE);
+                    } else {
+                        // 返回获取到的消息(可以为一般消息、时间到的延迟消息、异步消息)
+                        return msg;
+                    }
+                } else {
+                    /**=============================
+                     * 4、没有找到消息或者异步消息
+                     *==============================*/
+                    nextPollTimeoutMillis = -1;
+                }
+
+                /**===========================================
+                 * 5、没有获取到消息，进行下一次循环。
+                 *   (1)此时可能处于的情况：
+                 *      1-没有获取到消息-nextPollTimeoutMillis = -1
+                 *      2-没有获取到异步消息(接收到同步屏障却没找到异步消息)-nextPollTimeoutMillis = -1
+                 *      3-延时消息的时间没到-nextPollTimeoutMillis = msg.when-now
+                 *   (2)根据nextPollTimeoutMillis的数值，最终都会阻塞在nativePollOnce(-1)，
+                 *      直到enqueueMessage将消息添加到队列中。
+                 *===========================================*/
+                if (pendingIdleHandlerCount <= 0) {
+                    // 用于enqueueMessage进行精准唤醒
+                    mBlocked = true;
+                    continue;
+                }
+            }
+        }
+    }
+```
+> 1. 如果是一般消息，会去获取消息，没有获取到就会阻塞(native方法)，直到enqueueMessage插入新消息。获取到直接返回Msg。
+> 1. 如果是同步屏障，会去循环查找异步消息，没有获取到会进行阻塞。获取到直接返回Msg。
+> 1. 如果是延时消息，会计算时间间隔，并进行精准定时阻塞(native方法)。直到时间到达或者被enqueueMessage插入消息而唤醒。时间到后就返回Msg。
+
 ## Looper
 
 
-14、Looper的构造
+15、Looper的构造
 ```java
 private Looper(boolean quitAllowed) {
     //1. 会创建消息队列: MessageQueue
@@ -212,7 +286,7 @@ private Looper(boolean quitAllowed) {
 }
 ```
 
-15、为线程创建Looper
+16、为线程创建Looper
 ```java
 //1. 在没有Looper的线程创建Handler会直接异常
 new Thread("Thread#2"){
@@ -237,18 +311,18 @@ new Thread("Thread#2"){
 }.start();
 ```
 
-16、主线程ActivityThread中的Looper
+17、主线程ActivityThread中的Looper
 >1. 主线程中使用`prepareMainLooper()`创建`Looper`
 >2. `getMainLooper`能够在任何地方获取到主线程的`Looper`
 
-17、Looper的退出
+18、Looper的退出
 >1. `Looper`的退出有两个方法：`quit`和`quitSafely`
 >2. `quit`会直接退出`Looper`
 >3. `quitSafely`只会设置退出标记，在已有消息全部处理完毕后才安全退出
 >4. `Looper`退出后，`Handler`的发行的消息会失败，此时`send`返回`false`
 >5. `子线程`中如果手动创建了`Looper`，应该在所有事情完成后调用`quit`方法来终止消息循环
 
-18、Looper的loop()源码分析
+19、Looper的loop()源码分析
 ```java
 //Looper.java
 public static void loop() {
@@ -285,7 +359,7 @@ public static void loop() {
 
 ## Handler
 
-19、Handler的post/send()源码分析
+20、Handler的post/send()源码分析
 ```java
 //Handler.java: post最终是通过send系列方法实现的
 //Handler.java
@@ -325,7 +399,7 @@ private boolean enqueueMessage(MessageQueue queue, Message msg, long uptimeMilli
 >2. `MessageQueue`的`next`方法就会返回这条消息交给`Looper`
 >3. 最终`Looper`会把消息交给`Handler`的`dispatchMessage`
 
-20、Handler的postDelayed源码分析
+21、Handler的postDelayed源码分析
 ```java
     //Handler.java---层层传递，和一般的post调用的同一个底层方法.
     public final boolean postDelayed(Runnable r, long delayMillis)
@@ -350,7 +424,7 @@ private boolean enqueueMessage(MessageQueue queue, Message msg, long uptimeMilli
 > 5. 唤醒后会拿出队列头部的消息B，进行处理。然后会继续因为消息A而阻塞。
 > 6. 如果达到了消息A延迟的时间，会取出消息A进行处理。
 
-21、Handler的消息处理源码
+22、Handler的消息处理源码
 ```java
 //Handler.java
 public void dispatchMessage(Message msg) {
@@ -382,7 +456,7 @@ public interface Callback {
 }
 ```
 
-22、Handler的特殊构造方法
+23、Handler的特殊构造方法
 >1. `Handler handle = new Handler(callback);`-不需要派生Handler
 >2. 通过特定`Looper`构造`Handler`
 ```java
@@ -408,7 +482,7 @@ public Handler(Callback callback, boolean async) {
 
 ## 主线程的消息循环
 
-23、主线程ActivityThread的消息循环
+24、主线程ActivityThread的消息循环
 ```java
 //ActivityThread.java
 public static void main(String[] args) {

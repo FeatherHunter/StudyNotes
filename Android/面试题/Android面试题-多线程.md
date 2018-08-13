@@ -5,9 +5,9 @@ Android面试题之多线程，包括线程、Java同步问题、阻塞队列、
 
 有帮助的话请点个赞！万分感谢！
 
-# Android面试题-多线程(73题)
+# Android面试题-多线程(99题)
 
-2018/8/5(23:45)
+2018/8/13(23:45)
 
 [TOC]
 
@@ -47,6 +47,7 @@ Android面试题之多线程，包括线程、Java同步问题、阻塞队列、
 >2. 线程一旦`得到锁`会返回到`可运行状态`
 
 
+备注：
 > 如下题目中的`Object.wait()`是指具体对象调用`wait等方法---someObject.wait()`，`Thread.join`是指具体线程调用该方法---`childThread.join()`
 
 
@@ -763,6 +764,95 @@ startService(service);
 >    1. 普通同步方法，锁是当前实例对象
 >    2. 静态同步方法，锁是当前类的class对象
 >    3. 同步方法块，锁是括号里面的对象
+
+74、现在有T1、T2、T3三个线程，你怎样保证T2在T1执行完后执行，T3在T2执行完后执行？
+>考察对Join是否熟悉：父线程会等待子线程运行结束
+```java
+Thread thread3 = new Thread(new Runnable() {
+            @Override
+            public void run() {
+              /**
+                * T2：T3等待T2执行完毕
+                */
+                Thread thread2 = new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                       /**
+                        * T1：T2等待T1执行完毕
+                        */
+                        Thread thread1 = new Thread(new Runnable() {
+                            @Override
+                            public void run() {
+                                System.out.println("Thread 1 stopped");
+                            }
+                        });
+                        thread1.start();
+                        // T2等待T1执行完毕
+                        thread1.join();
+
+                        System.out.println("Thread 2 stopped");
+                    }
+                });
+                thread2.start();
+                //T3等待T1执行完毕
+                thread2.join();
+
+                System.out.println("Thread 3 stopped");
+            }
+});
+thread3.start();
+
+```
+
+75、在Java中Lock接口比synchronized块的优势是什么？你需要实现一个高效的缓存，它允许多个用户读，但只允许一个用户写，以此来保持它的完整性，你会怎样去实现它？
+
+76、在java中wait和sleep方法的不同？
+
+77、用Java实现阻塞队列。
+
+78、用Java写代码来解决生产者——消费者问题。
+
+79、用Java编程一个会导致死锁的程序，你将怎么解决？
+
+80、什么是原子操作，Java中的原子操作是什么？如何同步一个原子操作？
+
+81、Java中的volatile关键是什么作用？怎样使用它？在Java中它跟synchronized方法有什么不同？
+
+82、什么是竞争条件？你怎样发现和解决竞争？
+
+83、你将如何使用thread dump？你将如何分析Thread dump？
+
+84、为什么我们调用start()方法时会执行run()方法，为什么我们不能直接调用run()方法？
+
+85、Java中你怎样唤醒一个阻塞的线程？
+
+86、在Java中CycliBarriar和CountdownLatch有什么区别？
+
+87、什么是不可变对象，它对写并发应用有什么帮助？
+
+88、你在多线程环境中遇到的共同的问题是什么？你是怎么解决它的？
+
+89、在java中绿色线程和本地线程区别？
+
+90、线程与进程的区别？
+
+91、什么是多线程中的上下文切换？
+
+92、死锁与活锁的区别，死锁与馅饼的区别？
+
+93、Java中用到的线程调度算法是什么？
+
+94、在Java中什么是线程调度？
+
+95、在线程中你怎么处理不可捕捉异常？
+
+96、什么是线程组，为什么在Java中不推荐使用？
+
+97、为什么使用Executor框架比使用应用创建和管理线程好？
+
+98、在Java中Executor和Executors的区别？
+
+99、如何在Windows和Linux上查找哪个线程使用的CPU时间最长？
 
 ## Java并发进阶
 

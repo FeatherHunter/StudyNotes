@@ -1,3 +1,4 @@
+转载请注明链接：https://blog.csdn.net/feather_wch/article/details/81613313
 
 # RecyclerView和ListView原理
 
@@ -418,3 +419,4 @@ private ArrayList<View>[] mScrapViews;
 1. [ListView的getItemViewType和getViewTypeCount](https://www.cnblogs.com/RGogoing/p/5872217.html)
 1. [Android ListView工作原理完全解析，带你从源码的角度彻底理解](https://blog.csdn.net/guolin_blog/article/details/44996879)
 1. [android列表View,ListView源码分析](https://www.jianshu.com/p/1e8fa9260637)
+1. [深入理解Android中的缓存机制(二)RecyclerView跟ListView缓存机制对比](https://juejin.im/post/5a7569676fb9a063435eaf4c)
