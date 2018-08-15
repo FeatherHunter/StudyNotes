@@ -12,26 +12,27 @@
 > 3.defer：可选。表示脚本可以延迟到文档完全被解析和显示之后执行（只对外部脚本文件有效）
 > 4.language：已废弃。原来用于表示编写代码使用的脚本语言。
 > 5.src：可选。表示包含要执行代码的外部文件。
-> 6.type：可选。
+> 6.type：可选，必需？。
 > 1. 可以看成是language的替代属性：表示编写代码使用的脚本语言的内容类型（也成为MIME类型）；
 > 2. 设置type为"text/javascript"（约定俗成和兼容性），实际上，服务器传的是application/x-javascript。在type中设置会导致脚本被忽略。
 
 2、使用`<script>`元素的方法
 > 1.直接在页面中嵌入JavaScript
 > 1. 指定type属性；
-> 2. `<script>`是结束标签，如果要表示"</script>"字符串，可以写成`<\/script>`；
+> 2. `<script>`是结束标签，如果要表示"</script>"字符串，可以写成`<\/script>`或`'</scr'+'ipt>'`；
 >```
 ><script type="text/javascipt">
 >function sayScript()
 >{
 >  alert("<\/script>");
+>  alert('</scr'+'ipt>');    //本质是将两个字符串组合起来
 >}
 >```
-> 2.包含外部JavaScript文件，src属性是必须的。
+> 2.包含外部JavaScript文件，src属性是必须的（此时，不存在"</script>"字符串表示的问题，可以直接在外部文件中使用`alert("</script>")`）。
 > > 1. src属性可以包含本地的js文件；
 > > 2. src属性也可以包含某个域中的URL；
 >```
-><script type="text/javascript" src="http://www.somewhere.com/afile.js></script>    
+><script type="text/javascript" src="http://www.somewhere.com/afile.js></script>
 >```
 > **注意：**
 > 带有src属性的`<script>`元素，不应该嵌入额外的JavaScript代码，如包含了，只会执行外部脚本文件，嵌入的会忽略。
@@ -49,7 +50,7 @@
 >  </head>
 >  <body>
 >    <!-- 这里放内容 -->
->    <script type="text/javascript" src="afile.js></script>  
+>    <script type="text/javascript" src="afile.js></script>
 >    <script type="text/javascript" src="bfile.js></script>
 >  </body>
 ></html>
