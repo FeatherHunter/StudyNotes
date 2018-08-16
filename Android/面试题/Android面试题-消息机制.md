@@ -6,7 +6,7 @@ Android面试题之Handler消息机制，包括Handler、MessageQueue、Looper�
 
 
 # Android面试题-Handler消息机制(24题)
-版本：2018/8/13-1(2346)
+版本：2018/8/16-1(1946)
 
 ---
 
@@ -508,3 +508,42 @@ private class H extends Handler {
 >2. `AMS`完成请求的工作后会回调`ApplicationThread`中的`Binder`方法
 >3. `ApplicationThread`会向`Handler H`发送消息
 >4. `H`接收到消息后会将`ApplicationThread`的逻辑切换到`ActivityThread`中去执行
+
+## 面试题：练一练
+1、Android如何保证一个线程最多只能有一个Looper？
+> 1-Looper的构造方法是private，不能直接构造。需要通过Looper.prepare()进行创建，
+```java
+private Looper(boolean quitAllowed) {
+    mQueue = new MessageQueue(quitAllowed);
+    mThread = Thread.currentThread();
+}
+```
+> 2-如果在已有Looper的线程中调用`Looper.prepare()`会抛出RuntimeException异常
+```java
+public class Looper {
+
+    static final HashMap<Long, Looper> looperRegistry = new HashMap<Long, Looper>();
+
+    private static void prepare() {
+        synchronized(Looper.class) {
+            long currentThreadId = Thread.currentThread().getId();
+            // 根据线程ID查询Looper
+            Looper l = looperRegistry.get(currentThreadId);
+            if (l != null)
+                throw new RuntimeException("Only one Looper may be created per thread");
+            looperRegistry.put(currentThreadId, new Looper(true));
+        }
+    }
+    ...
+}
+```
+
+
+2、Handler消息机制中，一个looper是如何区分多个Handler的？
+> 1. Looper.loop()会阻塞于MessageQueue.next()
+> 1. 取出msg后，msg.target成员变量就是该msg对应的Handler
+> 1. 调用msg.target的disptachMessage()进行消息分发。这样多个Handler是很容易区分的。
+
+3、主线程向子线程发送消息的方法？
+> 1. 通过在主线程调用子线程中Handler的post方法，完成消息的投递。
+> 1. 通过`HandlerThread`实现该需求。
