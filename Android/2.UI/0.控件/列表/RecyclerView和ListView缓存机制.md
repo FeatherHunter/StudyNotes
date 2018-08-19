@@ -2,7 +2,7 @@
 
 # RecyclerView和ListView原理
 
-最后修改版本：2018/8/13-1(0:52)
+最后修改版本：2018/8/20-1(0:52)
 
 ----
 
@@ -375,13 +375,13 @@ private ArrayList<View>[] mScrapViews;
 
 ## RecyclerView
 
-16、RecyclerView特点
+1、RecyclerView特点
 > 1. 多样式：可以对数据的展示进行定制，可以是列表\网格\瀑布流，还可以自定义样式.
 > 1. 定向刷新：可以对指定的Item数据进行刷新
 > 1. 刷新动画：RecyclerView支持对Item的刷新添加动画
 > 1. 添加装饰：相对于ListView以及GridView的单一的分割线，RecyclerView可以自定义添加分割样式
 
-17、RecyclerView的6大组成
+2、RecyclerView的6大组成
 
 |RecyclerView内部类||
 |---|---|
@@ -392,10 +392,305 @@ private ArrayList<View>[] mScrapViews;
 |ItemAnimator|负责处理数据添加或者删除时的动画效果|
 |【Cache】|Recycler/RecycledViewPool/ViewCacheExtension|
 
+### 观察者模式
 
+3、RecyclerView的Observer(观察者)
+> 1)-RV没有采用系统的Observer，而是用RecyclerViewDataObserver继承自自定义的AdapterDataObserver。
+> 2)-AdapterDataObserver如下：
+```java
+    public abstract static class AdapterDataObserver {
+        // 改变：范围内item
+        public void onItemRangeChanged(int positionStart, int itemCount) {
+        }
+        // 插入：范围内item
+        public void onItemRangeInserted(int positionStart, int itemCount) {
+        }
+        // 删除：范围内item
+        public void onItemRangeRemoved(int positionStart, int itemCount) {
+        }
+        // 移动：范围内item
+        public void onItemRangeMoved(int fromPosition, int toPosition, int itemCount) {
+        }
+    }
+```
+> 3)-RecyclerViewDataObserver: 继承并实现了AdapterDataObserver的所有方法。
 
-1、RecyclerView的四级缓存
+4、RecyclerView的Observable(被观察者)
+> 1. RecyclerView实际采用了系统的Observable。
+> 2. AdapterDataObservable继承自Observable。
+```java
+    static class AdapterDataObservable extends Observable<RecyclerView.AdapterDataObserver> {
+        // 获取到【观察者】，并且调用其onChanged方法
+        public void notifyChanged() {
+            for(int i = this.mObservers.size() - 1; i >= 0; --i) {
+                ((RecyclerView.AdapterDataObserver)this.mObservers.get(i)).onChanged();
+            }
+
+        }
+        // 通知观察者，范围刷新Item
+        public void notifyItemRangeChanged(int positionStart, int itemCount, @Nullable Object payload) {
+            for(int i = this.mObservers.size() - 1; i >= 0; --i) {
+                ((RecyclerView.AdapterDataObserver)this.mObservers.get(i)).onItemRangeChanged(positionStart, itemCount, payload);
+            }
+
+        }
+        // 通知观察者，范围插入Item
+        public void notifyItemRangeInserted(int positionStart, int itemCount) {
+            for(int i = this.mObservers.size() - 1; i >= 0; --i) {
+                ((RecyclerView.AdapterDataObserver)this.mObservers.get(i)).onItemRangeInserted(positionStart, itemCount);
+            }
+
+        }
+        // 通知观察者，范围删除Item
+        public void notifyItemRangeRemoved(int positionStart, int itemCount) {
+            for(int i = this.mObservers.size() - 1; i >= 0; --i) {
+                ((RecyclerView.AdapterDataObserver)this.mObservers.get(i)).onItemRangeRemoved(positionStart, itemCount);
+            }
+
+        }
+        // 通知观察者，范围移动Item
+        public void notifyItemMoved(int fromPosition, int toPosition) {
+            for(int i = this.mObservers.size() - 1; i >= 0; --i) {
+                ((RecyclerView.AdapterDataObserver)this.mObservers.get(i)).onItemRangeMoved(fromPosition, toPosition, 1);
+            }
+        }
+    }
+```
+
+### 缓存类
+
+5、RV的内部类Recycler是什么？有什么作用？
+> 1.  Recylcer用于管理"Scrpped View"和"Detached View"
+> 1. Scrapped View: 废弃的View，也就是仍然和RV连接着的，但是已经被标记为“删除的”或者“重用的”
+> 2. Detached View: 已经移除的View。
+```java
+    /**
+     * Recylcer用于管理"Scrpped View"和"Detached item"
+     */
+    public final class Recycler {
+        // 1、连接着RV的所有的Scraped View
+        final ArrayList<RecyclerView.ViewHolder> mAttachedScrap = new ArrayList();
+        // 2、数据源更改过的Attached View(连接着RV的View)
+        ArrayList<RecyclerView.ViewHolder> mChangedScrap = null;
+        // 3、缓存的所有View(包括可见和不可见的ViewHolder)
+        final ArrayList<RecyclerView.ViewHolder> mCachedViews = new ArrayList();
+
+        private final List<RecyclerView.ViewHolder> mUnmodifiableAttachedScrap;
+        // 4、RecycledViewPool：ViewHolder的缓存池，如果多个RV之间用setRecycledViewPool设置同一个RecycledViewPool，他们就可以共享Item。
+        RecyclerView.RecycledViewPool mRecyclerPool;
+        /**=======================================
+         * 5、缓存的扩展，可以对指定的position跟Type缓存
+         *  * 通过实现方法getViewForPositionAndType()来实现自己的缓存。
+         *=====================================================*/
+        private RecyclerView.ViewCacheExtension mViewCacheExtension;
+
+        static final int DEFAULT_CACHE_SIZE = 2; //默认缓存数量
+        private int mRequestedCacheMax = DEFAULT_CACHE_SIZE; //设置的最大缓存数量，默认为2。
+        int mViewCacheMax = DEFAULT_CACHE_SIZE; //View的缓存的最大数量，默认为2。
+    }
+```
+
+6、RV的缓存相对于ListView缓存的创新之处？
+> 1. `RV`给ViewHolder增加了一个`UpdateOp`标志。
+> 1. 通过`UpdateOp`标志可以进行定向刷新指定的Item，并通过`Payload`参数对`Item`进行局部刷新。
+> 1. 如果数据源经常变动，RecyclerView是最好的选择。
+
+#### 初始化
+
+7、RecycledViewPool的作用
+> 1. RecycledViewPool类是用来缓存Item用，是一个ViewHolder的缓存池
+> 1. 如果多个RecyclerView之间用setRecycledViewPool(RecycledViewPool)设置同一个RecycledViewPool，他们就可以共享Item。
+> 1. RecycledViewPool的内部维护了一个Map，里面以不同的viewType为Key存储了各自对应的ViewHolder集合。
+> 1. 可以通过提供的方法来修改内部缓存的Viewholder。
+
+8、Recycler会对RecylcedViewPool初始化
+```java
+    void setRecycledViewPool(RecyclerView.RecycledViewPool pool) {
+        if (this.mRecyclerPool != null) {
+            this.mRecyclerPool.detach();
+        }
+
+        this.mRecyclerPool = pool;
+        if (this.mRecyclerPool != null && RecyclerView.this.getAdapter() != null) {
+            this.mRecyclerPool.attach();
+        }
+
+    }
+```
+> 1. 如果原来有RecyclerPool则进行detach工作，然后使用新的pool
+
+#### 存缓存
+
+9、Recycler的recycleView()进行缓存
+```java
+    /**===============================================
+     * 回收不可见的View：
+     *   1. 采用LFU算法，最少使用策略，会去覆盖掉最少是用的缓存
+     *   2. 会添加缓存到mCachedViews中(缓存的所有View---包括可见和不可见的ViewHolder)
+     *   3. 特定的View回访金RecyclerViewPool
+     *=============================================*/
+    public void recycleView(View view) {
+        //这边传递过来的是一个View，然后通过View获取ViewHolder
+        ViewHolder holder = getChildViewHolderInt(view);
+        xxx
+        //开始缓存
+        recycleViewHolderInternal(holder);
+    }
+
+    void recycleViewHolderInternal(ViewHolder holder) {
+        // 1. 缓存的时候不能覆盖最近经常被使用到缓存
+        if (!mPrefetchRegistry.lastPrefetchIncludedPosition(cachedPos)) {
+            break;
+        }
+
+        // 2. 添加缓存
+        mCachedViews.add(targetCacheIndex, holder);
+        cached = true;
+        // 3. 如果没有缓存的话就添加进RecycledViewPool
+        if (!cached) {
+            addViewHolderToRecycledViewPool(holder, true);
+            recycled = true;
+        }
+    }
+```
+
+#### 取出缓存
+
+10、RecyclerView的四级缓存
+![RV缓存流程图](http://upload-images.jianshu.io/upload_images/1155837-e5365d4a8d217428.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 ![RecyclerView的四级缓存](http://mmbiz.qpic.cn/mmbiz_png/tnZGrhTk4desHkFxgnbyfgeoUgmoppufC6icrM5bKUMlvibopVTofN5qahSLwvibk3QDL48tib20PmcGB5EgKjjy9g/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1)
+
+11、Recycler取出缓存
+```java
+    // 1、获取到Position上的View
+    View getViewForPosition(int position, boolean dryRun) {
+        return this.tryGetViewHolderForPositionByDeadline(position, dryRun, xxx).itemView;
+    }
+
+    @Nullable
+    RecyclerView.ViewHolder tryGetViewHolderForPositionByDeadline(int position, boolean dryRun) {
+        RecyclerView.ViewHolder holder = null;
+        /**====================================
+         * 1、如果是提前layout，会先从 mChangedScrap集合中取（数据源更改过的Attached View）
+         *==================================*/
+        if (RecyclerView.this.mState.isPreLayout()) {
+            // mChangedScrap.get(offsetPosition)
+            holder = this.getChangedScrapViewForPosition(position);
+            xxx
+        }
+
+        /**====================================
+         * 2、会先从 mAttachedScrap集合中取（所有Attached Scrapped View），再从mCachedViews中寻找(缓存的所有View：包括可见和不可见)。
+         *==================================*/
+        if (holder == null) {
+            // mAttachedScrap.get(cacheSize)->mCachedViews.get(i)
+            holder = this.getScrapOrHiddenOrCachedHolderForPosition(position, dryRun);
+            xxxx
+        }
+        /**====================================
+         * 3、会先从 mAttachedScrap集合中取，再从mCachedViews中寻找。
+         *==================================*/
+        if (holder == null) {
+            // mAttachedScrap.get(cacheSize)->mCachedViews.get(i)
+            holder = this.getScrapOrCachedViewForId(RecyclerView.this.mAdapter.getItemId(offsetPosition), type, dryRun);
+        }
+
+        /**====================================
+         * 4、从mViewCacheExtension中获取
+         *==================================*/
+        if (holder == null && this.mViewCacheExtension != null) {
+            View view = this.mViewCacheExtension.getViewForPositionAndType(this, position, type);
+            if (view != null) {
+                holder = RecyclerView.this.getChildViewHolder(view);
+            }
+        }
+        /**====================================
+         * 5、从RecycledViewPool中获取ViewHolder
+         *==================================*/
+        if (holder == null) {
+            holder = this.getRecycledViewPool().getRecycledView(type);
+        }
+
+        /**=======================================================
+         * 6、均获取失败，会先create ViewHolder，再bind ViewHolder
+         *===================================================*/
+        if (holder == null) {
+            // 调用RV的Adapter的方法创建ViewHolder
+            holder = RecyclerView.this.mAdapter.createViewHolder(RecyclerView.this, type);
+            // 绑定ViewHolder： RecyclerView.this.mAdapter.bindViewHolder(holder, offsetPosition);
+            this.tryBindViewHolderByDeadline(holder, type, position, deadlineNs);
+        }
+        // 设置布局参数
+        android.view.ViewGroup.LayoutParams lp = holder.itemView.getLayoutParams();
+        RecyclerView.LayoutParams rvLayoutParams = generateLayoutParams(lp);
+
+        return holder;
+    }
+```
+
+#### 清除缓存
+12、Recycler清除所有缓存
+```java
+    // RecyclerView.java内部类：Recycler
+    public void clear() {
+        // 1、mAttachedScrap(所有Attached Scrapped View)都清除
+        this.mAttachedScrap.clear();
+        // 2、mCachedViews(缓存的所有可见和不可见View)全部清除
+        this.recycleAndClearCachedViews();
+    }
+    void recycleAndClearCachedViews() {
+        // 3、清除mCachedViews
+        this.mCachedViews.clear();
+        xxx
+    }
+```
+
+### 定向刷新
+
+13、AdapterHelper的作用
+> 1. 用于帮助Adapter更新数组
+> 1. 类似于ChildHelper帮助LayoutManager进行布局
+
+14、RecyclerView的定向刷新
+> 调用`mAdapter.notifyItemChanged(int position);`进行定向刷新
+```java
+    // RecyclerView.Adapter
+    public final void notifyItemChanged(int position) {
+        // 被观察者调用方法
+        this.mObservable.notifyItemRangeChanged(position, 1);
+    }
+    // RecyclerView.AdapterDataObservable
+    public void notifyItemRangeChanged(int positionStart, int itemCount, @Nullable Object payload) {
+        for(int i = this.mObservers.size() - 1; i >= 0; --i) {
+            // 通知观察者进行定向刷新
+            ((RecyclerView.AdapterDataObserver)this.mObservers.get(i)).onItemRangeChanged(positionStart, itemCount, payload);
+        }
+    }
+    // RecyclerView.AdapterDataObserver
+    public void onItemRangeChanged(int positionStart, int itemCount, @Nullable Object payload) {
+        this.onItemRangeChanged(positionStart, itemCount);
+    }
+
+    // RecyclerView.RecyclerViewDataObserver
+    public void onItemRangeChanged(int positionStart, int itemCount, Object payload) {
+        RecyclerView.this.assertNotInLayoutOrScroll((String)null);
+        if (RecyclerView.this.mAdapterHelper.onItemRangeChanged(positionStart, itemCount, payload)) {
+            this.triggerUpdateProcessor();
+        }
+    }
+
+    // AdapterHelper.java
+    boolean onItemRangeChanged(int positionStart, int itemCount, Object payload) {
+        if (itemCount < 1) {
+            return false;
+        } else {
+            // 将需要更新的Item的范围记录下来，并且添加更新标识。
+            this.mPendingUpdates.add(this.obtainUpdateOp(UpdateOp.UPDATE, positionStart, itemCount, payload));
+            this.mExistingUpdateTypes |= UpdateOp.UPDATE;
+            return this.mPendingUpdates.size() == 1;
+        }
+    }
+```
 
 1、RecyclerView如何复用Item
 
@@ -420,3 +715,4 @@ private ArrayList<View>[] mScrapViews;
 1. [Android ListView工作原理完全解析，带你从源码的角度彻底理解](https://blog.csdn.net/guolin_blog/article/details/44996879)
 1. [android列表View,ListView源码分析](https://www.jianshu.com/p/1e8fa9260637)
 1. [深入理解Android中的缓存机制(二)RecyclerView跟ListView缓存机制对比](https://juejin.im/post/5a7569676fb9a063435eaf4c)
+1. [关于Recyclerview的缓存机制的理解](https://zhooker.github.io/2017/08/14/%E5%85%B3%E4%BA%8ERecyclerview%E7%9A%84%E7%BC%93%E5%AD%98%E6%9C%BA%E5%88%B6%E7%9A%84%E7%90%86%E8%A7%A3/)
