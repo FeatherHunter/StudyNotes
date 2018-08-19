@@ -1,0 +1,178 @@
+	.clr {
+		clear: both;
+		width: 0px;
+		height: 0px;
+		overflow: hidden;
+	}
+
+	#container{
+		margin: 0 auto;
+		width:1002px;
+	}
+	#header{
+		height: 128px;
+		background: gray url(./top_bg.jpg);
+	}
+
+	#nav li {
+		width: 90px;
+		margin-right: 1px;
+		float:left;
+	}
+
+	#nav a {
+		/*font-size: 16px;
+		line-height: 37px;
+		font-family: '微软雅黑';*/
+		font:16px/37px '微软雅黑','黑体',sans-serif;
+		color:#363636;
+		display: block;
+		width:90px;
+		height: 37px;
+		text-align: center;
+	}
+
+	#nav a:hover {
+		color:white;
+		background: url(./nav_on.gif);
+	}
+
+	#banner {
+		margin: 6px 0;
+	}
+
+	#main{
+	}
+
+	#lside {
+		height: 480px;
+		width: 694px;
+		border: 1px solid #EEE;
+		border-radius:5px; 
+		float: left;
+		border-top:none;
+	}
+
+	.subtitle {
+		height: 37px;
+		background: gray url(./index_main_top_bg.gif);
+	}
+
+	.subtitle img {
+		margin:5px 0 0 10px;
+		float: left;
+	}
+
+	.subtitle h1 {
+		color: #151515;
+		float: left;
+		margin-left: 10px;
+		font:16px/37px 'Microsoft Yahei' , SimHei , sans-serif;
+	}
+
+	.subtitle a {
+		display: block;
+		color: #888;
+		font: 12px/37px SimSun,serif;
+		float:right;
+	}
+
+	.four {
+		width: 326px;
+		height: 200px;
+		background: #EEE;
+		margin: 10px;
+		float: left;
+	}
+
+	.four img {
+		float: left;
+		margin-left: 10px;
+		padding: 6px;
+		background: white;
+	}
+
+	.four ul{
+		float: left;
+		margin-left: 10px;
+	}
+
+	.four li {
+		background: url(./service_intro_bg.gif) no-repeat;
+		padding-left: 10px;
+		height: 20px;
+	}
+	
+	.four a {
+		font-size: 12px;
+		color:#888;
+	}
+
+	.four a:visited {
+		color:#808080;
+	}
+
+	.four a:hover{
+		color: #FF832C;
+	}
+
+	.four h2 {
+		color: #A0A0A0;
+		margin: 6px 0 6px 10px;
+		font-size:16px;
+		font-family: 'Microsoft Yahei' , SimHei , sans-serif;
+	}
+
+	#rside {
+		width: 294px;
+		float:right;
+	}
+
+	#art {
+		background: #EEE;
+		margin-top: 1px;
+		padding-top: 10px;
+	}
+
+	#art a {
+		font-size: 12px;
+		line-height: 29px;
+		color: #888;
+		display: block;
+		height: 29px;
+		padding-left: 30px;
+		background: url(./article_head.gif) no-repeat;
+	}
+
+	#art a:hover{
+		color: #FF832C;
+		background: url(./article_on_bg.gif);
+	}
+
+	#contact {
+		margin-top: 1px;
+		height: 249px;
+		background: #EEE;
+	}
+
+	#footer {
+		margin-top: 15px;
+		height: 120px;
+	}
+
+	#footer ul {
+		height: 40px;
+		background: #EEE;
+	}
+	#footer li {
+		font-size: 12px;
+		float: left;
+		margin-top: 15px;
+		margin-right: 10px;
+	}
+
+	#footer address {
+		margin-top: 10px;
+		font-size: 12px;
+		font-family: '微软雅黑',sans-serif;
+	}

@@ -1,0 +1,37 @@
+.header{
+    height:200px;
+    background: blue;
+}
+.main{
+    height:250px;
+    background: green;
+}
+.left{
+    height: 100px;
+    width:40%;
+    border:1px solid black;
+    float:left;
+}
+.right{
+    height: 100px;
+    width:40%;
+    border:1px solid black;
+    float:left;
+}
+.comml{
+    clear: both;
+    height:100px;
+    width:40%;
+    border: 1px solid orange;
+    float: left;
+}
+.commr{
+    height: 100px;
+    width:40%;
+    border: 1px solid orange;
+    float: left;
+}
+.footer{
+    height:200px;
+    background: red;
+}
