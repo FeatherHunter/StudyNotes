@@ -7,9 +7,13 @@
 
 # RecyclerView和ListView原理
 
-最后修改版本：2018/8/20-1(19:52)
+最后修改版本：2018/8/20-1(23:59)
 
 ----
+
+![RecyclerView和ListView原理](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/android/RecyclerView_ListView_YL_81613313.png?raw=true)
+
+---
 
 [TOC]
 
