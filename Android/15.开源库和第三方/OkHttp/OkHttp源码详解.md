@@ -1,401 +1,19 @@
-转载请注明链接: https://blog.csdn.net/feather_wch/article/details/51009871
 
-本文介绍OkHttp的介绍、特点、基本使用、进阶使用(拦截器、Cookie管理)、源码解析异步请求、同步请求、复用连接池等内容。
+转载请注明链接:https://blog.csdn.net/feather_wch/article/details/82086146
+
+本文进行OkHttp源码详细解析。包括异步请求、同步请求、复用连接池、失败重连、底层路由、路由选择器等内容。
 
 如果有帮助的话，请点个赞！万分感谢！
 
-# OkHttp详解
+# OkHttp源码详解
 
-版本：2018/8/26-1(3:20)
+版本：2018/8/26-1(23:20)
 
 ---
 
 [TOC]
 
-## 介绍(3)
-
-1、OkHttp是什么?
-> 1. 一个处理网络请求的开源项目
-> 2. Android上最火热的轻量级框架
-> 3. 由移动支付Square公司贡献
-
-### 特点
-
-2、OkHttp的特点
-> 1. 支持同步、异步
-> 2. 支持GZIP减少数据流量
-> 3. 缓存响应数据：从而减少重复的网络请求
-> 4. 自动重连：处理了代理服务器问题和SSL握手失败问题
-> 5. 支持SPDY：1.共享同个Socket来处理同一个服务器的请求。 2.若SPDY不可用，则通过连接池来减少请求延时
-> 6. 请求、处理速度快：基于NIO和Okio。
-> 7. API使用方便简单：需要进一步封装。
-> 1. 能够从许多连接问题中，自动恢复。如：服务器配置了多个IP，第一个IP连接失败后okhttp会自动尝试下一个IP
-
-3、OkHttp的应用场景
-> 数据量大的重量级网络请求
-
-## 基本使用(10)
-
-1、OkHttp集成
->okio是okhttp的io基础，因此也需要集成
-```XML
-//build.gradle
-compile 'com.squareup.okhttp3:okhttp:3.2.0'
-compile 'com.squareup.okio:okio:1.7.0'
-```
-
-2、Okio是什么？
-> square基于IO、NIO的一个高效处理数据流的开源库。
-
-3、NIO是什么？
-> 非阻塞性IO
-
-### GET请求
-
-4、OkHttp的GET请求
-```java
-//1. 通过Builder构建Request
-Request.Builder requestBuilder = new Request.Builder().url("https://www.baidu.com/");
-//2. 设定方法=GET
-requestBuilder.method("GET", null);
-//3. 构建Request
-Request request = requestBuilder.build();
-//4. 创建OKHttpClient客户端
-OkHttpClient okHttpClient = new OkHttpClient();
-//5. 创建Call请求
-Call call = okHttpClient.newCall(request);
-//6. 通过call的enqueue将请求入队(enqueue为异步方法， execute为同步方法)
-call.enqueue(new Callback() {
-    @Override
-    public void onFailure(Call call, IOException e) {
-    }
-    @Override
-    public void onResponse(Call call, Response response) throws IOException {
-         //TODO 接收返回值并进行处理
-        String str = response.body().string();
-        //注意！该回调不在UI线程中
-        Log.d("HttpActivity", str);
-    }
-});
-```
-
-### POST请求
-5、OkHttp的POST请求
-```java
-//1. 通过FormBody创建RequestBody
-        RequestBody requestBody = new FormBody.Builder()
-                .add("ip", getIPAddress(this)) //本机IP
-                .build();
-        //2. 创建Request
-        Request request = new Request.Builder()
-                .url("http://ip.taobao.com/service/getIpInfo.php")
-                .post(requestBody)
-                .build();
-        //3. 创建OKHttpClient客户端
-        OkHttpClient okHttpClient = new OkHttpClient();
-        //4. 创建Call请求
-        Call call = okHttpClient.newCall(request);
-        //5. 通过call的enqueue将请求入队(enqueue为异步方法， execute为同步方法)
-        call.enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-            }
-
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                //TODO 接收返回值并进行处理
-                String str = response.body().string();
-                //注意！该回调不在UI线程中
-                Log.d("HttpActivity", str);
-            }
-        });
-```
->获取本机IP的方法（需要网络权限）
-```java
-    public static String getIPAddress(Context context) {
-        NetworkInfo info = ((ConnectivityManager) context
-                .getSystemService(Context.CONNECTIVITY_SERVICE)).getActiveNetworkInfo();
-        if (info != null && info.isConnected()) {
-            if (info.getType() == ConnectivityManager.TYPE_MOBILE) {//当前使用2G/3G/4G网络
-                try {
-                    //Enumeration<NetworkInterface> en=NetworkInterface.getNetworkInterfaces();
-                    for (Enumeration<NetworkInterface> en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
-                        NetworkInterface intf = en.nextElement();
-                        for (Enumeration<InetAddress> enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements(); ) {
-                            InetAddress inetAddress = enumIpAddr.nextElement();
-                            if (!inetAddress.isLoopbackAddress() && inetAddress instanceof Inet4Address) {
-                                return inetAddress.getHostAddress();
-                            }
-                        }
-                    }
-                } catch (SocketException e) {
-                    e.printStackTrace();
-                }
-
-            } else if (info.getType() == ConnectivityManager.TYPE_WIFI) {//当前使用无线网络
-                WifiManager wifiManager = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
-                WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-                String ipAddress = intIP2StringIP(wifiInfo.getIpAddress());//得到IPV4地址
-                return ipAddress;
-            }
-        } else {
-            //当前无网络连接,请在设置中打开网络
-        }
-        return null;
-    }
-
-    /**
-     * 将得到的int类型的IP转换为String类型
-     */
-    public static String intIP2StringIP(int ip) {
-        return (ip & 0xFF) + "." +
-                ((ip >> 8) & 0xFF) + "." +
-                ((ip >> 16) & 0xFF) + "." +
-                (ip >> 24 & 0xFF);
-    }
-```
-
-### 上传文件
-6、OkHttp上传文件
-```java
-//1. 创建媒体类型
-    public static final MediaType MEDIA_TYPE_MARKDOWN = MediaType.parse("text/x-markdown; charset=utf-8");
-    public void upload(String url, String filename){
-        String filepath = "";
-        //2. 获取到SD卡根目录中的文件
-        if(Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)){
-            filepath = Environment.getExternalStorageDirectory().getAbsolutePath();
-        }else{
-            return;
-        }
-        File file = new File(filepath, filename);
-        //3. 创建请求(传入需要上传的File)
-        Request request = new Request.Builder()
-                .url(url) //"https://www.baidu.com"
-                .post(RequestBody.create(MEDIA_TYPE_MARKDOWN, file))
-                .build();
-        //4. 异步上传文件(同步上传需要用execute())
-        new OkHttpClient().newCall(request).enqueue(new Callback() {
-            @Override
-            public void onFailure(Call call, IOException e) {
-            }
-            @Override
-            public void onResponse(Call call, Response response) throws IOException {
-                //TODO 接收返回值并进行处理.注意！该回调不在UI线程中
-                String str = response.body().string();
-                Log.d("HttpActivity", str);
-            }
-        });
-    }
-```
-
-### 异步下载
-7、OkHttp异步下载
-```java
-public void download(String url, final String filename){
-    //1. 创建请求(目标的url)
-    Request request = new Request.Builder()
-            .url(url) //"https://.../xxxx.jpg"
-            .build();
-    //2. 异步下载文件
-    new OkHttpClient().newCall(request).enqueue(new Callback() {
-        @Override
-        public void onFailure(Call call, IOException e) {
-        }
-        @Override
-        public void onResponse(Call call, Response response) throws IOException {
-            //3. 得到Response中的流
-            InputStream inputStream = response.body().byteStream();
-            //4. 创建保存网络数据的文件
-            String filepath = "";
-            if(Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)){
-                filepath = Environment.getExternalStorageDirectory().getAbsolutePath();
-            }else{
-                filepath = Environment.getDataDirectory().getAbsolutePath();
-            }
-            File file = new File(filepath, filename);
-            //5. 下载数据到文件中
-            if(null != file){
-                FileOutputStream fileOutputStream = new FileOutputStream(file);
-                byte[] buffer = new byte[2048];
-                int len = 0;
-                while((len = inputStream.read(buffer)) != -1){
-                    fileOutputStream.write(buffer, 0, len);
-                }
-                fileOutputStream.flush();
-            }
-            Log.d("HttpActivity", "Downloaded");
-        }
-    });
-}
-```
-
-### 多份数据上传
-8、OKHttp同时上传多份数据(字符串、图片等等)
-```java
-//1. 创建媒体类型
-public static final MediaType MEDIA_TYPE_PNG = MediaType.parse("image/png");
-public void multiUpload(String url){
-    //2. 请求主体：同时上传字符串数据和图片数据
-    RequestBody requestBody = new MultipartBody.Builder()
-            .setType(MultipartBody.FORM)
-            .addFormDataPart("title", "some jpg") //上传的字符串(key, value)
-            .addFormDataPart("image"  //* key值
-                    ,"feather.jpg" //* 文件名
-                    , RequestBody.create(MEDIA_TYPE_PNG, new File("/sdcard/feather.jpg")) //* 需要上传的文件
-                 ) //同时也上传图片
-            .build();
-    //3. 创建请求
-    Request request = new Request.Builder()
-            .header("Authorization", "Client-ID" + "...")
-            .url(url) //"https://www.baidu.com"
-            .post(requestBody)
-            .build();
-    //4. 异步上传数据和文件(同步上传需要用execute())
-    new OkHttpClient().newCall(request).enqueue(new Callback() {
-        @Override
-        public void onFailure(Call call, IOException e) {
-        }
-        @Override
-        public void onResponse(Call call, Response response) throws IOException {
-            //TODO 接收返回值并进行处理.注意！该回调不在UI线程中
-            String str = response.body().string();
-            Log.d("HttpActivity", str);
-        }
-    });
-}
-```
-
-### 超时时间与缓存
-
-9、OkHttp设置连接、读取、写入的超时时间，以及设置缓存
-```java
-int cacheSize = 10 * 1024 * 1024;
-File sdcacheFile = getExternalCacheDir();
-//1. 需要通过Builder创建OkHttpClient客户端---才能设置超时和缓存
-OkHttpClient.Builder builder = new OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .writeTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .cache(new Cache(sdcacheFile.getAbsoluteFile(), cacheSize));
-OkHttpClient okHttpClient = builder.build();
-```
-
-### 取消请求
-
-10、OkHttp如何取消请求
->1. `OkHttp3`的`Callback`的回调方法里面有个参数是`Call` 这个call可以单独取消相应的请求，随便在onFailure或者onResponse方法内部执行`call.cancel()`都可以。
->2. 如果想`取消所有的请求`，则可以`okHttpClient.dispatcher().cancelAll();`进行取消。
-
-## 进阶使用(11)
-
-### Interceptors
-
-1、什么是Interceptors拦截器？
->1. 是一种强大的机制，可以监视、重写、重试call请求。
->2. 通常情况下，用于添加、移除、转换请求和响应的头部信息。
-
-
-2、最简单拦截器的实现方法
-```java
-//会拦截 请求和返回的数据
-public class SignInInterceptor implements Interceptor{
-    @Override
-    public Response intercept(Chain chain) throws IOException {
-        Request request = chain.request();
-
-        long t1 = System.nanoTime();
-        Logger.getGlobal().info(String.format("Sending request %s on %s%n%s",
-                request.url(), chain.connection(), request.headers()));
-
-        Response response = chain.proceed(request);
-
-        long t2 = System.nanoTime();
-        Logger.getGlobal().info(String.format("Received response for %s in %.1fms%n%s",
-                response.request().url(), (t2 - t1) / 1e6d, response.headers()));
-
-        return response;
-    }
-}
-
-```
-
-3、拦截器的分类和在流程上的区别
-> 1. 应用拦截器：拦截OkHttp核心和应用间的请求与响应。不需要关心重定向和重试的中间响应。
-> 2. 网络拦截器：拦截OkHttp核心和网络之前的请求与响应。
-![interceptors](https://raw.githubusercontent.com/wiki/square/okhttp/interceptors@2x.png)
-
-4、添加应用拦截器: addInterceptor
-```java
-OkHttpClient client = new OkHttpClient.Builder()
-    .addInterceptor(new SignInInterceptor())
-    .build();
-```
-
-5、添加网络拦截器: addNetworkInterceptor
-```java
-OkHttpClient client = new OkHttpClient.Builder()
-    .addNetworkInterceptor(new SignInInterceptor())
-    .build();
-```
-
-6、拦截器的应用场景
-> 1. 可以在拦截器中进行请求体压缩(如果Web服务端支持请求体的压缩)。
-> 2. 可以将域名替换为IP地址
-> 3. 可以在在请求头中添加host属性
-> 4. 可以在请求头中添加应用相关的公共参数：设备ID、版本号等
-
-7、应用拦截器是在哪里进行处理的？
-> 1. RealCall的getResponseWithInterceptorCahin()中
-> 1. 大致流程：从拦截器链中取出拦截器，依次进行递归调用。
-```java
- //RealCall.java
-private Response getResponseWithInterceptorChain(){...}
-```
-
-### Cookie管理
-
-8、如何持久化Cookie？
-> 1. 手动保存Cookie，从Response中取出Header里面的Cookie，保存到本地(SharePreference)。发送请求时利用`Interceptor拦截器`添加到头部(保存Cookie也可以采用拦截器拦截，然后本地保存)。为了对应不同域名，可以将域名作为key对Cookie进行保存。
-> 2. OkHttp3的Cookie管理。
-
-9、OkHttp3新增的CookieJar
->1. okhttp3中对Cookie管理提供了额外的支持
-> 2. 实现CookieJar接口中的两个方法(发送请求/接到响应)，实现Cookie的内存or本地缓存。
-
-10、CookieJar的实现
->1-实现
-```java
-public class MyCookieJar implements CookieJar{
-
-    private static HashMap<String, List<Cookie>> mCookieStore = new HashMap<>();
-
-    @Override
-    public void saveFromResponse(HttpUrl url, List<Cookie> cookies) {
-        mCookieStore.put(url.host(), cookies);
-    }
-
-    @Override
-    public List<Cookie> loadForRequest(HttpUrl url) {
-        List<Cookie> cookies = mCookieStore.get(url.host());
-        return cookies != null ? cookies : new ArrayList<Cookie>();
-    }
-}
-```
->2-使用
-```java
-OkHttpClient client = new OkHttpClient.Builder()
-                            .cookieJar(new MyCookieJar())
-                            .build();
-```
-
-11、CookieJar的saveFromeResponse()在哪里被调用？
-> 1. HttpClient.readResponse()->receiveHeaders(networkResponse.headers())
-> 1. receiveHeaders()中从response的headers中解析出Cookie
-
-## 源码解析(21)
-
-### Call
+## Call(13题)
 1、Call的创建源码
 ```java
   //1、创建Call
@@ -417,6 +35,7 @@ OkHttpClient client = new OkHttpClient.Builder()
 
 ### 异步请求
 
+#### enqueue
 3、异步请求源码分析
 >1-异步请求主体流程
 ```java
@@ -563,6 +182,8 @@ OkHttpClient client = new OkHttpClient.Builder()
 > 1. engine.readResponse()： 获取Response响应
 > 1. 如果出现异常，会通过engine.recover()进行失败重连。
 
+#### 流程图
+
 7、OkHttp异步请求的流程图和要点
 ![OkHttp异步请求的流程图和要点](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/OkHttp_AsyncCall.jpg?raw=true)
 > 1. 调用到`RealCall`的enqueue
@@ -592,9 +213,48 @@ OkHttpClient client = new OkHttpClient.Builder()
 > 25. 使用该Stream创建新的HttpEngine
 > 26. 重复(20)(21)(22)的任务
 
-#### Dispatcher
+8、如何进行失败重连？
+> 1. HttpEngine里面通过sendRequest和readResponse进行网络请求
+> 1. 如果出现了RouteException或者IOException，会通过HttpEngine.recover进行恢复且返回新的HttpEngine。
+> 1. 因为是While循环，continue后会继续进行网络请求。
 
-8、Dispatcher是什么？
+### 同步请求
+
+9、同步请求源码分析
+> `call.execute(xxx);`
+```java
+    //RealCall.java
+    @Override public Response execute() throws IOException {
+        ...
+        try {
+            // 1. 添加到【运行中的同步队列】
+            client.dispatcher().executed(this);
+            // 2. 请求网路
+            Response result = getResponseWithInterceptorChain(false);
+            return result;
+        } finally {
+            // 3. 从【运行中的同步队列】中移除该任务
+            client.dispatcher().finished(this);
+        }
+    }
+
+    //Dispatcher.java---添加到【运行中的同步队列】
+    synchronized void executed(RealCall call) {
+        runningSyncCalls.add(call);
+    }
+
+    //Dispatcher.java---从【运行中的同步队列】中移除该任务
+    synchronized void finished(Call call) {
+        if (!runningSyncCalls.remove(call)) throw new AssertionError("Call wasn't in-flight!");
+    }
+```
+>1. 添加到【运行中的同步队列】
+>2. getResponseWithInterceptorChain()进行网络请求
+>3. 从【运行中的同步队列】中移除该任务
+
+### Dispatcher
+
+10、Dispatcher是什么？
 > 1. 用于控制并发的请求。
 > 2. 定义了最大并发数：64
 > 3. 定义了每个主机的最大请求数：5
@@ -630,7 +290,7 @@ public final class Dispatcher {
 }
 ```
 
-9、Dispatcher在请求任务完成后，如何进行的清理工作？
+11、Dispatcher在请求任务完成后，如何进行的清理工作？
 > 1. getResponseWithInterceptorChain()进行网络请求后，会调用Dispatcher.finished()进行清理工作。
 > 1. 会将任务从正在运行的异步任务队列中移除
 > 1. 在满足最大并发数和主机最大请求数的情况下，将待执行的异步任务进行提升到正在运行的异步任务队列，并且通过线程池执行该任务。
@@ -668,15 +328,15 @@ public final class Dispatcher {
     }
 ```
 
-#### AsyncCall
+### AsyncCall
 
-10、AsyncCall是什么？
+12、AsyncCall是什么？
 > 1. RealCall的内部类
 > 2. 继承自`NamedRunnable`，间接继承`Runnable`
 > 3. 在run()中会执行execute()：完成了异步任务的执行
 > 4. 用于Dispatcher内部的待运行/运行中的异步任务队列
 
-11、AysncCall的execute方法中做了哪些工作？(4个)
+13、AysncCall的execute方法中做了哪些工作？(4个)
 > 1-请求网络
 ```java
 Response response = getResponseWithInterceptorChain(forWebSocket);
@@ -694,12 +354,39 @@ responseCallback.onFailure(RealCall.this, e);
 client.dispatcher().finished(this);
 ```
 
-#### HttpEngine
+## HttpEngine(12题)
 
-12、HttpEngine是什么？
+1、HttpEngine是什么？
 > 1. 处理单个Http的请求和响应
 
-13、HttpEngine.sendRequest()发送请求的源码分析
+### 构造
+
+2、HttpEngine的构造
+> 1. 主要是将OkHttpClient、request、streamAllocation等保存到了内部。
+> 1. StreamAllocation的构造：将address、connectionPool、RouteSelector保存在内部。
+> 1. RouteSelector：用于选择合适的Route去访问服务器。
+```java
+//HttpEngine.java-构造HttpEngine
+public HttpEngine(OkHttpClient client, okhttp3.Request request, boolean bufferRequestBody,
+                      boolean callerWritesRequestBody, boolean forWebSocket, StreamAllocation streamAllocation,
+                      RetryableSink requestBodyOut, Response priorResponse) {
+    // 1、OkHttpClient
+    this.client = client;
+    // 2、request
+    this.userRequest = request;
+
+    //...所有参数都作为成员变量保存...
+
+    // 3、创建streamAllocation
+    this.streamAllocation = streamAllocation != null? streamAllocation
+                : new StreamAllocation(client.connectionPool(), //返回OkHttpClient中的ConnectionPool
+                                        createAddress(client, request));
+}
+```
+
+### sendRequest
+
+3、HttpEngine.sendRequest()发送请求的源码分析
 > 1. sendRequest(): 并不会真正的发送请求，而是找到合适的Socket封装到了HttpStream中。
 > 1. Internal.instance.internalCache(client)：获取到客户端中的Cache，Cache在初始化时会读取缓存目录中曾经请求过的所有信息。
 > 1. responseCache.get(request)：获取到上次与服务器交互时缓存的Response。
@@ -710,6 +397,14 @@ client.dispatcher().finished(this);
 ```java
     //HttpEngine.java
     public void sendRequest() throws RequestException, RouteException, IOException {
+       /**===========================================================================
+         * 0. request加上header
+         *   1- Host：www.wanandroid.com
+         *   2- Connection：Keep-Alive
+         *   3- Accept-Encoding: gzip
+         *   4- Cookie: cookieJar().loadForRequest()获取到cookie列表, 转换为String，添加到header
+         *   5- User-Agent：okhttp/3.2.0
+         *===========================================================================*/
         Request request = networkRequest(userRequest);
         /**===========================================================================
          * 1. 获取Client中的Cache，Cache在初始化时会读取缓存目录中曾经请求过的所有信息。
@@ -727,7 +422,7 @@ client.dispatcher().finished(this);
         networkRequest = cacheStrategy.networkRequest;
         // 5. 缓存的Response或者过期失效；如果为null则表示不使用缓存
         cacheResponse = cacheStrategy.cacheResponse;
-        // 6. 如果既没有使用网络，并且缓存不存在或者过期。直接新建并返回报504错误的Response(网关超时)。
+        // 6. 如果没有网络request，并且缓存不存在或者过期。直接新建并返回报504错误的Response(网关超时)。
         if (networkRequest == null && cacheResponse == null) {
             userResponse = new Response.Builder().request(userRequest)
                     .code(504)
@@ -751,7 +446,8 @@ client.dispatcher().finished(this);
     }
 ```
 
-14、HttpEngine.readResponse()获取响应信息的源码分析
+### readResponse
+4、HttpEngine.readResponse()获取响应信息的源码分析
 ```java
     /**====================================================
      * // HttpEngine.java
@@ -929,7 +625,8 @@ client.dispatcher().finished(this);
     }
 ```
 
-15、HttpEngine如何进行失败重连？
+### recover
+5、HttpEngine如何进行失败重连？
 > 1. 通过HttpEngine.recover()方法
 ```java
     /**=================================================
@@ -946,17 +643,17 @@ client.dispatcher().finished(this);
     }
 ```
 
-16、返回码504
+6、返回码504
 > 1. 获得具有该返回码的Response表示：网关超时
 > 1. HttpEngine的sendRequest()中，如果既没有网络，有没有缓存，就会返回具有504的Response。
 
-17、返回码204/205
+7、返回码204/205
 > 1. 204: 响应报文中包含若干首部和一个状态行，但是没有实体的主体内容。使用场景：对于一些提交到服务器处理的数据,只需要返回是否成功,此时不需要返回数据。可以使用204。
 > 1. 205: 告知浏览器清除当前页面中的所有html表单元素，也就是表单重置。
 > 1. NetworkInterceptorChain.proceed()中获取到最终的Response时，会处理返回码为204/205的情况。
 > 1. 当code=204/205时，Body的Content长度 > 0, 会抛出ProtocolException。
 
-18、返回码304
+8、返回码304
 > 1. 表示资源没有更改过。
 > 1. HttpEngine的invalidate()方法用于判断是采用缓存还是网络的Response
 > 1. 如果netWork.code = 304，则直接使用缓存数据。
@@ -964,15 +661,15 @@ client.dispatcher().finished(this);
 > 1. 缓存的最后修改时间更大，就采用缓存。
 > 1. 网络的最后修改时间更大，就采用网络数据。
 
-##### CacheStrategy
+### CacheStrategy
 
-19、CacheStrategy是什么？
+9、CacheStrategy是什么？
 > 1. 缓存策略
 > 1. 返回和request对应的Cached Response。
 > 1. 决定了是否使用网络、缓存，还是两者都使用。
 > 1.
 
-20、OkHttp如何缓存的Reponse？
+10、OkHttp如何缓存的Reponse？
 > 1. OkHttpClient中保存了缓存：Cache cache
 > 1. 缓存实现于`Cache.java`
 > 1. 采用DiskLruCache进行缓存。
@@ -1013,57 +710,274 @@ client.dispatcher().finished(this);
     }
 ```
 
-### 同步请求
-
-21、同步请求源码分析
-> `call.execute(xxx);`
+11、CacheStrategy的构造源码
+> `cacheStrategy = new CacheStrategy.Factory(now, request, cacheCandidate).get();`
 ```java
-    //RealCall.java
-    @Override public Response execute() throws IOException {
-        ...
+   // CacheStrategy.java-存储cacheReponse中的通用报头、实体报头
+    public Factory(long nowMillis, okhttp3.Request request, Response cacheResponse) {
+        // 1. 遍历headers进行本地存储
+        if (cacheResponse != null) {
+            Headers headers = cacheResponse.headers();
+            for (int i = 0, size = headers.size(); i < size; i++) {
+                String fieldName = headers.name(i);
+                String value = headers.value(i);
+                // 2. 通用报头：表示消息产生的日期和时间
+                if ("Date".equalsIgnoreCase(fieldName)) {
+                    servedDate = HttpDate.parse(value);
+                    servedDateString = value;
+                    // 3. 实体报头：响应过期的日期和时间
+                } else if ("Expires".equalsIgnoreCase(fieldName)) {
+                    expires = HttpDate.parse(value);
+                    // 4. 实体报头：资源最后修改的日期和时间
+                } else if ("Last-Modified".equalsIgnoreCase(fieldName)) {
+                    lastModified = HttpDate.parse(value);
+                    lastModifiedString = value;
+                    /**==============================================================
+                     * 5. ETag：帮助服务端进行缓存验证。请求时发送给服务端。
+                     *     服务端验证该哈希值和服务端哈希值一致，表明没有变化，返回304表示未修改。
+                     *     如果不一致，表明数据发生改变，返回200.
+                     *==============================================================*/
+                } else if ("ETag".equalsIgnoreCase(fieldName)) {
+                    etag = value;
+                    // 6. Age：该Reponse从产生那一刻起到现在所经过的时间。
+                } else if ("Age".equalsIgnoreCase(fieldName)) {
+                    ageSeconds = HeaderParser.parseSeconds(value, -1);
+                }
+                //xxx
+            }
+        }
+    }
+```
+
+### HttpStream
+
+12、sendRequest()中获取到HttpStream的流程
+>  `httpStream = connect();`
+```java
+    // HttpEngine.java: 获取到HttpStream
+    private HttpStream connect() throws RouteException, RequestException, IOException {
+        boolean doExtensiveHealthChecks = !networkRequest.method().equals("GET");
+        return streamAllocation.newStream(client.connectTimeoutMillis(),
+                client.readTimeoutMillis(), client.writeTimeoutMillis(),
+                client.retryOnConnectionFailure(), doExtensiveHealthChecks);
+    }
+
+    // StreamAllocation.java
+    public HttpStream newStream(int connectTimeout, int readTimeout, int writeTimeout,
+                                boolean connectionRetryEnabled, boolean doExtensiveHealthChecks)
+            throws RouteException, IOException {
         try {
-            // 1. 添加到【运行中的同步队列】
-            client.dispatcher().executed(this);
-            // 2. 请求网路
-            Response result = getResponseWithInterceptorChain(false);
-            return result;
-        } finally {
-            // 3. 从【运行中的同步队列】中移除该任务
-            client.dispatcher().finished(this);
+            // 1、找到健康的Connection
+            RealConnection resultConnection = findHealthyConnection(connectTimeout, readTimeout,
+                    writeTimeout, connectionRetryEnabled, doExtensiveHealthChecks);
+
+            HttpStream resultStream;
+            // 2、framedConnection == null
+            if (resultConnection.framedConnection != null) {
+                resultStream = new Http2xStream(this, resultConnection.framedConnection);
+            } else {
+                resultConnection.socket().setSoTimeout(readTimeout);
+                resultConnection.source.timeout().timeout(readTimeout, MILLISECONDS);
+                resultConnection.sink.timeout().timeout(writeTimeout, MILLISECONDS);
+                // 3、创建Http1xStream(Http 1x 版本的Stream)
+                resultStream = new Http1xStream(this, resultConnection.source, resultConnection.sink);
+            }
+            // 4、返回Http1xStream
+            synchronized (connectionPool) {
+                stream = resultStream;
+                return resultStream;
+            }
+        } catch (IOException e) {
+            // IO异常就抛出Route异常
+            throw new RouteException(e);
+        }
+    }
+    /**==================================================
+     * // StreamAllocation.java
+     *  1. 找到healthy connection
+     *  2. 如果connection不健康，会一直寻找，直到找到healthy connection。
+     *==============================================*/
+    private RealConnection findHealthyConnection(int connectTimeout, int readTimeout, int writeTimeout, boolean connectionRetryEnabled, boolean doExtensiveHealthChecks)
+            throws IOException, RouteException {
+        while (true) {
+            // 1、获取到RealConnection(内部的socket已经和服务器建立链接)
+            RealConnection candidate = findConnection(connectTimeout, readTimeout, writeTimeout,
+                    connectionRetryEnabled);
+
+            // 2、如果是崭新的connection，跳过昂贵的健康检查，直接返回
+            synchronized (connectionPool) {
+                if (candidate.successCount == 0) {
+                    // 直接返回
+                    return candidate;
+                }
+            }
+            // 3、不是崭新的connection，经过健康检查后，return
+            if (candidate.isHealthy(doExtensiveHealthChecks)) {
+                return candidate;
+            }
+            // 4、连接失败-StreamAllocation.java: routeSelector.connectFailed(route, e);将Route添加到黑名单。
+            connectionFailed(new IOException());
         }
     }
 
-    //Dispatcher.java---添加到【运行中的同步队列】
-    synchronized void executed(RealCall call) {
-        runningSyncCalls.add(call);
+    /**======================================================================
+     * //StreamAllocation.java
+     *   返回一个connection(host a new stream)
+     *   1. 这更倾向于已经存在的connection
+     *   2. 然后才是connection pool
+     *   3. 最后才会新建一个connection
+     *========================================================================*/
+    private RealConnection findConnection(int connectTimeout, int readTimeout, int writeTimeout,
+                                          boolean connectionRetryEnabled) throws IOException, RouteException {
+        Route selectedRoute;
+        synchronized (connectionPool) {
+            // 1、第一次进来StreamAllocation内部的connection = null
+            RealConnection allocatedConnection = this.connection;
+            if (allocatedConnection != null && !allocatedConnection.noNewStreams) {
+                // 不会进入
+                return allocatedConnection;
+            }
+            // 2、尝试从connection pool中获取到connection
+            RealConnection pooledConnection = Internal.instance.get(connectionPool, address, this);
+            if (pooledConnection != null) {
+                // 不会进入
+                this.connection = pooledConnection;
+                return pooledConnection;
+            }
+            // 3、选择的route = null
+            selectedRoute = route;
+        }
+        // 4、选择的route = null
+        if (selectedRoute == null) {
+            // 5、从RouteSelector中获取到有效的Route--next()内部会去寻找到有效的route，没找到会继续递归调用next
+            selectedRoute = routeSelector.next();
+            synchronized (connectionPool) {
+                // 6、StreamAllocation内部存储这个route的引用
+                route = selectedRoute;
+            }
+        }
+        // 7、构造RealConnection：内部仅仅是保存该Route
+        RealConnection newConnection = new RealConnection(selectedRoute);
+        // 8、StreamAllocation内部的allocation列表中，持有这个connection的引用
+        acquire(newConnection);
+
+        // 9、将connection添加到连接池中
+        Internal.instance.put(connectionPool, newConnection);
+        // 10、StreamAllocation内部保存这个connection
+        this.connection = newConnection;
+        // 11、从Route中获取address和port，创建Socket，并且调用socket的connect去连接address。(socket保存在RealConnection内部)
+        newConnection.connect(connectTimeout, readTimeout, writeTimeout, address.connectionSpecs(),
+                connectionRetryEnabled);
+        // 12、将Route从黑名单中移除
+        routeDatabase().connected(newConnection.route());
+
+        return newConnection;
     }
 
-    //Dispatcher.java---从【运行中的同步队列】中移除该任务
-    synchronized void finished(Call call) {
-        if (!runningSyncCalls.remove(call)) throw new AssertionError("Call wasn't in-flight!");
+    // RealConnection.java
+    public void connect(int connectTimeout, int readTimeout, int writeTimeout,
+                        List<ConnectionSpec> connectionSpecs, boolean connectionRetryEnabled) throws RouteException {
+        // 0、原来就已经连接上了，抛出状态异常。
+        if (protocol != null) throw new IllegalStateException("already connected");
+        RouteException routeException = null;
+        ConnectionSpecSelector connectionSpecSelector = new ConnectionSpecSelector(connectionSpecs);
+        // 1、Route中获取proxy、address
+        Proxy proxy = route.proxy();
+        Address address = route.address();
+        // 2、路由异常，之后再分析。
+        if (route.address().sslSocketFactory() == null
+                && !connectionSpecs.contains(ConnectionSpec.CLEARTEXT)) {
+            throw new RouteException(new UnknownServiceException("CLEARTEXT communication not supported: " + connectionSpecs));
+        }
+        // 3、while循环，直到连接成功(protocol != null)
+        while (protocol == null) {
+            try {
+                // 4、Direct或者http会调用socketFactory的createSocket
+                rawSocket = proxy.type() == Proxy.Type.DIRECT || proxy.type() == Proxy.Type.HTTP
+                        ? address.socketFactory().createSocket()
+                    //5、其他会调用new Socket(proxy)
+                        : new Socket(proxy);
+                // 6、socket.connect去连接address
+                connectSocket(connectTimeout, readTimeout, writeTimeout, connectionSpecSelector);
+            } catch (IOException e) {
+                closeQuietly(socket);
+                closeQuietly(rawSocket);
+                // 抛出Route Exception
+                throw new RouteException(e);
+            }
+        }
+    }
+
+        // RealConnection.java-做所有必要工作用于在原始套接字(raw socket)上构建HTTP/HTTPS的连接
+    private void connectSocket(int connectTimeout, int readTimeout, int writeTimeout,
+                               ConnectionSpecSelector connectionSpecSelector) throws IOException {
+        // 1、设置read超时时间
+        rawSocket.setSoTimeout(readTimeout);
+        try {
+            // 2、调用socket的connect去连接address
+            Platform.get().connectSocket(rawSocket, route.socketAddress(), connectTimeout);
+        } catch (ConnectException e) {
+            throw new ConnectException("Failed to connect to " + route.socketAddress());
+        }
+        // 3、获取到读写Stream
+        source = Okio.buffer(Okio.source(rawSocket));
+        sink = Okio.buffer(Okio.sink(rawSocket));
+        // 4、成员变量socket设置为rawSocket
+        protocol = Protocol.HTTP_1_1;
+        socket = rawSocket;
+    }
+
+    // Platform.java-进行socket的连接
+    @Override public void connectSocket(Socket socket, InetSocketAddress address, int connectTimeout) throws IOException {
+        // 调用socket的connect方法，去连接address
+        socket.connect(address, connectTimeout);
+        // xxx
     }
 ```
->1. 添加到【运行中的同步队列】
->2. getResponseWithInterceptorChain()进行网络请求
->3. 从【运行中的同步队列】中移除该任务
+> socket的构建：
+```java
+    // SocketFactory.java：内部类DefaultSocketFactory
+    public Socket createSocket() {
+        return new Socket();
+    }
+    // Socket.java
+    public Socket() {
+        setImpl();
+    }
+    // Socket.java-Proxy构造Socket(socks socket或者一般的socket)
+    public Socket(Proxy proxy) {
+        Proxy.Type type = p.type();
+        // 1、Proxy类型为Socks
+        if (type == Proxy.Type.SOCKS) {
+            // xxx
+            // 2、构造socks socket
+            impl = new SocksSocketImpl(p);
+            impl.setSocket(this);
+        } else {
+            // 3、构造Plain Socket
+            if (p == Proxy.NO_PROXY) {
+                impl = new PlainSocketImpl();
+                impl.setSocket(this);
+            }
+        }
+    }
+```
 
-### 复用连接池
+## ConnectionPool(14题)
 
-22、OkHttp的复用连接池
+1、OkHttp的复用连接池
 > 1. TCP的三次握手和四次挥手，会导致效率低下。
 > 1. HTTP有一种keepalive connection机制
 > 1. OkHttp支持5个并发socket连接
 > 1. OkHttp默认keppAlive时间为5分钟
 
-#### ConnectionPool
-
-23、OkHttp的ConnectionPool
+2、OkHttp的ConnectionPool
 > 具有五种主要变量：
 > 1. 空闲的最大连接数：默认5
 > 1. keepAlive时间：默认5分钟
 > 1. 线程池：后台用于清理需要清理的线程
 > 1. 双向队列：维护者RealConnections(socket物理连接的包装)
-> 1. 连接失败的路线名单：连接失败时，会将失败的路线添加进去
+> 1. routeDatabase-连接失败的路线名单：连接失败时，会将失败的路线添加进去
 > 1. cleanupRunning：表明是否正在进行清理工作
 > 1. cleanupRunnable：清理任务，每隔一定时间间隔就进行下次清理工作。
 ```java
@@ -1110,19 +1024,19 @@ public final class ConnectionPool {
 }
 ```
 
-24、RealConnection的作用？
+3、RealConnection的作用？
 > 是对socket物理连接的包装
 
-25、ConnectionPool是什么时候创建的？
+4、ConnectionPool是什么时候创建的？
 > 在OkHttpClient构造时，创建的ConnectionPool
 
-26、Deque是什么？
+5、Deque是什么？
 > 1. Deque是Queue的子接口
 > 1. 既具有stack栈的性质，也具有queue队列的性质。
 
-#### 缓存操作
+### 缓存操作
 
-27、ConnectionPool关于缓存的操作有哪些？
+6、ConnectionPool关于缓存的操作有哪些？
 > 1. 也就是对`Deque<RealConnection>`双向队列的操作。
 > 1. 提供了四种操作：放入连接-put；获取连接-get；移除连接-connectionBecameIdle；移除所有连接-evictAll
 >
@@ -1199,9 +1113,9 @@ void put(RealConnection connection) {
     }
 ```
 
-#### 自动回收连接
+### 自动回收连接
 
-28、ConnectionPool的自动回收连接
+7、ConnectionPool的自动回收连接
 > 1. OkHttp是根据StreamAllocation的引用计数是否为0来实现自动回收连接.
 > 1. ConnectionPool具有一个cleanup线程
 > 1. ConnectionPool.put()方法缓存connection时，会开启cleanup线程进行清理工作。
@@ -1304,9 +1218,9 @@ void put(RealConnection connection) {
     }
 ```
 
-29、清理线程的工作流程？以及四种情况的处理办法？
+8、清理线程的工作流程？以及四种情况的处理办法？
 
-30、ConnectionPool.pruneAndGetAllocationCount()的源码分析
+9、ConnectionPool.pruneAndGetAllocationCount()的源码分析
 > 1. 用于判断connection是空闲连接还是使用中的连接。
 > 1. return 0: idle connection
 > 1. return >0: connection处于使用中
@@ -1352,13 +1266,36 @@ void put(RealConnection connection) {
     }
 ```
 
-#### StreamAllocation
-31、StreamAllocation是什么?
+### StreamAllocation
+10、StreamAllocation是什么?
 > 1. OkHttp中使用了类似于引用计数的方式追踪socket流的调用。
 > 1. 该计数对象就是StreamAllocation
 > 1. 具有两个重要方法：acquire()、release()---本质是改变RealConnection中StreamAllocation的List的大小。
 
-32、StreamAllocation的acquire()和release()源码
+#### 构造
+
+11、StreamAllocation的构造
+> 将connectionPool、address、routeselector保存到内部
+```java
+/**===============================================================================
+ * // StreamAllocation.java
+ *  1、address：createAddress(client, request) 通过OkHttpClient和请求的Request进行构造
+ *    1. host: 如www.wanandroid.com
+ *    2. scheme：http
+ *    3. port：80
+ *    4. url：http://www.wanandroid.com/
+ *  2、connectionPool： new OkHttpClient()时会在内部创建connectionPool。一个Client一个pool
+ *==========================================================================*/
+public StreamAllocation(ConnectionPool connectionPool, Address address) {
+    this.connectionPool = connectionPool;
+    this.address = address;
+    this.routeSelector = new RouteSelector(address, //目标Address
+            routeDatabase()); //将OkHttpClient的connectionPool中的RouteDatabase保存到RouteSelector内部
+}
+```
+
+#### acquire()、release()
+12、StreamAllocation的acquire()和release()源码
 ```java
     /**======================================================
      * // StreamAllocation.java
@@ -1386,13 +1323,558 @@ void put(RealConnection connection) {
     }
 ```
 
-#### RealConnection
-33、RealConnection是什么？有什么用？
+### RealConnection
+13、RealConnection是什么？有什么用？
 > 1. 是socket物理连接的包装
 > 1. 维护了`List<Reference<StreamAllocation>> allocations`
 > 1. StreamAllocation的数量也就是socket被引用的次数
 > 1. 如果计数  = 0，表明该连接处于idle状态，需要经过算法进行回收。
 > 1. 如果计数 != 0, 表明该连接处于使用中，无需关闭。
+
+14、RealConnection的源码和构造方法
+```java
+public final class RealConnection extends FramedConnection.Listener implements Connection {
+  // Route
+  private final Route route;
+  // 底层的 TCP socket.
+  private Socket rawSocket;
+  // 应用层socket
+  public Socket socket;
+  public volatile FramedConnection framedConnection;
+  // Allocation队列
+  public final List<Reference<StreamAllocation>> allocations = new ArrayList<>();
+  // 构造方法
+  public RealConnection(Route route) {
+    this.route = route;
+  }
+}
+```
+
+## Request(12)
+
+1、Request的作用
+> 1. 用于Http的请求
+> 1. 使用OkHttp之前都需要对Request进行构造。
+
+2、OkHttp请求的构造
+> GET：通过Builder去构造Request
+```java
+//1. 通过Builder构建Request
+Request.Builder requestBuilder = new Request.Builder()
+                                        .url("https://www.baidu.com/")
+                                        .method("GET", null);
+```
+> POST：通过FormBody去构造requestBody，然后再通过Builder和requestBody构造Request。
+```java
+//1. 通过FormBody创建RequestBody
+RequestBody requestBody = new FormBody.Builder()
+                .add("ip", getIPAddress(this)) //本机IP
+                .build();
+//2. 创建Request(通过Builder和RequestBody)
+Request request = new Request.Builder()
+                .url("http://ip.taobao.com/service/getIpInfo.php")
+                .post(requestBody)
+                .build();
+```
+
+3、Request源码
+> 1. 具有五个重要的字段。
+```java
+public final class Request {
+    // 请求的url
+    private final HttpUrl url;
+    // GET、POST
+    private final String method;
+    // 头部全部存放在里面
+    private final Headers headers;
+    // request的body，包括MediaType、Charset、ContentType等内容
+    private final RequestBody body;
+    // tag标签，用于取消请求。
+    private final Object tag;
+
+    private Request(okhttp3.Request.Builder builder) {
+        this.url = builder.url;
+        this.method = builder.method;
+        this.headers = builder.headers.build();
+        this.body = builder.body;
+        this.tag = builder.tag != null ? builder.tag : this;
+    }
+
+    public okhttp3.Request.Builder newBuilder() {
+        return new okhttp3.Request.Builder(this);
+    }
+
+    public static class Builder {
+        //buidler相关
+    }
+}
+```
+
+4、Request有哪些重要的字段？
+> 1. url
+> 1. method
+> 1. headers
+> 1. body
+> 1. tag
+
+### Builder
+
+5、Request.Builder的构造方法
+> 默认构造：默认Get请求
+> Request构造：将一些字段保存在内部。
+```java
+// Request.Builder-默认构造方法
+public Builder() {
+    this.method = "GET";
+    this.headers = new Headers.Builder();
+}
+// Request进行构造
+private Builder(okhttp3.Request request) {
+    this.url = request.url;
+    this.method = request.method;
+    this.body = request.body;
+    this.tag = request.tag;
+    this.headers = request.headers.newBuilder();
+}
+public okhttp3.Request build() {
+    return new okhttp3.Request(this);
+}
+```
+
+6、url()
+```java
+        /**=================================================
+         * //Request.Builder: 将String的url转换为HttpUrl
+         *   1. HttpUrl具有字段：scheme、host、port等所有Http相关字段
+         *==================================================*/
+        public okhttp3.Request.Builder url(String url) {
+            HttpUrl parsed = HttpUrl.parse(url);
+            return url(parsed);
+        }
+        public okhttp3.Request.Builder url(HttpUrl url) {
+            this.url = url;
+            return this;
+        }
+```
+
+7、method()
+```java
+        // Request.Builder: 将method，如“GET”直接保存在内部。RequestBody也是保存在内部。
+        public okhttp3.Request.Builder method(String method, RequestBody body) {
+            this.method = method;
+            this.body = body;
+            return this;
+        }
+```
+
+8、header相关：header()、addHeader()、removeHeader()、headers()
+```java
+        // Request.Builder：将名为name参数的header的数值替换为value
+        public okhttp3.Request.Builder header(String name, String value) {
+            // headers的set
+            headers.set(name, value);
+            return this;
+        }
+
+        // Request.Builder：添加一个header，名为name，值为value
+        public okhttp3.Request.Builder addHeader(String name, String value) {
+            headers.add(name, value);
+            return this;
+        }
+
+        //  Request.Builder：移除名为name的所有header
+        public okhttp3.Request.Builder removeHeader(String name) {
+            headers.removeAll(name);
+            return this;
+        }
+
+        // Request.Builder：移除原来所有headers，将参数的headers全部添加进来
+        public okhttp3.Request.Builder headers(Headers headers) {
+            this.headers = headers.newBuilder();
+            return this;
+        }
+```
+
+9、cacheControl(): 设置Http协议中请求和响应的缓存机制
+```java
+        // Request.Builder：用于设置Http协议中的Cache-Control(请求和响应的缓存机制)
+        public okhttp3.Request.Builder cacheControl(CacheControl cacheControl) {
+            String value = cacheControl.toString();
+            if (value.isEmpty()) return removeHeader("Cache-Control");
+            return header("Cache-Control", value);
+        }
+```
+
+10、tag()：通过tag可以取消请求
+```java
+        // Request.Builder：给Request设置tag标签，可以用于之后取消请求。方便统一管理OkHttp请求。
+        public okhttp3.Request.Builder tag(Object tag) {
+            this.tag = tag;
+            return this;
+        }
+```
+
+11、build(): 构造Request
+```java
+        // Request.Builder：构造Request
+        public okhttp3.Request build() {
+            return new okhttp3.Request(this);
+        }
+```
+
+12、内部通过method()方法实现的API：get()、head()、post()、delete()、put()、patch()
+```java
+        /**==================================================================
+         * // Request.Builder： 系列方法都是内部通过method()方法将GET、POST和body保存到内部
+         *=============================================================*/
+        // GET
+        public okhttp3.Request.Builder get() {
+            return method("GET", null);
+        }
+        // HEAD
+        public okhttp3.Request.Builder head() {
+            return method("HEAD", null);
+        }
+        // POST
+        public okhttp3.Request.Builder post(RequestBody body) {
+            return method("POST", body);
+        }
+        // DELETE
+        public okhttp3.Request.Builder delete(RequestBody body) {
+            return method("DELETE", body);
+        }
+        // PUT
+        public okhttp3.Request.Builder put(RequestBody body) {
+            return method("PUT", body);
+        }
+        // PATCH
+        public okhttp3.Request.Builder patch(RequestBody body) {
+            return method("PATCH", body);
+        }
+```
+
+## Address(5)
+
+1、Address的作用
+> 1. 连接说明书：用于和源服务器进行连接
+> 1. 如果是简单的connections，这就是server的hostname和port。
+> 1. 如果是具有明确的proxy请求，这也会包括一些proxy信息。
+> 1. 如果是安全性的connections, 也会包含SSL socket factory，hostname verifier, certificate(证书)。
+
+2、Address源码
+```java
+/**==================================================================
+ * 和源服务器的连接说明书(A specification for a connection)
+ * 1. 如果是简单的connections，这就是server的hostname和port
+ * 2. 如果是具有明确的proxy请求，这也会包括一些proxy信息。
+ * 3. 如果是安全性的connections, 也会包含SSL socket factory，hostname verifier, certificate(证书)。
+ * *  Http请求如果共享同一个Address，也会共享同一个connection
+ *==============================================================*/
+public final class Address {
+    // 1、 Http所有相关字段：如scheme、host、port
+    final HttpUrl url;
+    // 2、dns
+    final Dns dns;
+    final SocketFactory socketFactory;
+    final List<Protocol> protocols;
+    final Proxy proxy;
+    final SSLSocketFactory sslSocketFactory;
+    final HostnameVerifier hostnameVerifier;
+    final CertificatePinner certificatePinner;
+    xxx
+}
+```
+
+3、构造Address
+> 用host、port、dns、protocols等内容去构造Address
+```java
+private static Address createAddress(OkHttpClient client, okhttp3.Request request) {
+        SSLSocketFactory sslSocketFactory = null;
+        HostnameVerifier hostnameVerifier = null;
+        CertificatePinner certificatePinner = null;
+        // 1、判断scheme是否是https
+        if (request.isHttps()) {
+            sslSocketFactory = client.sslSocketFactory();
+            hostnameVerifier = client.hostnameVerifier();
+            certificatePinner = client.certificatePinner();
+        }
+        // 1、host、port、dns、protocols等去构造Address
+        return new Address(request.url().host(), request.url().port(), client.dns(),
+                client.socketFactory(), sslSocketFactory, hostnameVerifier, certificatePinner,
+                client.proxyAuthenticator(), client.proxy(), client.protocols(),
+                client.connectionSpecs(), client.proxySelector());
+}
+```
+
+### Proxy
+
+4、Proxy是什么?
+> 1. proxy的相关设置
+> 1. type: 决定类型(direct、http、socks)
+> 1. SocketAddress：socket地址
+```java
+/**=======================================================
+ * // Proxy.java
+ * proxy的相关设置，包括type(http代理还是socks代理)、socket地址
+ *========================================================*/
+public class Proxy {
+    // proxy的类型
+    private java.net.Proxy.Type type;
+    // proxy的socket地址。如果属于直连则返回null(没有代理)
+    private SocketAddress sa;
+    public enum Type {
+        // 直接的连接或者没有proxy
+        DIRECT,
+        // 应用层协议的代理(HTPP、FTP等)
+        HTTP,
+        // Socks代理(v4或者v5)
+        SOCKS
+    };
+}
+```
+
+### SocketFactory
+
+5、SocketFactory
+```java
+    /**=================================================
+     * // SocketFactory.java
+     * 用于创建socket。可以被继承，用于创建特殊的socket子类，
+     *     并且提供了一种框架用于增加socket层面的功能。
+     *===============================================*/
+    public abstract class SocketFactory
+    {
+        public static void setDefault(javax.net.SocketFactory factory){...}
+        //xxx
+    }
+```
+
+## Route(6)
+
+1、Route的作用
+> 连接到服务器的connection需要使用该Route路由。
+```java
+/**=============================================================
+ * 1、该具体Route被连接到抽象源服务器的connection所使用。
+ *
+ * 2、当创建connection时，客户端可以由很多选项：
+ *   HTTP proxy(Http代理): 一个代理服务器可能为该客户端进行了明确的配置。
+ *                         否则会使用ProxySelector，可能会返回多个proxy用于尝试。
+ *   IP address(IP地址)：无论是直连源服务器还是代理服务器，打开一个socket都需要一个IP地址。
+ *                      DNS服务器会返回多个IP地址用于尝试。
+ *
+ * 3、每个路由对用这些选项都有明确的选择。
+ *========================================================*/
+public final class Route {
+    final Address address;
+    final Proxy proxy;
+    final InetSocketAddress inetSocketAddress;
+}
+```
+
+### InetSocketAddress
+
+2、InetSocketAddress是什么？
+```java
+    /**===========================================
+     * // InetSocketAddress.java
+     * 用于实现 IP Socket地址(IP地址 + port号)
+     * 也可以是hostname + port号
+     *==============================================*/
+    public class InetSocketAddress extends SocketAddress {
+        private static class InetSocketAddressHolder {
+            // 1、Socket Address's 主机名
+            private String hostname;
+            // 2、Socket Address's IP 地址
+            private InetAddress addr;
+            // 3、Socket Address's 端口号
+            private int port;
+        }
+    }
+```
+
+### RouteDatabase
+3、RouteDatabase的作用？
+> 1. 路由黑名单
+> 1. 用于避免使用那些连接失败的Route
+```java
+/**=================================================================
+ * 失败的Route(路由)的黑名单
+ * 1. 用于避免创建和目标address有关的connection
+ * 2. 如果尝试连接一个指定的IP地址或者proxy server出现了失败，
+ *    会进行记录并且优先修改这个路由。
+ *============================================================*/
+public final class RouteDatabase {
+    // LinkedHashSet存储Route
+    private final Set<Route> failedRoutes = new LinkedHashSet<>();
+    // 将连接失败的route添加到黑名单中
+    public synchronized void failed(Route failedRoute) {
+        failedRoutes.add(failedRoute);
+    }
+    // 将成功连接的route从黑名单中移除
+    public synchronized void connected(Route route) {
+        failedRoutes.remove(route);
+    }
+    // 如果route最近失败过，return true，需要推迟这个route。
+    public synchronized boolean shouldPostpone(Route route) {
+        return failedRoutes.contains(route);
+    }
+    // 失败的route数量
+    public synchronized int failedRoutesCount() {
+        return failedRoutes.size();
+    }
+}
+```
+
+### RouteSelector
+
+4、RouteSelector
+```java
+/**
+ * // RouteSelector.java
+ *  1. 选择routes去连接到源服务器。
+ *  2. 每个connection需要在proxy servver、IP address、TLS mode中进行选择。
+ *  3. Connections也可能会被回收
+ */
+public final class RouteSelector {
+    // 请求的目标地址信息，如http://www.wanandroid.com/
+    private final Address address;
+    // Route黑名单
+    private final RouteDatabase routeDatabase;
+    // 最近使用的Porxy、socketAddress
+    private Proxy lastProxy;
+    private InetSocketAddress lastInetSocketAddress;
+
+    // Proxy列表
+    private List<Proxy> proxies = Collections.emptyList();
+    // socket Address列表。
+    private List<InetSocketAddress> inetSocketAddresses = Collections.emptyList();
+    // index
+    private int nextProxyIndex;
+    private int nextInetSocketAddressIndex;
+
+    // 失败的Route列表
+    private final List<Route> postponedRoutes = new ArrayList<>();
+
+}
+```
+
+#### 构造
+
+5、构造方法
+```java
+    // RouteSelector.java-构造方法
+    // 调用层次关系：
+    // HttpEngine.sendRequest() -> new HttpEngine() -> new StreamAllocation() -> new RouteSelector()
+    public RouteSelector(okhttp3.Address address, okhttp3.internal.RouteDatabase routeDatabase) {
+        // 1、保存address
+        this.address = address;
+        // 2、保存route黑名单
+        this.routeDatabase = routeDatabase;
+        // 3、将proxy存储到内部列表中
+        resetNextProxy(address.url(), address.proxy());
+    }
+
+    // RouteSelector.java-准备proxy server相关的proxy
+    private void resetNextProxy(HttpUrl url, java.net.Proxy proxy) {
+        if (proxy != null) {
+            // 1、Porxy不为null，建立proxy列表
+            proxies = Collections.singletonList(proxy);
+        }
+        nextProxyIndex = 0;
+    }
+```
+
+#### next()
+
+6、next(): 获取有效的Route
+```java
+    // RouteSelector.java-获取Route，如果该Route失败过，去找下个Route
+    public Route next() throws IOException {
+        if (!hasNextInetSocketAddress()) {
+            // 1、有下一个Proxy： nextProxyIndex = 0 < proxies.size() = 1
+            if (!hasNextProxy()) {
+                return nextPostponed();
+            }
+            // 2、获取到Proxy列表中nextProxyIndex下标的proxy
+            lastProxy = nextProxy();
+        }
+        // 3、获取到socket address列表中nextInetSocketAddressIndex下标的socket地址
+        lastInetSocketAddress = nextInetSocketAddress();
+        // 4、RouteSlector初始化传入的address；最新的proxy，type=Direct；最新的socket address-47.104.74.165
+        Route route = new Route(address, lastProxy, lastInetSocketAddress);
+        // 5、判断该route最近是否失败过。true-失败过；
+        if (routeDatabase.shouldPostpone(route)) {
+            postponedRoutes.add(route);
+            // 6、如果该Route失败过，会去递归调用next，直到找到不失败的Route
+            return next();
+        }
+        // 7、返回Route
+        return route;
+    }
+
+    // RouteSelector.java-返回下一个proxy
+    private Proxy nextProxy() throws IOException {
+        // 1、返回proxy列表中index指向的元素。Result = “DIRECT”
+        Proxy result = proxies.get(nextProxyIndex++);
+        // 2、重置下一个Internet Socket Address(将dns下所有的address添加到了RouteSelector内部的adress列表中)
+        resetNextInetSocketAddress(result);
+        return result;
+    }
+
+
+    // RouteSelector.java-为当前的proxy或者主机准备socket address。
+    //  通过dns去查找host下所有address和port，并且存入inet socket address列表中
+    private void resetNextInetSocketAddress(java.net.Proxy proxy) throws IOException {
+        // 1、清除socket address。
+        inetSocketAddresses = new ArrayList<>();
+
+        String socketHost;
+        int socketPort;
+        // 2、proxy的type为Direct(直连)，或者为Socks。都是直接将address的主机和端口号，作为socket的主机和端口号。
+        if (proxy.type() == Type.DIRECT || proxy.type() == Type.SOCKS) {
+            // 直接将address的主机，作为socket的主机
+            socketHost = address.url().host();
+            // 直接将address的port，作为socket的port
+            socketPort = address.url().port();
+        }
+        // 3、非Direct，非socks，表示采用http、ftp等高层协议的代理
+        else {
+            // 4、采用proxy的address
+            SocketAddress proxyAddress = proxy.address();
+            InetSocketAddress proxySocketAddress = (InetSocketAddress) proxyAddress;
+            // 5、获取到代理的socket address中的host和port
+            socketHost = getHostString(proxySocketAddress);
+            socketPort = proxySocketAddress.getPort();
+        }
+        // 6、1 <= 端口号 <= 65535 才是合法端口
+        if (socketPort < 1 || socketPort > 65535) {
+            throw new SocketException("No route to " + socketHost + ":" + socketPort + "; port is out of range");
+        }
+        // 7、proxy type = spcks时，向internet socket address列表中添加unresolved的host和port
+        if (proxy.type() == java.net.Proxy.Type.SOCKS) {
+            inetSocketAddresses.add(InetSocketAddress.createUnresolved(socketHost, socketPort));
+        } else {
+            // 8、address的dns去查找addresses。会返回socketHost的所有ip地址，OkHttp会依次尝试，如果一个地址的连接失败，会去尝试连接下一个地址。
+            List<InetAddress> addresses = address.dns().lookup(socketHost);
+            for (int i = 0, size = addresses.size(); i < size; i++) {
+                /**==================================================================
+                 * 将InetAddress都添加到RouteSelector内部的inetSocketAddress列表中
+                 *  1. InetAddress位于java.net包中。
+                 *  2. inetAddress = www.wanandroid.com/47.104.74.169; socketport = 80.
+                 *===================================================================*/
+                InetAddress inetAddress = addresses.get(i);
+                inetSocketAddresses.add(new InetSocketAddress(inetAddress, socketPort));
+            }
+        }
+        nextInetSocketAddressIndex = 0;
+    }
+
+    // ReouteSelector.java- 返回SocketAddresses列表中下标为nextInetSocketAddressIndex的socket地址。
+    private InetSocketAddress nextInetSocketAddress() throws IOException {
+        return inetSocketAddresses.get(nextInetSocketAddressIndex++);
+    }
+```
 
 ## 总结题
 
@@ -1433,7 +1915,35 @@ void put(RealConnection connection) {
 > 1. 204/205: 在获取到返回Response后，如果code=204/205, 但是Body的Content长度>0，会抛出异常：ProtocolException
 > 1. 304：数据没有更改过。比如请求图片，如果图片在上次访问后没有更新过，就不用重新下载，直接返回304，告诉客户端可以直接使用缓存。
 
-## 参考资料
-1. [OkHttp拦截器-官方github-wiki](https://github.com/square/okhttp/wiki/Interceptors)
-1. [OKHTTP结合官网示例分析两种自定义拦截器的区别](https://www.jianshu.com/p/d04b463806c8)
-1. [http中的204和205](https://blog.csdn.net/mevicky/article/details/50483178)
+10、Http表单是什么
+> 1. 本质上是一种HTTP的`Content-Type：application/x-www-form-urlencoded`, 数据本质上是通过HTTP body传输。
+> 1. OkHttp的post通过FormBody.builder去构造RequestBody能进行表单的传输。
+
+11、Http的patch操作是什么？
+> PATCH方法是新引入的，是对PUT方法的补充，用来对已知资源进行局部更新
+
+12、Http中的Cache-Control是什么？
+> 1. 指定了请求和响应遵循的缓存机制。
+> 1. 可以减少对网络带宽的占用，可以提高访问速度，提高用户的体验，还可以减轻服务器的负担。
+
+13、代理服务器中的HTTP代理与SOCKS代理有什么区别?
+> 1. Http代理：在浏览网页，下载数据等场景下就是http代理。它通常绑定在代理服务器的80、3128、8080等端口上。
+> 1. 采用socks协议的代理服务器就是SOCKS服务器，是一种通用的代理服务器。
+> 1. Socks不要求应用程序遵循特定的操作系统平台，Socks 代理与应用层代理、 HTTP 层代理不同，Socks 代理只是简单地传递数据包，而不必关心是何种应用协议（比如FTP、HTTP和NNTP请求）。所以，Socks代理比其他应用层代理要快得多。它通常绑定在代理服务器的1080端口上。
+
+14、Http的ETag是什么？
+> 1. ETag(Entity Tag), 实体标签
+> 1. ETag是Http 1.1中加入的属性，用于帮助服务器控制缓存验证。
+> 1. 当客户端请求服务端的资源A时，会通过A计算出Hash值，如`3f80f-1b6-3e1cb03b`，就是ETag
+> 1. 客户端会将`ETag`和资源A都保存在本地。
+> 1. 下次请求资源A时，会通过类似`If-None-Match: "3f80f-1b6-3e1cb03b`的请求头，将ETag发给服务器。
+> 1. 服务端会进行比较，如果一致，返回304表示数据未修改。客户端直接用本地缓存的资源A。
+> 1. 如果不一致，表明数据修改过，会将资源A返回给客户端(返回码为200)
+
+15、返回码200的作用？
+> 表示客户端请求成功。
+
+16、Http Age的作用
+> 1. 当Reponse是从缓存里获取时，HTTP/1.1协议规定要添加`Age`header字段。
+> 1. Age的值是响应报文在源服务器中产生或者过期验证的那一刻起，到现在为止所经过时间的一个估计值。
+> 1. 经常和max-age一起来验证缓存是否过期，即如果`Age`的值比`max-age`的值还大，表明缓存已经过期。
