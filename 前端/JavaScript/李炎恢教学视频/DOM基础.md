@@ -162,10 +162,234 @@ box.removeAttribute('style');
 ```
 
 11、node节点属性
-> 1.元素节点，属性节点和文本节点，都有三个属性；
+> 1.节点分为：元素节点，属性节点和文本节点，都有三个属性；
 
 |节点类型|nodeName|nodeType|nodeValue|
 |---|---|---|---|
 |元素|元素标签名(tagName属性)|1|null|
 |属性|属性名称|2|属性值|
 |文本|#text|3|文本内容(不包含html)|
+
+12、层次节点属性
+> 1.节点的层次结构可划分为：父节点与子节点，兄弟结点这两种；
+
+|属性|说明|
+|---|---|
+|childNodes|获取当前元素节点的所有子节点|
+|firstChild|获取当前元素节点的第一个子节点|
+|lastChild|获取当前元素节点的最后一个子节点|
+|ownerDocument|获取该节点的文档根节点，相当于document|
+|parentNode|获取当前节点的父节点|
+|previousSibling|获取当前节点的前一个同级节点|
+|netSibling|获取当前节点的后一个同级节点|
+|attributes|获取当前元素节点的所有属性节点集合|
+
+13、childNodes属性
+> 1.作用，获取当前元素节点的所有子节点，子节点包括元素子节点和文本子节点；
+> 2.文本子节点可以使用nodeValue，输出文本内容（无法使用innerHTML属性获取文本内容）；
+> 3.元素子节点可以使用nodeName，输出标签名称；
+```
+<div id='div' class='class' style="color:red;">测试<strong>div</strong>结尾</div>
+
+var box = document.getElementById('div');
+console.log(box.childNodes);               //NodeList(3) [text, strong, text]
+console.log(box.childNodes[0]);            //'测试'（文本子节点）
+```
+```
+//小例子，通过判断节点类型来输出值
+for(var i = 0; i < box.childNodes.length; i++){
+    if(box.childNodes[i].nodeType === 1){
+        console.log('元素节点：'+box.childNodes[i].nodeName);
+    }else{
+        console.log('文本节点：'+box.childNodes[i].nodeValue);
+    }
+}
+//文本节点：测试
+//元素节点：STRONG
+//文本节点：结尾
+```
+
+14、firstChild和lastChild属性
+> 1.firstChild：获取当前元素节点的第一个子节点;
+> 2.lastChild：获取当前元素节点的最后一个子节点；
+```
+console.log(box.firstChild.nodeValue);     //测试
+console.log(box.lastChild.nodeValue);      //结尾
+```
+
+15、attributes属性
+> 1.获取当前元素节点的所有属性节点集合；
+> 2.返回一个集合数组NamedNodeMap，保存着这个元素节点的属性列表；
+```
+<div id='div' class='class' style="color:red;">测试<strong>div</strong>结尾</div>
+console.log(box.attributes);                //NamedNodeMap
+console.log(box.attributes.length);         //3
+console.log(box.attributes[0]);             //id='div'
+console.log(box.attributes[0].nodeName);    //id(属性名)
+
+console.log(box.attributes['style'].nodeValue);    //color:red;（遍历的时候从后往前）
+```
+
+16、空白文本节点
+> 1.在IE8及以下的版本中，DOM忽略了空白字符；
+> 2.在其他浏览器，和IE9以上的版本中，标准的DOM具有是哦空白文本节点的功能；
+```
+<div id="test">
+    <p>p1</p>
+    <p>p2</p>
+    <p>p3</p>
+</div>
+
+console.log(box1.childNodes.length);    //7(IE8及以下，输出3)
+console.log(filterWhiteNode(box1.childNodes).length);   //所有浏览器都输出3
+console.log(filterSpaceNode(box1.childNodes).length);
+
+//忽略空白字符
+function filterWhiteNode(node){
+    var ret = [];
+    for(var i = 0; i < node.length; i++){
+        if(node[i].nodeType === 3 && /^\s+$/.test(node[i].nodeValue)){
+            continue;
+        }else{
+            ret.push(node[i]);
+        }
+    }
+    return ret;
+}
+
+//删除空白节点
+function filterSpaceNode(node){
+    for(var i = 0; i < node.length; i++){
+        if(node[i].nodeType === 3 && /^\s+$/.test(node[i].nodeValue)){
+            node[i].parentNode.removeChild(node[i]);
+        }
+    }
+    return node;
+}
+```
+> 3.如果firstChild，lastChild，previousSibling和nextSibling在获取节点的过程中遇到空白节点，解决办法如下:
+```
+console.log(removeSpaceNode(box1).firstChild.nodeName);   //p
+
+function removeSpaceNode(node){
+    for(var i = 0; i < node.childNodes.length; i++){
+        if(node.childNodes[i].nodeType === 3 && /^\s+$/.test(node.childNodes[i].nodeValue)){
+            node.childNodes[i].parentNode.removeChild(node.childNodes[i]);
+        }
+    }
+    return node;
+}
+```
+
+17、节点操作
+> 1.定义：动态的创建，赋值，插入，删除和替换节点；
+
+|方法|说明|
+|---|---|
+|write()|把任意字符串插入到文档中|
+|createElement()|创建一个元素节点|
+|appendChild()|将节点追加到子节点列表的末尾|
+|createTextNode()|创建一个文本节点|
+|insertBefore()|将新节点插入在前面|
+|replaceChild()|将新节点替换旧节点|
+|cloneNode()|复制节点|
+|removeChild()|移除节点|
+```
+console.log(document.write('<p>你好</p>'));
+```
+
+18、createElement()方法
+> 1.创建一个元素节点；
+```
+document.createElement('p');   //创建了一个p节点，但还未添加到文档中
+```
+
+19、appendChild()方法
+> 1.将节点追加到某个子节点列表的末尾；
+```
+<div id="test">
+    <p>p1</p>
+    <p>p2</p>
+    <p>p3</p>
+</div>
+
+var box1 = document.getElementById('test');
+var p = document.createElement('p');
+box1.appendChild(p);
+```
+
+20、createTextNode()方法
+> 1.创建一个文本节点；
+```
+var box1 = document.getElementById('test');
+var p = document.createElement('p');
+box1.appendChild(p);
+var text = document.createTextNode('测试DOM方法');
+p.appendChild(text);
+```
+
+21、insertBefore()方法
+> 1.将新节点插入在指定节点的前面；
+> 2.两个参数：新节点和指定节点；
+```
+var box1 = document.getElementById('test');
+var p = document.createElement('p');
+box1.parentNode.insertBefore(p,box1);     //首先要获取当前节点的父节点，才可以插入
+```
+```
+<span>开头</span>
+<div id="test">
+    <p>p1</p>
+    <p>p2</p>
+    <p>p3</p>
+</div>
+<span>结尾</span>
+
+//将新节点插入到指定节点的后面(在结尾那个span标签之后添加)
+function insertAfter(newElement,targetElement){
+    var parent = targetElement.parentNode;    //获取指定节点的父节点
+    console.log(parent.lastChild.nodeName);
+    if(parent.lastChild === targetElement){   //如果指定节点是同级里的最后一个节点(去除空白节点的问题)
+        alert('你');
+        parent.appendChild(newElement);       //直接使用appendChild方法添加到末尾
+    }else{
+        parent.insertBefore(newElement,targetElement.nextSibling);
+    }
+}
+```
+
+22、replaceChild()方法
+> 1.将新节点替换旧节点；
+> 2.两个参数：新节点和旧节点；
+```
+<span>开头</span>     //第一个span标签在执行该方法后替换为p标签
+<span>结尾</span>
+
+var box2 = document.getElementsByTagName('span')[0];
+var p = document.createElement('p');
+box2.parentNode.replaceChild(p,box2);     //首先获取父节点再进行操作
+```
+
+23、cloneNode()方法
+> 1.复制节点；
+> 2参数：true表示复制标签(包括标签内的内容)；false表示只复制标签(不复制标签内的内容)；
+```
+var box2 = document.getElementsByTagName('span')[0];
+var p = document.createElement('p');
+var clone = p.cloneNode(true);
+box2.append(clone);
+```
+
+24、removeChild()方法
+> 1.删除节点；
+```
+<div id="test">
+    <p>p1</p>
+    <p>p2</p>
+    <p>p3</p>
+</div>
+
+var box1 = document.getElementById('test');
+box1.removeChild(removeSpaceNode(box1).firstChild);   //删除box1的第一个子节点
+box1.parentNode.removeChild(box1);     //删除整个box1节点
+```
