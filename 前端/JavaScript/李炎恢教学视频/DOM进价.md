@@ -19,7 +19,7 @@
 |ATTRIBUTE_NODE|属性节点|2|
 |TEXT_NODE|文本节点|3|
 > 3.使用英文常量代替阿拉伯数字，使判断更加清晰；
-```
+```js
 if(box1.nodeType === 1)               //判断元素节点
 if(box1.nodeType === Node.ELEMENT_NODE)    //等价
 
@@ -36,7 +36,7 @@ if (typeof Node === 'undefined') {
 
 3、Document类型
 > 1.Document类型表示文档，或者根节点；这个节点是隐藏的，没有具体的元素标签；
-```
+```js
 console.log(document.nodeType);                 //9
 console.log(document.childNodes[0]);            //DocumentType，文档申明
 console.log(document.childNodes[0].nodeType);   //10(在IE8及以下，会将<!理解为注释，显示值为8)
@@ -143,7 +143,7 @@ console.log(box1.firstChild.nodeValue);     //Mr.Lee
 > 2.IE为document对象添加了一个compatMode属性，用来识别模式；
 > 3.标准模式，返回CSS1Compat；混杂模式，返回BackCompat。
 > 4.应用：设置窗口页面大小（详见BOM.md文章）
-```
+```js
 //判断IE6的模式
 function judgeMode() {
     if (document.compatMode === 'CSS1Compat') {
@@ -159,7 +159,7 @@ function judgeMode() {
 > 1. 标准模式：8
 > 2. 仿真模式：7
 > 3. 混杂模式：5
-```
+```js
 function judgeIEMode() {
     if (document.documentMode > 7) {
         console.log('标准模式' + document.documentMode);
@@ -245,6 +245,18 @@ function refAndChildContains(ref, child) {
 box1.innerHTML = "<script>alert('Lee');</script>";   
 console.log(box1.innerHTML);    //只能纯粹的打印出节点里的内容，而不能执行alert方法
 ```
+> 2. 性能问题：设置innerHTML时，会创建一个HTML解析器，是浏览器级别的，创建和销毁这个解析器会带来性能损失；
+```
+for(var i = 0; i < 10; i++){
+  ul.innerHTML = '<li>item</li>'   //频繁操作
+}
+
+//改
+for(var i = 0; i < 10; i++){
+  a = '<li>item</li>'             //临时保存
+}
+ul.innerHTML = a;
+```
 > 2.innerText：获取文本内容,如果有html，直接删除内部的标签；赋值，包含标签直接转义；
 ```
 <div id="test">
@@ -265,5 +277,4 @@ box1.innerText = '<b>123</b>';               //赋值，<b>123</b>
 var box1 = document.getElementById('test');
 box1.outerText = 'nihao';
 console.log(document.getElementById('test'));    //null
-
 ```
