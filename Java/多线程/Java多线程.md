@@ -2,7 +2,7 @@
 
 # Java 多线程
 
-版本：2018/8/13-1
+版本：2018/8/29-1(23:59)
 
 ---
 
@@ -388,6 +388,70 @@ public class Main {
 }
 ```
 
+8、实现线程A和线程B打印1、2、3，在线程A打印好1后，线程B开始打印1、2、3，最后线程A打印2、3。
+```java
+public class Main {
+
+    static Lock mLock = new ReentrantLock();
+    // 1、如果线程A没有打印出1，线程B就一直去等待条件满足(firstThreadIsRunning = true)
+    static boolean firstThreadIsRunning = false;
+    static Condition firstRuncondition = mLock.newCondition();
+    // 2、线程A去等待线程B打印好1、2、3后，继续打印1、2
+    static Condition waitSecondCondition = mLock.newCondition();
+
+    public static void main(String c[]) {
+        Thread thread1 = new Thread(new Runnable1());
+        thread1.start();
+        Thread thread2 = new Thread(new Runnable2());
+        thread2.start();
+    }
+
+    static class Runnable1 implements Runnable{
+        @Override
+        public void run() {
+            mLock.lock();
+            try {
+                for (int i = 0; i < 3; i++) {
+                    if(i == 1){
+                        firstThreadIsRunning = true;
+                        // 更改flag后，唤醒第二个线程开始执行
+                        firstRuncondition.signal();
+                        // 等待第二个线程执行完毕(打印1、2、3)
+                        waitSecondCondition.await();
+                    }
+                    System.out.println("A"+(i+1));
+                }
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                mLock.unlock();
+            }
+        }
+    }
+
+    static class Runnable2 implements Runnable{
+        @Override
+        public void run() {
+            mLock.lock();
+            try {
+                // 必须要等到第一个Thread执行OK，才会继续执行
+                while(firstThreadIsRunning == false){
+                    firstRuncondition.await();
+                }
+                for (int i = 0; i < 3; i++) {
+                    System.out.println("B"+(i+1));
+                }
+                waitSecondCondition.signal();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }finally {
+                mLock.unlock();
+            }
+        }
+    }
+}
+```
+
 8、什么是原子操作，Java中的原子操作是什么？
 
 非常简单的java线程面试问题，接下来的问题是你需要同步一个原子操作。
@@ -457,3 +521,5 @@ public class Main {
 1. [Java并发编程：Lock](https://www.cnblogs.com/dolphin0520/p/3923167.html)
 1. [JAVA Lock接口详解](https://blog.csdn.net/u014209205/article/details/80471752)
 1. [java.util.concurrent 包中Executor与Executors的区别](https://blog.csdn.net/gjf281/article/details/26576919)
+1. [死磕Java并发](http://cmsblogs.com/?p=2122)
+1. [Java多线程面试题Top50](http://www.importnew.com/12773.html)
