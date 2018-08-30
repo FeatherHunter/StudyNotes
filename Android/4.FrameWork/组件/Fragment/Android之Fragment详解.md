@@ -1,30 +1,23 @@
+转载请注明转载自：http://blog.csdn.net/feather_wch/article/details/79462351
+
 Fragment有这一篇就够了！汲取各路大神精华，亲自从源码剖析Fragment工作原理和底层机制。
 
 **包含:**
-   >1. Fragment基础-讲解Fragment基本用法和很多注意要点
-   >2. Fragment相关的FragmentManager和FragmentTransaction讲解
-  >3. Fragment通信
-  >4. 从源码角度分析Fragment底层机制和原理
+>1. Fragment基础-讲解Fragment基本用法和很多注意要点
+>2. Fragment相关的FragmentManager和FragmentTransaction讲解
+>3. Fragment通信
+>4. 从源码角度分析Fragment底层机制和原理
 
 
 # Android Fragment详解
-版本: 2018/3/9-1
-转载请注明转载自：http://blog.csdn.net/feather_wch/article/details/79462351
-
-参考资料：
-1. [Frgament基本使用方法](https://www.jianshu.com/p/2bf21cefb763)
-2. [FragmentTransaction详解](https://www.jianshu.com/p/5761ee2d3ea1)
-3. [Fragment详解](http://blog.csdn.net/harvic880925/article/details/44927375)
-4. [Android基础：Fragment看这篇就够了](https://www.jianshu.com/p/bb09c6f9c238?utm_campaign=maleskine&utm_content=note&utm_medium=seo_notes&utm_source=recommendation)
-5. [ViewPager的使用](http://blog.csdn.net/feather_wch/article/details/79494748)
-6. [Android优化方案之--Fragment的懒加载实现](http://blog.csdn.net/ljcitworld/article/details/77528585)
+版本: 2018/8/30-1
 
 ---
 
-##目录
 [TOC]
 
 ---
+
 
 ## Fragment基础
 
@@ -34,6 +27,8 @@ Fragment有这一篇就够了！汲取各路大神精华，亲自从源码剖析
 >3. `Fragment`的生命周期只接受所在的`Activity`影响（`Activity`暂停，其`Fragment`也会暂停）
 >4. `Fragment`在`Android 3.0`引入，低版本中需要采用`android-support-v4.jar`兼容包
 >5. `Fragment`的可重用：多个`Activity`可以重用一个`Fragment`
+
+### 生命周期
 
 2、官方生命周期图
 ![官方生命周期图](https://upload-images.jianshu.io/upload_images/944365-cc85e7626552d866.png?imageMogr2/auto-orient/)
@@ -61,6 +56,12 @@ Fragment有这一篇就够了！汲取各路大神精华，亲自从源码剖析
 
 5、Fragment和Activity生命周期对比图
 ![Fragment和Activity生命周期对比图](https://upload-images.jianshu.io/upload_images/944365-0f9670e55a52403c.png?imageMogr2/auto-orient/)
+> 1. 创建流程中：先执行Activity生命周期回调，再执行Fragment方法。
+> 1. 销毁流程中：先执行Fragment生命周期回调，再执行Activity方法。
+
+### 添加
+
+#### 静态
 
 6、Fragment的静态添加-在Activity的布局文件中添加
 * Fragment
@@ -123,6 +124,8 @@ public class BlankFragment extends Fragment {
 >1. 如果`Fragment`属于`android.support.v4.app.Fragment`，所用的`Activity`必须继承自`FragmentActivity`
 >2. 如果`Fragment`属于`android.app.Fragment`，直接使用`Activity即可`
 
+#### 动态
+
 8、Fragment的动态添加
 * Fragment代码不变
 * Activity中进行动态添加
@@ -161,6 +164,8 @@ public class MainJavaActivity extends Activity {
 
 </android.support.constraint.ConstraintLayout>
 ```
+
+#### 重复添加
 
 9、Fragment的重复添加
 >问题：`Fragment`的动态添加是在`onCreate()`中，当手机横竖屏切换，会导致多次调用`onCreate()`最终导致创建多个`Fragment`
@@ -237,10 +242,10 @@ override fun onCreate(savedInstanceState: Bundle?) {
 
 
 
-### FragmentTransaction方法详解
+### FragmentTransaction
 
 18、FragmentTransaction的`replace()`方法
->1. 作用： `Remove`移除容器所有的`Fragment`，然后再`add一个Fragment`
+>1. 作用： 等于先`Remove`移除容器所有的`Fragment`，然后再`add一个Fragment`
 >2. 在`replace()`前调用多次`add()`, 最终只有`replace()`的`Fragment`留存
 ```java
 getSupportFragmentManager().beginTransaction()
@@ -325,7 +330,7 @@ getSupportFragmentManager().beginTransaction()
 >3. `commitNow()`：同步的提交这个事务。（API_24添加）
 >4. `commitNowAllowingStateLoss()`：和commitNow()一样，但是允许Activity的状态保存之后提交。（API_24添加）
 
-### FragmentManager详解
+### FragmentManager
 25、FragmentManagerImpl是什么？
 >1. 是`FragmentManager`的实现类
 >2. `mAdded`是已经添加到Activity的Fragment的集合
@@ -395,7 +400,17 @@ dialogFragment.show(getFragmentManager(), "dialog");
 >1.` Fragment`通信涉及：Fragment向Activity传递数据、Activity向Fragment传递数据、Fragment之间床底数据
 >2. `EventBus:` 一个Android事件发布/订阅轻量级框架---能够便捷、高效解决`Fragment所有通信问题`
 
-32、Fragment向Activity传递数据的方法
+### Fragment和Activity
+
+32、Fragment调用Activity中的方法
+> 1. getActivity()或者onAttach()中Context转为Activity
+> 1. 用该Activity对象，调用Activity的对象方法。
+
+33、Activity调用Fragment中的方法
+> 1. Activity中直接用该Fragment对象去调用方法。
+> 1. 用过接口回调
+
+34、Fragment向Activity传递数据的方法
 >1. 接口回调: 在`Fragment`中`定义接口`，并让`Activity实现该接口`
 >2. FABridge: 以`注解`的形式免去了`接口回调`的各种步骤，github:(https://github.com/hongyangAndroid/FABridge)
 ```java
@@ -429,23 +444,26 @@ public BlankFragment(Context context) {
 mInterface.onItemClick("data from fragment");
 ```
 
-33、Activity向Fragment传递数据
+35、Activity向Fragment传递数据
 >1. 通过`构造函数`传递数据(不推荐)
 >2. 通过`参数`传递数据，在`Fragment`中`onAttach()`中`getArguments()`
 >3. 在`Activity`中获取`Fragment`对象，直接调用`Fragment的方法`，通过`参数传递数据`
 
-34、Fragment之间的通信
->1. 需要借助`Activity`进行数据通信
+### Fragment之间
 
-##Fragment与ViewPager
+36、Fragment之间的通信
+>1. 需要借助`Activity`进行数据通信
+>1. Activity中通过FragmentManager的`findFragmentById`去获取Fragment
+
+## Fragment与ViewPager
 >ViewPager的基本使用：[请参考该链接](http://blog.csdn.net/feather_wch/article/details/79494748)
 
-35、ViewPager介绍
+37、ViewPager介绍
 >1. `ViewPager`常用于实现`Fragment的左右滑动切换`的效果
 >2. `ViewPager`会缓存当前页相邻的界面，比如当滑动到第2页时，会初始化第1页和第3页的Fragment对象，且生命周期函数运行到onResume()。
 >3. 通过`ViewPager的setOffscreenPageLimit(count)`设置离线缓存的界面个数。
 
-36、Fragment的FragmentPagerAdapter的实现方法
+38、Fragment的FragmentPagerAdapter的实现方法
 ```java
 public class MyFragmentStatePagerAdapter extends FragmentStatePagerAdapter{
     //1. Fragment链表
@@ -468,21 +486,23 @@ public class MyFragmentStatePagerAdapter extends FragmentStatePagerAdapter{
 }
 ```
 
-37、懒加载是什么
+### 懒加载
+
+39、懒加载是什么
 >1. `ViewPager`默认会`预加载`左右相邻的`Fragment`，但是在一些有耗时操作的情况下，需要`懒加载`-在打开相应`Fragment`时才加载数据
 >2. `懒加载的实现思路`：用户不可见的界面，只初始化UI，但是不会做任何数据加载。等滑到该页，才会异步做数据加载并更新UI。
 
-38、懒加载之Fragment的setUserVisibleHint()方法
+40、懒加载之Fragment的setUserVisibleHint()方法
 >1. 懒加载需要依赖Fragment的setUserVisibleHint()方法
 >2. 当Fragment变为`可见`时，需要调用`setUserVisibleHint(true)`
 >3. 当Fragment变为`不可见`时，会调用`setUserVisibleHint(false)`
 
-39、setUserVisibleHint()的调用时机
+31、setUserVisibleHint()的调用时机
 >1. `onAttach()`之前，调用`setUserVisibleHint(false)`。
 >2. `onCreateView()`之前，如果该界面为当前页，则调用`setUserVisibleHint(true)`，否则调用`setUserVisibleHint(false)`。
 >3. 界面变为可见时，调用setUserVisibleHint(true)。界面变为不可见时，调用setUserVisibleHint(false)。
 
-40、懒加载Fragment的实现
+42、懒加载Fragment的实现
 >1、网络请求不涉及UI更新时直接重写`Fragment`的`setUserVisibleHint()`方法
 ```java
 public void setUserVisibleHint(boolean isVisibleToUser) {
@@ -510,9 +530,34 @@ public void onStart() {
 }
 ```
 
+### FragmentPagerAdapter
+
+43、FragmentPagerAdapter的特点
+> 1. Item销毁时，只是将其detach()和界面分离
+> 1. 适合Fragment较少的情况，更占内存，但是反应速度会更快
+> 1. destroyItem()源码
+```java
+public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
+        //...
+        this.mCurTransaction.detach((Fragment)object);
+}
+```
+
+### FragmentStatePagerAdapter
+44、FragmentStatePagerAdapter的特点
+> 1. Item销毁时，会直接remove。
+> 1. 不占内存，适合大量Fragment的情况。
+> 1. destroyItem()源码
+```java
+public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
+        //...
+        this.mCurTransaction.remove(fragment);
+}
+```
+
 ## Fragment进阶
 ### Fragment源码分析
-41、getFragmentManager()源码和逻辑分析
+45、getFragmentManager()源码和逻辑分析
 ```java
 //Activty.java
 FragmentController mFragments = FragmentController.createController(new HostCallbacks());
@@ -539,7 +584,7 @@ FragmentManagerImpl getFragmentManagerImpl() {
 ```
 >1. `FragmentManager`是一个`抽象类`，最终实现类是`FragmentManagerImpl`
 
-42、beginTransaction()源码解析
+46、beginTransaction()源码解析
 ```java
 //FragmentManager.java的内部类FragmentManagerImpl的方法:
 public FragmentTransaction beginTransaction() {
@@ -548,7 +593,7 @@ public FragmentTransaction beginTransaction() {
 }
 ```
 
-43、`BackStackRecord`类是什么？
+47、`BackStackRecord`类是什么？
 ```java
 final class BackStackRecord extends FragmentTransaction implements
         FragmentManager.BackStackEntry, FragmentManagerImpl.OpGenerator {
@@ -575,11 +620,11 @@ final class BackStackRecord extends FragmentTransaction implements
 }
 ```
 >1. `继承FragmentTransaction(事务)`---保存了整个事务的`全部操作轨迹`
->2. `实现BackStackEntry`---Fragment回退栈中的实体，因此在`popBackStack()`时能回退整个失误。
+>2. `实现BackStackEntry`---Fragment回退栈中的实体，因此在`popBackStack()`时能回退整个事务。
 >3. `实现OpGenerator`---用于`UI线程`调度一个`add或pop`事务。
 >4. 内部拥有表示`add`等操作的`Op`类的链表。
 
-44、add()源码解析
+48、add()源码解析
 ```java
 //BackStackRecord.java
 public FragmentTransaction add(int containerViewId, Fragment fragment) {
@@ -608,7 +653,7 @@ void addOp(Op op) {
 }
 ```
 
-45、addToBackStack(“”)源码
+49、addToBackStack(“”)源码
 ```java
 //BackStackRecord.java
 public FragmentTransaction addToBackStack(String name) {
@@ -620,7 +665,7 @@ public FragmentTransaction addToBackStack(String name) {
 }
 ```
 
-46、commit()源码解析
+50、commit()源码解析
 ```java
 /**==============================*
  * 思路流程:
@@ -809,7 +854,7 @@ void executeOps() {
 }
 ```
 
-47、Fragment的7种状态
+51、Fragment的7种状态
 ```java
 static final int INVALID_STATE = -1;   // 作为null值的非法状态
 static final int INITIALIZING = 0;     // 没有被create
@@ -823,7 +868,7 @@ static final int RESUMED = 5;          // 已经完成create,start和resume
 >2. 若Fragment的`当前状态`小于`新状态`，就会进行`创建`、`唤醒`等过程
 >3. 若Fragment的`当前状态`大于`新状态`，就会进行`暂停`、`彻底销毁`等过程
 
-48、FragmentManager的addFragment()源码解析
+52、FragmentManager的addFragment()源码解析
 ```java
 //BackStackRecord.java
 void executeOps() {
@@ -1009,3 +1054,11 @@ void moveToState(Fragment f, int newState, int transit, int transitionStyle, boo
  >进度条动画库:Lottie(https://github.com/airbnb/lottie-android)实现
  >Lottie动画:(https://www.lottiefiles.com/)。
  >优点： 使用非常方便，只需要下载JSON动画文件，然后在XML中写入。
+
+## 参考资料
+1. [Frgament基本使用方法](https://www.jianshu.com/p/2bf21cefb763)
+2. [FragmentTransaction详解](https://www.jianshu.com/p/5761ee2d3ea1)
+3. [Fragment详解](http://blog.csdn.net/harvic880925/article/details/44927375)
+4. [Android基础：Fragment看这篇就够了](https://www.jianshu.com/p/bb09c6f9c238?utm_campaign=maleskine&utm_content=note&utm_medium=seo_notes&utm_source=recommendation)
+5. [ViewPager的使用](http://blog.csdn.net/feather_wch/article/details/79494748)
+6. [Android优化方案之--Fragment的懒加载实现](http://blog.csdn.net/ljcitworld/article/details/77528585)
