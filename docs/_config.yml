@@ -1,5 +1,5 @@
 # Site settings
-title: Hux Blog
+title: 猎羽 Blog
 SEOTitle: 猎羽的博客 | Feather Blog
 header-img: img/home-bg.jpg
 email: 975559549@qq.com
@@ -53,7 +53,7 @@ kramdown:
 
 
 # Disqus settings
-disqus_username: hux
+disqus_username: 猎羽
 
 # Netease settings
 netease_comment: false
@@ -73,7 +73,7 @@ ga_domain: feather.we
 # Sidebar settings
 sidebar: true                           # whether or not using Sidebar.
 sidebar-about-description: "For the next quantum leap<br>离开世界之前，一切都是过程"
-sidebar-avatar: /img/avatar-hux-ny.jpg      # use absolute URL, seeing it's used in both `/` and `/about/`
+sidebar-avatar: /img/profile_feather.jpg      # use absolute URL, seeing it's used in both `/` and `/about/`
 
 
 
