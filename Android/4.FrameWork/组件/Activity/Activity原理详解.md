@@ -5,7 +5,7 @@ Activity的原理详解。
 >本文是我一点点归纳总结的干货，但是难免有疏忽和遗漏，希望不吝赐教。
 
 # Acitivity原理详解(26)
-版本：2018/8/30-1(20:16)
+版本：2018/9/1-1(18:16)
 
 ---
 
@@ -536,22 +536,64 @@ final void performResume() {
 >1. ActivityStarter中对`FLAG_ACTIVITY_SINGLE_TOP`等内容进行处理
 >1. 比如`FLAG_ACTIVITY_SINGLE_TOP`就回去执行`onNewIntent()`
 
-### 补充题
+## 序列图：startActivity
 
-21、Activity是在哪里创建的？
+21、startActivity
+```sequence
+Activity->Activity:1.startActivity
+Activity->Activity:2.startActivityForResult
+Activity->Activity:3.mInstrumentation.\nexecStartActivity
+Activity->ActivityManagerService:【IPC】4.ActivityManager.\ngetService()
+ActivityManagerService->ActivityManagerService:5.startActivity()
+Activity->Activity:6.checkStartActivityResult
+ActivityManagerService->ActivityStackSupervisor:7.realStartActivityLocked()
+ActivityStackSupervisor->ActivityThread:【IPC】8.app.thread.\nscheduleLaunchActivity
+ActivityThread->ActivityThread:9.sendMessage(H.LAUNCH_ACTIVITY)
+ActivityThread->ActivityThread:10.Handler H
+ActivityThread->ActivityThread:11.handleMessage()
+ActivityThread->ActivityThread:12.handleLaunchActivity()
+ActivityThread->ActivityThread:13.WindowManagerGlobal.\ninitialize()\n(12)
+ActivityThread->ActivityThread:14.performLaunchActivity()\n(12)
+ActivityThread->ActivityThread:15.handleResumeActivity()\n(12)
+ActivityThread->ActivityThread:16.getPackageInfo()\n(14)
+ActivityThread->ActivityThread:17.newActivity()\n(14)
+ActivityThread->ActivityThread:18.makeApplication()\n(14)
+ActivityThread->ActivityThread:19.createBaseContextForActivity()\n(14)
+ActivityThread->ActivityThread:20.activity.attach()\n(14)
+ActivityThread->ActivityThread:21.callActivityOnCreate()\n(14)
+ActivityThread->ActivityThread:22.attachBaseContext()\n(20)
+ActivityThread->ActivityThread:23.new PhoneWindow()\n(20)
+ActivityThread->ActivityThread:24.mWindow.\nsetWindowManager()\n(20)
+ActivityThread->ActivityThread:25.保存WM到Activity内部\n(20)
+```
+>13.创建Activity前初始化WindowManagerGlobal
+>14.完成Activity对象的创建和启动过程
+>15.调用Activity的onResume这一生命周期
+>17.通过类加载器来创建Activity对象
+>18.通过LoadedApk的makeApplication方法创建Application对象(唯一)，并会调用`onCreate()`
+>19.创建ContextImpl，并调用attach
+>20.关联了Context和Activity，并且创建Window加载WM等初始化工作
+>21.调用Activity的onCreate方法
+
+## 补充题
+
+1、Activity是在哪里创建的？
 > performLaunchActivity
 
-22、Aplication在哪里创建的？
+2、Aplication在哪里创建的？
 > performLaucnActivity
 
-23、Context在哪里创建的？
+3、Context在哪里创建的？
 > performLaunchActivity创建的ContextImpl
 
-24、Widow(PhoneWindow)是哪里创建的？
+4、Widow(PhoneWindow)是哪里创建的？
 > activity.attach()方法
 
-25、DecorView是哪里创建的？
+5、DecorView是哪里创建的？
 > handleResumeActivity中
 
-26、何时将DecorView添加到了Window中？
+6、何时将DecorView添加到了Window中？
 > handleResumeActivity中执行`wm.addView(decorview)`
+
+## 参考资料
+1. [剖析Activity、Window、ViewRootImpl和View之间的关系](http://mp.weixin.qq.com/s/-5lyASIaSFV6wG3wfMS9Yg)

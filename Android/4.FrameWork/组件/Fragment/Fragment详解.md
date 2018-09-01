@@ -10,7 +10,7 @@ Fragment有这一篇就够了！汲取各路大神精华，亲自从源码剖析
 
 
 # Android Fragment详解
-版本: 2018/8/30-1
+版本: 2018/9/1-1
 
 ---
 
@@ -1045,6 +1045,11 @@ void moveToState(Fragment f, int newState, int transit, int transitionStyle, boo
 }
 ```
 
+## 补充题
+
+1、Fragment的常见问题，以及如何处理？
+>1. `getActivity()空指针`：常见于进行异步操作的时候，此时如果`Fragment已经onDetach()`,就会遇到。解决办法：在`Fragment`里面使用一个`全局变量mActivity`，可能会导致内存泄露。但是比`崩溃`更好。
+>2. `视图重叠`：主要是因为`Fragment`的`onCreate()`中没有判断`saveInstanceSate == null`，导致重复加载了同一个`Fragment`
 
 ## 额外收获
 * SparseArray：
