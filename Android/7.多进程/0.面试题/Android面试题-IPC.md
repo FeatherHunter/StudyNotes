@@ -1,120 +1,76 @@
-转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79190230
-# IPC-进程间通信(62题)
-版本：2018/2/4-1
+转载请注明链接：https://blog.csdn.net/feather_wch/article/details/79190230
 
->选取总结自《Android开发艺术探索》。
->文本包含两部分，1、对知识点就行归纳汇总 2、讲解IPC知识点
->链接：http://blog.csdn.net/feather_wch/article/details/79190230
+总结所有Android进程间通信相关的面试题。在其他博文已经有答案的会提供[猎羽的博文链接](https://blog.csdn.net/feather_wch)进行参考。没有答案的会在文章内给出。
 
-问题汇总：
-1、什么是IPC？
->Inter-Process Communication(进程间通信)
+# Android面试题-IPC
 
-2、进程间通信是什么？
->两个进程之间进行数据交换的过程
+版本号：2018/09/02-1(1:38)
 
-3、进程是什么？
->一般指一个执行单元,也是系统分配资源的最小单位。
+---
 
-4、线程是什么？
->是CPU调度的最小单元，而且是有限的系统资源。一个进程可以包含多个线程。
+[答案参考-Android进程间通信IPC详解](https://blog.csdn.net/feather_wch/article/details/81136290)
 
-5、ANR导致的原因？如何避免？
->ANR-application not respongding是因为UI线程内部的耗时操作导致界面无响应。应该将耗时操作移到非UI线程即可。
+---
 
-6、什么时候需要用到多进程？
->比如：当前应用需要从其他应用获取数据
+[TOC]
 
-7、开启多进程模式的方法
->1. 给四大组件添加属性`android:process`
->2. 特殊方法：通过JNI在native层去fork一个新的进程。
+## 基本概念
 
-8、activity的`android：process`属性`=":remote"`和`"com.example.remote"`的区别
->1. `:remote`是指在当前进程名前面加上当前的包名`com.example:remote`，且该进程是当前应用的私有进程，其他应用的组件不能和该进程跑在同一个进程内
->2. 后者是属于全局进程，其他应用可以通过ShareUID的方式和它跑在同一个进程中。
 
-9、多进程会造成的问题：
->1. 静态成员和单例模式完全失效
->2. 线程同步机制完全失效
->3. SharedPreferences的可靠性下降(不支持两个进程同时读写)
->4. Application会多次创建
+1. 什么是IPC？
+2. 进程间通信是什么？
+3. 进程是什么？
+4. Android中的IPC方法(6种)
+5. 线程是什么？
+6. ANR导致的原因？如何避免？
+7. 什么时候需要用到多进程通信？
+8. 开启多进程模式的方法
+9. activity的`android：process`属性`=":remote"`和`"com.example.remote"`的区别
+10. 多进程会造成的问题？(4)
+11. Serializable和Parcelable接口作用?(3)
+12. Serializable接口的作用和使用?
+13. serialVersionUID的作用?(2)
+14. 静态成员变量是否会参加序列化过程？
+15. 用`transient`关键字标记的成员变量是否会参加序列化过程？
+16. java.io.ObjectOutputStream和ObjectInputStream有什么用？
+17. 系统中哪些类实现了Parcelable接口？
+18. 实现序列化的集合中的元素是否一定要实现序列化？
+19. Parcelable和Serializable的区别？(2)
 
-10、Serializable和Parcelable接口作用
->1. 可以完成对象的序列化过程
->2. 使用Intent和Binder传输数据时就需要Serializable或Parcelable
->3. 需要把对象持久化到存储设备，或者通过网络传给其他客户端。
+## Binder
 
-11、Serializable接口的作用和使用
->1、Serializable接口为对象提供了标准的序列化和反序列化操作。
->1. 这个类实现Serializable接口
->2. 该类声明一个serialVersionUID(`private static final long serialVersionUID=8711368828010083044L`)。 甚至可以不申明ID，但是这个ID会对反序列化产生影响。
-
-12、serialVersionUID的作用
->1、序列化后的数据的ID只有和当前类的ID相同才能正常被反序列化。
->2、可以手动设置ID为1L，这样会自动根据当前类结构去生成它的hash值
-
-13、两个特别注意点：
->1、静态成员变量不属于对象，不会参与序列化过程
->2、用`transient`关键字标记的成员变量不会参与序列化过程。
-
-14、java.io.ObjectOutputStream和ObjectInputStream用于对象序列化
-
-15、系统中实现了Parcelable接口的类
->Intent、Bundle、Bitmap、List、Map
->里面的每个元素也都要可序列化
-
-16、Parcelable和Serializable
->1. Serializable是java中的序列化接口，简单，但开销很大(需要大量IO操作)
->2. Parcelable是Android首推方法，使用麻烦，效率很高
->3. Parcelable主要用于内存序列化上
->4. Serializable适用于将对象序列化到存储设备或通过网络传输(Parcelable也可以只是较复杂)
-
-17、Binder是什么？
->1. Binder是android的一个类，实现了IBinder接口
->2. IPC角度：Binder是android的一种跨进程通信方式
->3. Binder也可以看做一种虚拟的物理设备，设备驱动是/dev/binder，Linux中没有这种通信方式
->4. Android Framework角度：Binder是ServiceManager连接各种Manager(ActivityManager,WindowManager等)和相应ManagerService的桥梁
->5. Android应用层：Binder是客户端和服务端进行通信的媒介，当bindService的时候，服务端会返回一个包含了服务端业务调用的Binder对象，通过该对象，客户端可以获取服务端提供的服务和数据，服务包括普通服务和基于AIDL的服务。
-
-18、Binder主要用在哪？
+1. Binder是什么？(从五个角度考虑)
+1. 设备驱动的作用？好处？
+1. Binder机制是做什么的？(2)
+1. Android基于的Linux内核，Linux有哪些IPC方法？(6种)优缺点是什么？
+1. Binder机制相比于LinuxIPC的优势体现在哪里？(3方面)
+1. Binder主要用在哪？(3)
 >1. Service
 >2. AIDL
 >3. Messenger(底层AIDL)
 
-19、AIDL文件的本质作用
+24、AIDL文件的本质作用
 >AIDL文件的本质就是系统提供了一种快速实现Binder的工具。
 
-20、通过AIDL快速实现Binder的步骤
+25、通过AIDL快速实现Binder的步骤?(4步)
 >1. 新建Book.java(简单的类，没有实际功能，实现Parcelable接口)
 >2. 新建Book.aidl需要有parcelable Book;
 >3. 新建IBookManager.aidl,里面需要导入Book类`import xxx.Book;`
 >4. 选择android studio的build中make project
 
-21、AIDL工具快速实现的Binder中的四个要点
+26、AIDL工具快速实现的Binder中的四个要点
 >1. 继承`IInterface`接口，本身也为接口
 >2. 声明了两个IBookManager.aidl中定义的getBookList和addBook方法(并且用两个id标识这两个方法，用于标识在transact中客户端请求的是哪个方法)
 >3. 声明一个内部类Stub，该Stub就是Binder类
->4. Stub的内部代理类Proxy，用于处理逻辑-客户端和服务端都位于一个进程时，方法调用不会走跨进程的transact过程，当位于不同进程时，方法调用走transact过程。
+>4. Stub的内部代理类Proxy，用于处理逻辑----客户端和服务端都位于一个进程时，方法调用不会走跨进程的transact过程，当位于不同进程时，方法调用走transact过程。
 
-22、Binder注意点
->1. 客户端发起远程请求后，当前线程会被挂起直到服务器返回结果，因此不要在UI线程发起远程请求。
->2. 服务端的Binder方法运行在Binder的线程池中，所以Binder方法是否耗时都要采用同步方法实现。
-
-23、Binder的工作流程：
+27、Binder的工作流程：
 >1. Client向Binder发起远程请求，Client同时挂起
 >2. Binder向data(输入端对象)写入参数，并且通过Transact方法向服务端发起远程调用请求(RPC)
 >3. Service端调用onTransact方法(运行在服务端线程池中)向reply(输出端对象)写入结果
 >4. Binder获取reply数据，返回数据并且唤起Client
 
-23、Android中的IPC方法(6种)
->1-Bundle
->2-文件共享
->3-Messenger
->4-AIDL
->5-ContentProvider
->6-Socket
-
-24、通过AIDL自动生成Binder的java文件
+28、通过AIDL自动生成Binder的java文件
 1. 新建Book.java(简单的类，没有实际功能，实现Parcelable接口)
 ```java
 public class Book implements Parcelable{
@@ -171,13 +127,13 @@ interface IBookManager {
 4. 选择android studio的build中make project
 >系统就会自动生成对应java文件`IBookManager`，位于目录`app\build\generated\source\aidl\debug\包下`
 
-25、Binder所在java文件要点如下:
+29、Binder所在java文件要点如下:
 >1. 继承`IInterface`接口，本身也为接口
 >2. 声明了两个IBookManager.aidl中定义的getBookList和addBook方法(并且用两个id标识这两个方法，用于标识在transact中客户端请求的是哪个方法)
 >3. 声明一个内部类Stub，该Stub就是Binder类
->4. Stub的内部代理类Proxy，用于处理逻辑-客户端和服务端都位于一个进程时，方法调用不会走跨进程的transact过程，当位于不同进程时，方法调用走transact过程。
+>4. Stub的内部代理类Proxy，用于处理逻辑----客户端和服务端都位于一个进程时，方法调用不会走跨进程的transact过程，当位于不同进程时，方法调用走transact过程。
 
-26、Stub(Binder)解析
+30、Binder类Stub的解析(3个重要方法+多个需求相关方法)
 >1. DESCRIPTOR
 >Binder的唯一标识,一般用类名表示
 >2. asInterface(android.os.IBinder obj)
@@ -194,42 +150,175 @@ interface IBookManager {
 >6. Proxy的addBook
 >运行在客户端。过程和getBookList类似，但是没有返回值。
 
-27、Binder注意点
+31、AIDL如何进行权限验证？
+> 1. 利用Binder类也就是Stub的onTransact方法
+> 2. 该方法如果返回false就代表请求失败，可以用于权限验证
+
+32、Binder注意点
 >1. 客户端发起远程请求后，当前线程会被挂起直到服务器返回结果，因此不要在UI线程发起远程请求。
 >2. 服务端的Binder方法运行在Binder的线程池中，所以Binder方法是否耗时都要采用同步方法实现。
 
-28、AIDL文件的本质就是系统提供了一种快速实现Binder的工具，仅此而已。
-
-29、Binder的两个重要方法
+33、Binder的两个重要方法/Binder如何检测服务端异常终止？
 >1. linkToDeath和unlinkToDeath。用于解决: 如果服务端异常终止，而会导致客户端调用失败，甚至可能客户端都不知道binder已经死亡，就会产生问题。
->2. linkToDeath作用给Binder设置一个死亡代理，当Binder会收到通知，还可以重新发起连接请求从而恢复连接。
+>2. linkToDeath作用给Binder设置一个死亡代理，Binder会收到通知，还可以重新发起连接请求从而恢复连接。
 >3. binder的isBinderAlive也可以判断Binder是否死亡。
+
+### 原理深度解析
+
+34、Android如何通过Binder机制提供跨进程通信的解决方案？
+>1. 进程A通过bindService方法去绑定在进程B中注册的一个service
+>1. 系统收到进程A的bindService请求后，会调用进程B中相应service的onBind方法，该方法返回一个特殊对象，系统会接收到这个特殊对象
+>1. 系统为这个特殊对象生成一个代理对象，再将这个代理对象返回给进程A
+>1. 进程A在ServiceConnection回调的onServiceConnected方法中接收该代理对象，依靠这个代理对象的帮助，就可以解决进程间通信问题
+
+35、Binder机制的核心步骤(6)
+> 1. 进程A去绑定到进程B注册的Service
+> 1. 进程B创建Binder对象---Servcice的onBind()
+> 1. 进程A接收进程B的Binder对象
+> 1. 进程A利用进程B传过来的对象发起请求
+> 1. 进程B收到并处理进程A的请求
+> 1. 进程A获取进程B返回的处理结果
+
+36、step 2: 进程B创建的Binder对象需要有两个特性：
+> 1. 具有能被跨进程传输的能力
+> 1. 具有完成特定任务的能力(例如a+b=c)
+
+
+37、Binder对象如何具有能被跨进程传输的能力？
+> 1. Binder对象实现了IBinder接口。
+> 1. 系统会为每个实现了该接口的对象提供跨进程传输。
+
+38、Binder对象如何具有完成特定任务的能力？
+> 1. 继承IBinder接口会需要实现两个方法：attachInterface()、queryLocalInterface()
+> 2. 通过attachInterface()会建立与IInterface对象的关系，通过该对象就获取执行特定任务的能力。
+> 3. attachIInterface(): 会将IInterface对象根据key-value存入到Binder内部的Map中。
+> 4. queryLocalInterface(): 根据key值（即参数 descriptor）可以查询到对应的IInterface对象。
+> 5. 实现IInterface接口的类中，可以定义需要执行的方法。
+```java
+public class Binder implement IBinder{
+        void attachInterface(IInterface plus, String descriptor)
+        IInterface queryLocalInterface(Stringdescriptor) //从IBinder中继承而来
+        boolean onTransact(int code, Parcel data, Parcel reply, int flags)//暂时不用管，后面会讲。
+        ......
+        final class BinderProxy implements IBinder {
+        ......//Binder的一个内部类，暂时不用管，后面会讲。
+        }
+}
+ public interface IPlus extends IInterface {
+         public int add(int a,int b);
+}
+
+public class Stub extends Binder {
+          @Override
+          boolean onTransact(int code, Parcel data, Parcel reply, int flags){
+          ......//这里我们覆写了onTransact方法，暂时不用管，后面会讲解。
+          }
+          ......
+}
+IInterface plus = new IPlus(){//匿名内部类
+         public int add(int a,int b){//定制我们自己的相加方法
+             return a+b;
+         }
+         public IBinder asBinder(){ //实现IInterface中唯一的方法，
+             return null ;
+        }
+};
+Binder binder = new Stub();
+binder.attachIInterface(plus,"PLUS TWO INT");
+```
+
+39、step 3: 进程A接收进程B的Binder对象
+> 1. Service的onBind中返回Binder对象。
+> 1. 系统会收到这个binder对象，然后会生成一个BinderProxy。并且返回给进程A。
+> 1. 进程A会在onServiceConnected中接收到了BinderProxy对象。
+> 1. 该对象仅仅是代理类，本身并不能去实现需要实现的功能。
+> 1. 只提供了transact()用于发起请求。
+
+40、step 4: 进程A利用进程B传过来的对象发起请求
+> 1. BinderProxy对象不能让进程A去直接完成需要的操作，但是提供了transact方法(在IBinder接口中定义的方法).
+> 1. 进程A将数据和操作通过transact方法交给Binder对象执行，最终结果会通过BinderProxy代理对象返回给进程A
+
+41、step 5: 进程B收到并处理进程A的请求
+> 1. 系统保存了Binder对象和BinderProxy对象的对应关系
+> 1. binderproxy.transact调用发生后，系统会将这个请求中的数据转发给Binder对象，Binder对象将会在onTransact中收到binderproxy传来的数据（Stub.ADD,data,reply,0）
+> 1. 根据约定好的操作Stub.ADD进行运算后，会把结果写回reply。
+
+42、step 6: 进程A获取进程B返回的处理结果
+> 1. 进程B把结果写入reply后，进程A就可以从reply读取结果。
+
+43、step 4、5、6的优化
+> 1. 进程A收到BinderProxy对象时，调用Stub.asInterface(binderproxy)
+> 1. 该方法负责利用BinderProxy生成一个PlusProxy代理对象返回给我们
+> 1. 给进程A一种假象：获取到了Plus对象(进程B中的加法操作)，并进行了add()操作。本质是内部进行了传入数据给B进行处理，最终从B中获取到结果等一系列操作。
+
+44、Binder的C/S架构
+![Binder IPC](https://upload-images.jianshu.io/upload_images/2628445-8e398eb2bcd029ba.png?imageMogr2/auto-orient/)
+> 1. Client: 用户实现的代码，如AIDL自动生成的接口类。
+> 2. Binder Driver: 内核层实现的驱动
+> 3. Server: Service中的onBind返回的IBinder对象。
+>
+> 绿色区域：用户自行实现部分
+> 蓝色区域：系统实现部分(包括Servcer端的线程池-线程池实现在Binder内部的native方法中)
+
+45、Binder的Server为什么不是线程安全的？
+>Server端使用了线程池决定了Server的代码`不是线程安全的`
+
+46、Binder服务端的线程池是如何实现的？
+>1. 系统实现
+>1. 线程池实现在Binder内部的native方法中
+
+47、ContentProvider中的CRUD是否是线程安全的？
+>不是, 因为底层的Binder机制中的Server端不是线程安全的
+
+48、AIDL中在Service中实现的接口是否是线程安全的？
+>不是, 理由同上
+
+49、IBinder接口作用
+>1. IBinder是用于远程对象的基本接口，是轻量级远程调用机制的核心部分，用于高性能地进行进程内部和进程间调用。
+>2. IBinder描述了远程对象间交互的抽象协议。
+>3. 不能直接实现IBinder接口，而是应该继承自Binder类。
+
+50、Binder解析
+```java
+//Binder.java
+public Binder(){
+  init();
+  ...
+}
+...
+private native final void init();
+```
+* init()是native方法，是对底层`Binder Driver`的封装。
+* 客户端发起请求的时候(调用IBinder的transact()接口也就是调用驱动层的`mRemote.transact()`), `Binder Driver`会调用`execTransact()`，并在内部调用服务端Binder的`onTransact()`方法。
+
+51、Binder的Driver层作用
+>对Binder类进行了完美的封装，开发者只需要继承`Binder`和实现`onTransact()`即可。
 
 ## Android中的IPC方法
 ### 1-Bundle
-30、Bundle的作用
+52、Bundle的作用
 >Bundle能携带数据-实现了Parcelable接口，常用于传递数据，如Acitivity、Service和Receiver都支持在Intent中通过Bundle传递数据。
 
-31、Bundle在直接传递数据外的一个特殊使用场景。
+53、Bundle传递数据在特殊使用场景无法使用的解决办法？
 > 场景：A进程在完成计算后需要启动B进程的一个组件并且将结果传递给B进程，但是这个结果不支持放入Bundle，因此无法通过Intent传输。
 > 方案：A进程通过Intent启动进程B的service组件(如IntentService)进行计算，因为Service也在B进程中，目标组件就可以直接使用计算结果。
 
 ### 2-文件共享
-32、文件共享的作用
+54、文件共享的作用
 >两个进程通过读/写同一个文件进行数据交换。也可以通过序列化在进程间传递对象。
 
-33、文件共享的特点：
+55、文件共享的特点：
 1. 通过序列化在进程间传递对象
 2. 只适合同步要求不高的进程间通信
 3. 要妥善处理并发读写问题，高并发情况下很容易出现数据丢失。
 
 ### 3-Messenger
-34、Messenger是什么？
+56、Messenger是什么？
 >1. 轻量级的IPC方案
 >2. 底层实现是AIDL
 >3. 一次处理一个请求，因此在服务端不考虑线程同步问题。
 
-35、 Messenger的使用
+57、 Messenger的使用
 >通过messenger在两个进程之间互相发送消息。
 >客户端:
 >1. 绑定并启动位于新进程的服务，通过msg发送消息
@@ -252,7 +341,7 @@ public class MessengerActivity extends Activity {
             //给msg绑定bundle
             msg.setData(data);
 
-            //**将用于服务端回复的msger发送给服务端**
+            //将用于服务端回复的msger发送给服务端
             msg.replyTo = mGetReplyMessenger;
             try {
                 //发送消息
@@ -359,12 +448,14 @@ public class MessengerService extends Service {
             android:process=":remote">
         </service>
 ```
-### 4-AIDL
-36、Messenger缺点：
+
+58、Messenger缺点：
 >1. 以串行的方式处理客户端发送的消息，如果大量的消息同时发送到服务端，服务端仍然只能一个个处理，如果有大量的并发请求，Messenger就无法胜任。
 >2. 如果需要跨进程调用服务端的方法，这种情形Messenger就无法做到。
 
-37、 AIDL进程间通信流程
+### 4-AIDL
+
+59、 AIDL进程间通信流程
 >1-服务端
 >>1. 创建一个Service来监听客户端的连接请求。
 >>2. 创建一个AIDL文件。
@@ -376,7 +467,7 @@ public class MessengerService extends Service {
 >>2. 将服务端返回的Binder对象转成AIDL接口所属的类型
 >>3. 最后就可以调用AIDL中的方法。
 
-38、AIDL实例
+60、AIDL实例
 >1. 创建你需要的接口文件：ITuringManager.aidl(这里功能就是获取图灵机列表，以及增加一个图灵机)
 ```aidl
 package com.example.administrator.featherdemos;
@@ -530,19 +621,19 @@ public class TuringActivity extends AppCompatActivity {
 }
 ```
 
-39、AIDL支持的数据类型
-* 基本数据类型(int、long、char、boolean、double等)
-* String和CharSequence
-* List：只支持ArrayList，且里面所有元素必须是AIDL支持的数据。
-* Map：只支持HashMap，且里面所有元素必须是AIDL支持的数据，包括key和value
-* Parcelable：所有实现Parcelable接口的对象
-* AIDL：所有AIDL接口都可以在AIDL中使用
+61、AIDL支持的数据类型
+  * 基本数据类型(int、long、char、boolean、double等)
+  * String和CharSequence
+  * List：只支持ArrayList，且里面所有元素必须是AIDL支持的数据。
+  * Map：只支持HashMap，且里面所有元素必须是AIDL支持的数据，包括key和value
+  * Parcelable：所有实现Parcelable接口的对象
+  * AIDL：所有AIDL接口都可以在AIDL中使用
 
-40、AIDL中List只能用ArrayList，远程服务端为何使用了CopyOnWriteArrayList(并非继承自ArrayList)：
+62、AIDL中List只能用ArrayList，远程服务端为何使用了CopyOnWriteArrayList(并非继承自ArrayList)：
 >Binder会根据List规范去访问数据，并且生成一个新的ArrayList传给客户端，因此没有违反数据类型的规定。
 >ConcurrentHashMap也是类似功能
 
-41、AIDL实例：如何使用观察者模式
+63、AIDL实例：如何使用观察者模式
 >在AIDL基础上有如下步骤：
 >1. 建立观察者接口(Observer)-ITMachineObserver.aidl
 >2. 在ITuringManager.aidl中增加注册和解注册功能(register\unregister)
@@ -553,7 +644,7 @@ public class TuringActivity extends AppCompatActivity {
 >1. 客户端中通过从服务端获得的Binder对象，调用register/unregister等方法
 >2. 服务端中通过Client客户端注册的Observer去调用客户端Binder中的更新方法
 
-42、AIDL观察者模式源码：
+64、AIDL观察者模式源码：
 >1. ITMachineObserver.aidl
 ```aidl
 package com.example.administrator.featherdemos;
@@ -694,7 +785,7 @@ public class TuringActivity extends AppCompatActivity{
 }
 ```
 
-43、AIDL观察中解除注册引发问题(RemoteCallbackList)
+65、AIDL观察中解除注册引发问题(RemoteCallbackList)
 >1. 在onDestory时，我们可以解除在服务端的注册：
 ```java
 @Override
@@ -717,7 +808,7 @@ public class TuringActivity extends AppCompatActivity{
 >4. RemoteCallbackList
 >系统专门提供用于删除跨进程Listener的接口。该类本身是一个泛型，支持任何AIDL接口。
 
-44、RemoteCallbackList工作原理
+66、RemoteCallbackList工作原理
 >1. 内部有一个Map结构，key是Ibinder，value是Callback类型。该结构能保存所有AIDL回调。将Listener的信息存入CallBack：
 ```java
 IBinder key = listener.asBinder();
@@ -726,12 +817,12 @@ Callback value = new Callback(key, cookie);
 >2. 虽然每次跨进程Client的同一个对象，会在服务端生成多个对象。但是这些对象本身的Binder都是同一个。
 >以Binder作为Key，这样Listener对应着唯一Binder。
 
-45、使用RemoteCallbackList的流程和特点
+67、使用RemoteCallbackList的流程和特点
 >1. 客户端解注册，服务端会遍历所有listener，找出那个和解注册的listener具有相同Binder的listener，并删除。
 >2. 客户端终止后，会自动移除客户端注册的所有listener
 >3. 自动实现线程同步，无需额外操作。
 
-46、RemoteCallbackList的使用
+68、RemoteCallbackList的使用
 >1. Service服务端
 ```java
 private RemoteCallbackList<ITMachineObserver> mObserverList = new RemoteCallbackList<>();
@@ -765,22 +856,22 @@ private RemoteCallbackList<ITMachineObserver> mObserverList = new RemoteCallback
         }
 ```
 
-47、AIDL的注意点
+69、AIDL的注意点
 >1. Client客户端调用远程方法，该方法运行在服务端的Binder线程池中，Client会被挂起。
 >2. 服务端的方法执行过于耗时，会导致Client长时间阻塞，若该线程是UI线程，会导致ANR。
 >3. 客户端的onServiceConnected和onServiceDisconnected方法都运行在UI线程中，不可以进行耗时操作
 >4. 服务端的方法本身就在服务端的Binder线程池中，所以服务端方法本身就可以执行大量耗时操作，不要再开线程进行异步操作。
 >5. 远程方法因为运行在Binder线程池中，如果要操作UI要通过Handler切换到UI线程(服务端通过远程方法去操作Cilent客户端的控件)
 
-48、Binder意外死亡的两种解决方法：
+70、Binder意外死亡的两种解决方法：
 >1. 给Binder设置DeathRecipient监听，Binder死亡时回调binderDied
 >2. 在onServiceDisconnected中重连远程服务。
 
-49、Binder意外死亡的解决方法的区别
+71、Binder意外死亡的解决方法的区别
 >1. onServiceDisconnected在客户端UI线程中被回调
 >2. binderDied在客户端的Binder线程池中被回调(无法操作UI)
 
-50、DeathRecipient处理Binder意外死亡的实现：
+54、DeathRecipient处理Binder意外死亡的实现：
 ```java
 //设置Binder死亡代理
     private IBinder.DeathRecipient mDeathRecipient = new IBinder.DeathRecipient(){
@@ -813,23 +904,37 @@ try {
 }
 ```
 
-51、onServiceDisconnected解决Binder死亡问题：
+72、onServiceDisconnected解决Binder死亡问题：
 >onServiceDisconnected是ServiceConnection的内部方法，在服务端Service断开后就会调用。
 
-52、AIDL中进行权限验证的方法
+73、AIDL中进行权限验证的方法
 >1. 直接在onBind中进行权限验证，比如可以使用permission验证等等。如果验证不通过则bind服务就失败。
 >2. 在服务端onTransact中验证
 >验证失败直接返回false，可以通过uid和pid验证，这样就可以验证包名也可以和第一种方法一样，验证permission。
 
+#### Binder连接池
+
+74、AIDL使用流程
+>1. 创建一个Service和一个AIDL接口
+>2. 创建一个Binder(自定义)继承自AIDL接口中的Stub类，并实现其中抽象方法
+>3. 在Service的onBind方法中返回该Binder类的对象
+>4. 客户端绑定Service
+>5. 建立连接后就可以访问远程服务端的方法
+
+75、大量业务模块都需要使用AIDL进行进程间通信，如何在不创建大量Service的情况下解决。
+>1. 可以将所有的AIDL放在一个Service中管理。
+>2. 服务端Service提供一个queryBinder接口，根据不同业务返回相应的Binder对象。
+>3. 就是使用Binder池
+
 ### 5-ContentProvider
-53、ContentProvider是什么
+76、ContentProvider是什么
 >1. ContentProvider是Android中提供的专门用于不同应用间数据共享的方式。
 >2. 底层实现是Binder，但是使用比AIDL简单很多，系统进行了封装。
 
-54、ContentProvider的使用
+77、ContentProvider的使用
 系统预置了许多ContentProvider，比如通讯录信息、日程表信息等。访问这些数据，只需要通过`ContentResolver`的query、update、insert和delete方法。
 
-55、自定义ContentProvider的步骤
+78、自定义ContentProvider的步骤
 >1. 继承ContentProvider
 >2. 实现：onCreate-创建的初始化工作
 >3. getType-返回url请求对应的MIME类型(媒体类型)，比如图片、视频等。不关注该类型，可以返回null或者`“*/*”`
@@ -838,15 +943,15 @@ try {
 >6. update-更新数据
 >7. delete-删除数据
 
-56、ContentProvider六种方法原理：
+79、ContentProvider六种方法原理：
 >1. 六种方法均运行在ContentProvider的进程中
 >2. onCreate由系统回调并运行在主线程里
 >3. 其余五种方法由外界回调，并运行在Binder线程池中
 
-57、ContentProvider存储方式
+80、ContentProvider存储方式
 >底层很像SQLite数据库，但是存储方式没有限制，可以使用数据，也可以使用普通文件，甚至可以采用内存中的对象存储数据。
 
-58、ContentProvider实例
+81、ContentProvider实例
 >1. 第一个app用于提供Provider功能，主要包含两个文件：DbOpenHelper和PetProvider两个文件（底层使用数据库存储数据）。
 >2. 第二个app使用Provider提供的数据
 >DbOpenHelper:
@@ -1028,27 +1133,13 @@ if(petCursor != null){
 ```
 
 
-### 7、Socket
+### 6-Socket
 
-59、Sokcet就可以进行进程间通信
-
-## Binder连接池
-
-60、AIDL使用流程
->1. 创建一个Service和一个AIDL接口
->2. 创建一个Binder(自定义)继承自AIDL接口中的Stub类，并实现其中抽象方法
->3. 在Service的onBind方法中返回该Binder类的对象
->4. 客户端绑定Service
->5. 建立连接后就可以访问远程服务端的方法
-
-61、大量业务模块都需要使用AIDL进行进程间通信，如何在不创建大量Service的情况下解决。
->1. 可以将所有的AIDL放在一个Service中管理。
->2. 服务端Service提供一个queryBinder接口，根据不同业务返回相应的Binder对象。
->3. 就是使用Binder池
+82、Sokcet就可以进行进程间通信
 
 ## 选用合适的IPC方式
 
-62、IPC各种方法的优缺点和适用场景：
+83、IPC各种方法的优缺点和适用场景：
 |名称|优点|缺点|适用场景|
 |---|---|---|---|
 |Bundle|简单易用|只能传输Bundle支持的数据类型|四大组件间的进程间通信|
@@ -1057,3 +1148,6 @@ if(petCursor != null){
 |Messenger|功能一般，支持一对多串行通信，支持实时通信|不能很好处理高并发情形，不支持RPC，数据通过Message传输因此只能传输Bundle支持的数据类型|低并发的一对多即时通信，无RPC需求，或者无须要返回结果的RPC需求|
 |ContentProvider|在数据源访问方面功能强大，支持一对多并发数据共享，可通过Call方法扩展其他操作|可以理解为受约束的AIDL，主要提供数据源的CRUD操作|一对多的进程间的数据共享|
 |Socket|功能强大，可以通过网络传输字节流，支持一对多并发实时通信|实现细节稍微繁琐，不支持直接的RPC|网络数据交换|
+
+## 参考资料
+1. [面试题-听说你精通Binder？](https://www.jianshu.com/p/adaa1a39a274)
