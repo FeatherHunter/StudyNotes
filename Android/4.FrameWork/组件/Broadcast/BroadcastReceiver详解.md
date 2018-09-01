@@ -1,6 +1,6 @@
-转载请注明链接：
+转载请注明链接：https://blog.csdn.net/feather_wch/article/details/50397199
 
-BroadcastReceiver的原理详解。
+BroadcastReceiver的基本知识和原理详解。
 
 >本文是我一点点归纳总结的干货，但是难免有疏忽和遗漏，希望不吝赐教。
 
@@ -11,7 +11,7 @@ BroadcastReceiver的原理详解。
 
 [TOC]
 
-## 基础(7)
+## 基础(10)
 
 1、BroadcastReceiver是什么？
 >1. 一种`消息型组件`，用于在不同组件甚至不同应用间传递消息
@@ -57,25 +57,116 @@ BroadcastReceiver的原理详解。
 >2. 发送的广播不会离开我们的应用，不会泄露关键数据。
 >3. 其他程序无法将广播发送到我们程序内部，不会有安全漏洞。
 
+8、本地广播的使用
+>1-自定义广播接收器，和一般广播一样。
+```java
+/**
+ * 自定义广播接受器,用来处理登录广播
+ */
+private class LoginBroadcastReceiver extends BroadcastReceiver{
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            //处理我们具体的逻辑,更新UI
+        }
+}
+```
+>2-用LocalBroadcastManager去注册和解注册Receiver。自定义一个Action。
+```java
+// 自定义Action
+public static final String LOGIN_ACTION = "com.example.action.LOGIN_ACTION";
+
+//广播接收器
+private LoginBroadcastReceiver mReceiver = new LoginBroadcastReceiver();
+
+//注册广播方法
+private void registerLoginBroadcast(){
+        IntentFilter intentFilter = new IntentFilter(LoginActivity.LOGIN_ACTION);
+        LocalBroadcastManager.getInstance(mContext).registerReceiver(mReceiver,intentFilter);
+}
+
+//取消注册
+private void unRegisterLoginBroadcast(){
+        LocalBroadcastManager.getInstance(mContext).unregisterReceiver(mReceiver);
+}
+```
+>3-发送广播
+```java
+private void sendBroadcast(){
+      //  发送广播，利用LocalBraodcastManager，Action和上面预定义的action一致
+        LocalBroadcastManager.getInstance(this).sendBroadcast(
+                new Intent(LOGIN_ACTION)
+        );
+}
+```
+
+9、LocalBroadcastManager原理
+> 1. 内部采用Handler实现，使用的是MainLooper，因此不能有耗时操作。
+> 1. 发送广播就是通过Handler发送一个Message实现的。
+
 ### 应用场景
-8、广播的应用场景
+10、广播的应用场景
 > 1. 一个APP具有多个进程的多个组件之间发送广播
 > 1. 不同APP直接发送广播
 
-## 注册方式(6)
+## 注册方式(8)
 
 1、广播两种注册方式的区别
 >1. `静态注册`：常驻系统，不受组件生命周期的影响，耗电，占内存。就算进程被杀死了，还能存在。
 >2. `动态注册`：非常驻系统，组件结束，广播就结束。但是在组件结束前，一定要释放广播，避免内存泄露和崩溃。
 
-2、广播的静态注册过程:
+2、静态注册实例
+>静态注册：即使app被关闭，依然能接收广播，处于活动状态。
+```java
+<receiver android:name=".Receiver">
+        <intent-filter>
+            <action android:name="android.intent.action.AIRPLANE_MODE"></action>
+        </intent-filter>
+</receiver>
+```
+
+3、动态注册
+> 1-自定义接收器
+```java
+    class MsgReceiver extends BroadcastReceiver{
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            // 1、通过Intent获得接收到的信息
+            String msg = intent.getStringExtra("message");
+            // 2、显示
+            Toast.makeText(context, "接收到广播：" + msg, Toast.LENGTH_SHORT).show();
+        }
+    }
+```
+> 2-动态注册
+```java
+        /**===========================================
+         *  动态注册Receiver
+         *===========================================*/
+        MsgReceiver msgReceiver = new MsgReceiver();
+        IntentFilter intentFilter = new IntentFilter();
+        // 指定Action
+        intentFilter.addAction(Intent.ACTION_ANSWER);
+        // 注册监听器
+        registerReceiver(msgReceiver, intentFilter);
+```
+> 3-发送广播
+```java
+        Intent intent = new Intent();
+        intent.setAction(Intent.ACTION_ANSWER);
+        intent.putExtra("message", "文文是猪");
+        sendBroadcast(intent);
+```
+
+4、广播的静态注册过程:
 >1. 安装应用时由系统自动完成注册
 >2. 具体是由`PMS(Package Manager Service)`来完成注册过程
 >3. 本质其他`三大组件`的注册都是在安装时由`PMS`解析并注册
 
+
 ### 动态注册
 
-3、广播动态注册的流程图
+5、广播动态注册的流程图
 ```mermaid
 graph TD;
 1(registerReceiver-ContextWrapper);
@@ -100,19 +191,19 @@ graph TD;
 >6. mRegisteredReceivers.put()： 将InnerReceiver对象进行存储(该对象与BroadcastReceiver对象相对应)
 >7. (mReceiverResolver.addFilter(): 存储IntentFilter
 
-4、为什么需要将BroadcastReceiver转换为IIntentReceiver？
+6、为什么需要将BroadcastReceiver转换为IIntentReceiver？
 >1. BroadcastReceiver作为组件不能直接进行IPC，需要进行中转
 >2. IIntentReceiver是Binder接口，具体实现是LoadedApk.ReceiverDispatcher.InnerReceiver
 >3. ReceiverDispatcher中同时保存了 BroadcastReceiver和InnerReceiver，接收广播时ReceiverDispatcher可以很方便调用BroadcastReceiver的onReceive()方法
 >4. Service也有ServiceDispatcher和内部类InnerConnection(Binder接口)，原理相同
 
-5、动态注册的本质是什么？
+7、动态注册的本质是什么？
 >1. 将BoradcastReceiver对应的Binder对象InnerReceiver存储到ActivityManagerService的Map中
 >2. 将IntentFilter存储到AMS中
 
 ### 动态注册源码
 
-6、广播的动态注册过程:
+8、广播的动态注册过程:
 ```java
 /**
  * =================================
@@ -173,7 +264,7 @@ public Intent registerReceiver(IApplicationThread caller, ...,IIntentReceiver re
 }
 ```
 
-## 广播发送
+## 广播发送(2)
 
 1、广播发送/接收的流程图(普通广播)
 ```mermaid
@@ -407,3 +498,10 @@ ActivityThread[接收方]->ActivityThread[接收方]: 11.receiver.\nonReceive();
 2、Broadcast的运行流程？
 > 1. 注册流程
 > 1. 发送接收流程
+
+3、LocalBroadcastManager底层实现？
+> 1. 用Handler实现
+> 1. 采用的是主线程的Looper，因此是在主线程执行逻辑，不能执行耗时操作。
+
+## 参考资料
+1. [本地广播的使用——LocalBroadcast](https://blog.csdn.net/jarchie520/article/details/71434833)

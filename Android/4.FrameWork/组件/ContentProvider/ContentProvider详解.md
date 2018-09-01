@@ -1,42 +1,137 @@
-Android面试题之四大组件+Fragment，包括Activity、Service、广播、ContentProvider和Fragment。
+转载请注明链接：https://blog.csdn.net/feather_wch/article/details/52035228
 
 >本文是我一点点归纳总结的干货，但是难免有疏忽和遗漏，希望不吝赐教。
->转载请注明链接：https://blog.csdn.net/feather_wch/article/details/81136168
 
-# Android面试题-四大组件(73题)
-版本：2018/9/1-1(1919)
+# ContentProvider详解
+版本：2018/9/1-1(18:16)
+
+---
 
 [TOC]
 
-1、四大组件的注册和调用方式
->1. Activity、Service、ContenProvider必须在`AndroidManifest`中注册
->2. `BroadcastReceiver`可以在`AndroidManifest`中注册，也可以`代码`中注册
->3. Activity、Service、ContenProvider的调用需要借助`Intent`
->4. `BroadcastReceiver`不需要借助`Intent`
 
-## ContentProvider
+## 基础
 
-60、ContentProvider是什么？
+1、ContentProvider是什么？
 >1. 一种`数据共享型组件`
 >2. 内部需要实现`增删改查`四种操作
 >3. 内部的`insert\delete\update\query`方法需要处理好线程同步，因为这些方法都在`Binder线程池`中调用
 
-61、ContentProvider要点
+2、ContentProvider要点
 > 1. ContentProvider所在进程启动时，就会同时启动并且发布到AMS中
 > 2. ContentProvider的onCreate要先于Application的onCreate执行
 
-### 启动
+### ContentResolver
 
-62、ContentProvider的启动流程
->1. `ActivityThread`的`main`方法为应用启动时的入口，`main`是静态方法——会创建`ActivityThread`的实例，并且创建`主线程`的`消息队列`
-> 2. 然后会在`ActivityThread`的`attach()`方法中远程调用`AMS`的`attachApplication`方法并将`ApplicationThread`对象提供给`AMS`
-> 3. `ApplicationThread`是Binder对象，Binder接口是`IApplicationThread`，主要用于`ActivityThread`和`AMS`之间的通信
-> 4. `AMS`的`attachApplication`中会调用`ApplicationThread`的`bindApplication`方法(IPC过程),`bindApplication`的逻辑会通过`ActivityThread`中的`Handler H`切换到`ActivityThread`中的`handleBindApplication`去处理
-> 5. `handleBindApplication`中会创建`Application`对象并且加载`ContentProvider`
-> 6. 加载`ContentProvider`后，才会调用`Application`的`onCreate`方法
+3、ContentResolver的作用
+> 1. 无法直接和ContentProvider交互，需要借助ContentResolver。
+> 2. 通过该类，通过URI就能操作不同的ContentProvider中的数据
 
-### 数据访问
-63、ContentProvider的数据访问
+4、为什么要使用通过ContentResolver类从而与ContentProvider类进行交互，而不直接访问ContentProvider类？
+> 1. 一款应用要使用多个ContentProvider，在ContentProvider类上增加 ContentResolver类对所有的ContentProvider进行统一管理。
+
+5、ContentResolver的使用
+```java
+// 1、使用ContentResolver前，需要先获取ContentResolver
+ContentResolver resolver =  getContentResolver();
+
+// 2、设置ContentProvider的URI
+Uri uri = Uri.parse("content://cn.scu.myprovider/user");
+
+// 3、根据URI 操作 ContentProvider中的数据
+// 此处是获取ContentProvider中 user表的所有记录
+Cursor cursor = resolver.query(uri, null, null, null, "userid desc");
+```
+
+### ContentObserver
+
+6、ContentObserver的作用？
+> 当ContentProvider中数据发生改变后可以通知外界
+
+## 启动
+
+1、ContentProvider的启动流程
+> 1. App启动时，会执行ActivityThread的main方法。
+> 1. 会创建主线程的Looper的Handler。
+> 1. 然后创建ActivityThread实例，并且执行`attach()`，最终会创建ContextImpl、Application、ContentProvider。
+> 1. 并且依次执行ContentProvider的onCreate()和Application的onCreate()
+```mermaid
+graph TD;
+1(1.main)
+2(2.Looper.prepareMainLooper)
+3(3.new ActivityThread)
+4(4.thread.attach)
+5(5.thread.getHandler)
+6(6.Looper.loop)
+7(7.ActivityManager.getService.attachApplication);
+8(8.thread.bindApplication);
+9(9.sendMessage);
+10(10.handleBindApplication);
+11(11.创建ContextImpl对象);
+12(12.makeApplication);
+13(13.installContentProviders);
+14(14.callApplicationOnCreate);
+15(15.installProvider);
+16(16.AMS.publishContentProviders);
+17(17.创建ContentProvider);
+18(18.localProvider.attachInfo);
+1-->2;
+1-->3;
+1-->4;
+1-->5;
+1-->6;
+4-->7;
+7-->8;
+8-->9;
+9-->10;
+10-->11;
+10-->12;
+10-->13;
+10-->14;
+13-->15;
+13-->16;
+15-->17;
+15-->18;
+```
+>1. main: 进行`第2、3、4、5、6的工作`
+>1. Looper.prepareMainLooper(): 准备主线程的Looper
+>1. new ActivityThread(): 创建实例
+>9. thread.attach: 一系列初始化工作
+>1. thread.getHandler(): 获取Main线程的Handler
+>10. Looper.loop(): Looper开启消息循环
+>7. ActivityManager.getService().attachApplication(): 通过`AMS`进行处理---【IPC】
+>8. thread.bindApplication(): 通过【IPC】又交给ContentProvider进程进行bindApplication操作
+>9. sendMessage(H.BIND_APPLICATION): 发送`BIND_APPLICATION`
+>10. handleBindApplication: 进行`11、12、13、14的工作`，主要是创建Application和COntentProvider
+>15. ContextImpl.createAppContext: 创建ContextImpl对象
+>16. makeApplication: 创建Application对象
+>17. installContentProviders: 进行`17、18`，启动当前进程的ContentProvider并调用其onCreate方法
+>18. callApplicationOnCreate： 调用Application的onCreate方法
+>19. installProvider: 遍历当前进程的Provider列表，调用installProvider进行启动。进行`21、22`
+>20. AMS.publishContentProviders: 将已经启动的ContentProvider保存在AMS的ProviderMap中 外部调用者就可以直接从AMS中获取ContentProvider
+>21. 类加载器创建ContentProvider
+>22. localProvider.attachInfo: 通过ContextProvider的方法调用了onCreate方法
+
+2、ActivityThread.main()的源码
+```java
+public static void main(String[] args) {
+    // 1、创建MainLooper
+    Looper.prepareMainLooper();
+    // 2、创建ActivityThread
+    ActivityThread thread = new ActivityThread();
+    // 3、thread.attach()->xxx->handleBindApplication()->创建ContentProvider
+    thread.attach(false, startSeq);
+    // 4、创建Handler
+    if (sMainThreadHandler == null) {
+         sMainThreadHandler = thread.getHandler();
+    }
+    // 5、loop()无限循环
+    Looper.loop();
+}
+```
+
+## 数据访问
+1、ContentProvider的数据访问
 > 1. ContentProvider启动后，外界就可以通过提供的接口进行增删改查
 > 2. 外界无法直接访问`ContentProvider`，需要通过`AMS`根据`Uri`来获取对应的`ContentProvider`的Binder接口`IContentProvider`
 > 3. 然后通过`IContentProvider`来访问其数据源
@@ -58,13 +153,13 @@ public Cursor query(String callingPkg, Uri uri, String[] projection, ......) {
 }
 ```
 
-### 数据解析
+## 数据解析
 
 64、ContentProvider的数据访问解析
 >1. 访问`ContentProvider`需要通过`ContentResolver`，这是一个抽象类
 > 2. `Context的getContentResolver()`本质获取的是`ApplicationContentResolver`对象(ContextImpl的内部类)
 > 3. 当`ContentProvider`所在进程未启动时，第一次访问会触发所在进程的启动和`ContentProvider`的创建。
-> 4. 例如`query`方法，首先会获取`IContentProvider`对象，最终通过`acquireProvider`来获取`ContentProvider`
+> 4. 例如`ContentResolver.query()`方法，首先会获取`IContentProvider`对象，最终通过`acquireProvider`来获取`ContentProvider`
 
 65、ContentProvider访问和创建的流程图
 ```mermaid
@@ -136,7 +231,7 @@ graph TD;
 >21. 类加载器创建ContentProvider
 >22. localProvider.attachInfo: 通过ContextProvider的方法调用了onCreate方法
 
-#### 源码
+### 源码
 
 66、ContentProvider源码解析
 ```java
@@ -301,7 +396,7 @@ graph TD;
 ```
 
 
-## 序列图解析四大组件流程
+## 序列图
 
 73、ContentProvider的机制
 ```sequence
@@ -352,5 +447,5 @@ AMS->AMS: 19.publishContentProviders()
 >18.创建ContentProvider对象,并调用onCreate方法
 >19.将已经启动的ContentProvider保存在AMS的ProviderMap中，外部调用者就可以直接从AMS中获取ContentProvider
 
-
-## 参考和学习资料
+## 参考资料
+1. [ContentProvider的基本使用](https://www.jianshu.com/p/ea8bc4aaf057)
