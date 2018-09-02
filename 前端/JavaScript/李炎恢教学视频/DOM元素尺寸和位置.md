@@ -123,3 +123,26 @@ function scrollStart(element){
     }
 }
 ```
+
+7、元素位置——getBoundingClientRect()方法
+> 1.这个方法返回一个矩形对象；
+> 2.包括四个属性：left，top，right，bottom；
+> 3.分别表示元素各边与页面上边和左边的距离；
+> 4.存在兼容问题，在IE7，<html>标签本身存在border边框；
+```
+console.log(document.documentElement.clientTop);         //IE7，显示2（其他浏览器，显示0）
+console.log(document.documentElement.clientLeft);        //IE7，显示2（其他浏览器，显示0）
+
+//解决IE7兼容性问题
+function getRect(element) {
+    var rect = element.getBoundingClientRect();
+    var clientTop = document.documentElement.clientTop;
+    var clientLeft = document.documentElement.clientLeft;
+    return{
+        left:rect.left-clientLeft,
+        top:rect.top-clientTop,
+        bottom:rect.bottom-clientTop,
+        right:rect.right-clientLeft
+    };
+}
+```
