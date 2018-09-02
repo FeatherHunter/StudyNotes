@@ -170,5 +170,19 @@
 > 1. 在计算资源充足的情况下，字节码的解释执行和即时编译可同时进行。
 > 1. 即时编译完成后的机器码会在 下次调用该方法时启用，以替换原本的解释执行。
 
+## 思考题
+
+26、Java语言和JVM看待boolean类型的方式是否相同？
+```java
+ public static void main(String[] args) {
+   boolean flag = true;
+   if (flag) System.out.println("Hello, Java!");
+   if (flag == true) System.out.println("Hello, JVM!");
+ }
+```
+> 1. JVM将boolean当做int值来处理, 因此flag = true = iconst_1
+> 1. 如果通过工具将flag改为 iconst_2, 会发现if(flag)依旧成立，因为iconst_2也为真
+> 1. 但是if(flag == true)就不成立了，iconst_1 不等于 inconst_2
+
 ## 参考资料
 1. [深入拆解Java虚拟机](https://time.geekbang.org/column/108)
