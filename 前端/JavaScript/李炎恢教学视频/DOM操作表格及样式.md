@@ -152,7 +152,7 @@ console.log('DOM2：'+document.implementation.hasFeature('CSS2','2.0'));    //tr
 console.log('DOM2：'+document.implementation.hasFeature('HTML','1.0'));   //true(在IE中，其他浏览器也为true)
 ```
 
-5、访问CSS样式（可以赋值）
+5、访问CSS样式（只能用于内嵌样式）（可以赋值）
 > 1.任何的HTML元素标签都会有一个通用的属性：style。会返回CSSStyleDeclaration对象。
 > 1.对于float属性，在IE8及以下的版本中，只能通过`style.styleFloat`访问；就兼容性而言，目前的主流浏览器都支持`style.cssFloat`访问；
 
@@ -172,4 +172,117 @@ console.log(box.style.fontSize);               //18px
 console.log(box.style.border);                 //1px solid green（符合属性也可以获取）
 console.log(box.style.cssFloat);               //left
 console.log(box.style.styleFloat);             //left(在chrome和firefox中显示undefined)
+```
+
+6、操作样式表
+> 1.调用样式表；通过id和class来调用；
+> 2.通过id调用，会带来灾难性问题，不建议使用（比较混乱）；
+```
+#test-css{
+    font-size:20px;
+}
+#pox{
+    color:black;
+}
+<div id="test-css">操作样式表</div>
+
+var box = document.getElementById('test-css');
+box.id = 'pox';                                //会应用id为pox的样式
+box.style.color='green';                       //又能够通过原来的id修改样式    
+```
+> 3.解决方法，通过className来设置，会清空原先的；
+```
+<div id="test-css" class="aaa">操作样式表</div>
+var box = document.getElementById('test-css');
+box.className = 'pox';    //将原来的aaa替换为pox
+```
+> 4.在class后附加其他的className值，会保留原先的；
+> 1. 判断这个附加的class是否存在，如果有，返回true；没有，返回false；
+> 2. 如果附加的是'aa'，而原先存在'aaa'，要判断这个正则的首尾；
+> 3. 加上'!!'，表示将字符串转换成布尔值；
+
+```
+//检查class是否存在
+function hasClass(element, cName) {
+    return !!element.className.match(new RegExp('(\\s|^)' + cName + '(\\s|$)'));   //获取原来该标签内的class属性后的所有字符串
+}
+
+//添加class
+function addClass(element, cName) {
+    if(!hasClass(element,cName)){
+        element.className += ' ' + cName;
+    }
+}
+
+//移除一个class
+function removeClass(element,cName){
+    if(hasClass(element,cName)){
+        element.calssName = element.className.replace(new RegExp('(\\s|^)' + cName + '(\\s|$)'),' ');
+    }
+}
+```
+
+7、获取<link>和<style>标签中的css样式表
+> 1.无法通过style属性，获取这两个里面的样式；
+> 2.方法一：通过`link.sheet`来获取样式表；
+> 1. 在IE8级以下版本中，通过`link.styleSheet`来获取；
+```
+var link = document.getElementsByTagName('link')[0];
+var sheet = link.sheet||link.styleSheet;      //为了兼容低版本的IE
+alert(sheet);
+```
+> 3.方法二：通过`document.styleSheets`属性，获取StyleSheetList集合；
+```
+var sheet = document.styleSheets;    //StyleSheetList
+alert(sheet[0]);                     //获取第一个样式表(每个浏览器都有这个属性)
+```
+
+8、css样式表的属性
+> 1.sheet的属性；
+
+|属性或方法|说明|
+|---|---|
+|disabled|获取或设置样式表是否被禁用|
+|href|如果是<link>包含的，则为样式表的URL，否则，为null|
+|media|样式表支持的所有媒体类型的集合|
+|title|获取<link>标签中的title属性值|
+|type|样式表类型字符串|
+|cssRules|样式表包含样式规则的集合，IE8以下不支持(rules)|
+|deleteRule(index)|删除cssRules集合中指定位置的规则，IE8以下不支持(removeRule)|
+|insertRule(rule,index)|向cssRules集合中指定位置插入rule字符串，IE8以下不支持(addRule)|
+```
+var sheet = document.styleSheets[0];    //StyleSheetList
+console.log(sheet.cssRules[0]);         //获取样式表的第一条规则
+```
+
+9、cssRules——样式的规则集合CSSRuleList
+> 1.表示整个css样式表，一个css样式称为一个规则CSSStyleRule；
+```
+#test-css{             //第一个规则CSSStyleRule
+    font-size:20px;
+}
+#pox{                  //第二个规则CSSStyleRule
+    color:black;       
+}
+```
+> 2.CSSStyleRule的属性
+
+|属性|说明|
+|---|---|
+|cssText|获取当前规则的所有的文本，IE不支持|
+|selectorText|获取当前规则的选择符文本|
+|style|返回CSSStyleDeclaration对象，可以获取和设置样式|
+```
+#test-css{
+    font-size:20px;
+    color:green;
+}
+#pox{
+    color:black;
+}
+
+var sheet = document.styleSheets[0];    //StyleSheetList
+rule1 = sheet.cssRules[0];
+console.log(rule1.selectorText);        //#test-css
+console.log(rule1.style.color);         //green
 ```
