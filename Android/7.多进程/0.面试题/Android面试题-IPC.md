@@ -4,17 +4,19 @@
 
 # Android面试题-IPC
 
-版本号：2018/09/02-1(1:38)
+版本号：2018/09/02-1(14:30)
 
 ---
 
-[答案参考-Android进程间通信IPC详解](https://blog.csdn.net/feather_wch/article/details/81136290)
+## 注意
+ * [☆] 标记的题目，是额外补充的题目，会直接给出答案。
+ * 没有标记的题目，详细答案请参考：[答案参考-Android进程间通信IPC详解](https://blog.csdn.net/feather_wch/article/details/81136290)
 
 ---
 
 [TOC]
 
-## 基本概念
+## 基本概念(19)
 
 
 1. 什么是IPC？
@@ -37,1109 +39,294 @@
 18. 实现序列化的集合中的元素是否一定要实现序列化？
 19. Parcelable和Serializable的区别？(2)
 
-## Binder
+## Linux内核基本知识(4)
+
+1. [☆]什么是Linux中的进程隔离？
+    > 1. 用于保护操作系统中的进程互不干扰
+    > 1. 让进程之间无法随意访问和改变数据。
+
+2. [☆]什么是Linux中的虚拟地址空间？
+    > 1. 用来实现进程隔离，因为进程AB所处于的虚拟地址空间不同，所以不能去改变其他进程的数据。
+    > 1. 不同进程间数据不共享，会让进程以为自己独享操作系统。
+
+1. [☆]Linux的系统调用是什么？
+    > 1. 内核会有保护机制，只允许访问许可的数据。
+    > 1. 将Linux的内核层和用户层，抽象分离开。
+    > 1. 用户层可以通过系统调用去访问内核层的资源。
+
+1. [☆]Linux中的binder驱动是什么？
+    > 1. 在android系统的内核空间中，一个负责各个进程通过Binder机制交互的驱动模块就是Binder驱动。
+
+
+1. [☆]
+    > 1.
+    > 1.
+
+
+## Binder(42)
 
 1. Binder是什么？(从五个角度考虑)
+1. [☆] Binder对于Server和Client来说是什么？
+    > 1. 对于服务端：Binder就是指Binder本地对象
+    > 1. 对于客户端：Binder就是指Binder代理对象
+    > 1. 本质通过内核层的ServiceManager进行通信。
+
 1. 设备驱动的作用？好处？
-1. Binder机制是做什么的？(2)
+
+1. Binder机制是做什么的？(2)为什么使用Binder？
+    > 1. 用于进程间通信
+    > 1. Android中各个app、系统服务运行于不同进程中，需要借助Binder进行通信。
+    > 1. 从Linux内核角度看，Linux存在进程隔离和虚拟地址空间，导致进程间无法共享数据。所以需要借助IPC。
+
 1. Android基于的Linux内核，Linux有哪些IPC方法？(6种)优缺点是什么？
+
+
 1. Binder机制相比于LinuxIPC的优势体现在哪里？(3方面)
-1. Binder主要用在哪？(3)
->1. Service
->2. AIDL
->3. Messenger(底层AIDL)
-
-24、AIDL文件的本质作用
->AIDL文件的本质就是系统提供了一种快速实现Binder的工具。
-
-25、通过AIDL快速实现Binder的步骤?(4步)
->1. 新建Book.java(简单的类，没有实际功能，实现Parcelable接口)
->2. 新建Book.aidl需要有parcelable Book;
->3. 新建IBookManager.aidl,里面需要导入Book类`import xxx.Book;`
->4. 选择android studio的build中make project
-
-26、AIDL工具快速实现的Binder中的四个要点
->1. 继承`IInterface`接口，本身也为接口
->2. 声明了两个IBookManager.aidl中定义的getBookList和addBook方法(并且用两个id标识这两个方法，用于标识在transact中客户端请求的是哪个方法)
->3. 声明一个内部类Stub，该Stub就是Binder类
->4. Stub的内部代理类Proxy，用于处理逻辑----客户端和服务端都位于一个进程时，方法调用不会走跨进程的transact过程，当位于不同进程时，方法调用走transact过程。
-
-27、Binder的工作流程：
->1. Client向Binder发起远程请求，Client同时挂起
->2. Binder向data(输入端对象)写入参数，并且通过Transact方法向服务端发起远程调用请求(RPC)
->3. Service端调用onTransact方法(运行在服务端线程池中)向reply(输出端对象)写入结果
->4. Binder获取reply数据，返回数据并且唤起Client
-
-28、通过AIDL自动生成Binder的java文件
-1. 新建Book.java(简单的类，没有实际功能，实现Parcelable接口)
-```java
-public class Book implements Parcelable{
-    public int bookId;
-
-    public Book(int bookId){
-        this.bookId = bookId;
-    }
-    private Book(Parcel in){
-        bookId = in.readInt();
-    }
-
-    public static final Creator<Book> CREATOR = new Creator<Book>() {
-        @Override
-        public Book createFromParcel(Parcel in) {
-            return new Book(in);
-        }
-
-        @Override
-        public Book[] newArray(int size) {
-            return new Book[size];
-        }
-    };
-
-    @Override
-    public int describeContents() {
-        return 0;
-    }
-
-    @Override
-    public void writeToParcel(Parcel parcel, int i) {
-        parcel.writeInt(bookId);
-    }
-}
-```
-2. 新建Book.aidl
-```java
-package com.example.administrator.featherdemos.aidl;
-
-parcelable Book;
-```
-3. 新建IBookManager.aidl
-```java
-package com.example.administrator.featherdemos.aidl;
-
-//关键：导入Book.java
-import com.example.administrator.featherdemos.aidl.Book;
-
-interface IBookManager {
-    List<Book> getBookList();
-    void addBook(in Book book);
-}
-```
-4. 选择android studio的build中make project
->系统就会自动生成对应java文件`IBookManager`，位于目录`app\build\generated\source\aidl\debug\包下`
-
-29、Binder所在java文件要点如下:
->1. 继承`IInterface`接口，本身也为接口
->2. 声明了两个IBookManager.aidl中定义的getBookList和addBook方法(并且用两个id标识这两个方法，用于标识在transact中客户端请求的是哪个方法)
->3. 声明一个内部类Stub，该Stub就是Binder类
->4. Stub的内部代理类Proxy，用于处理逻辑----客户端和服务端都位于一个进程时，方法调用不会走跨进程的transact过程，当位于不同进程时，方法调用走transact过程。
-
-30、Binder类Stub的解析(3个重要方法+多个需求相关方法)
->1. DESCRIPTOR
->Binder的唯一标识,一般用类名表示
->2. asInterface(android.os.IBinder obj)
->将服务端Binder对象转换成客户端所需AIDL接口类型对象(xxx.aidl.IBookManager)。如果客户端和服务端位于同一进程，此方法返回就是服务端的Stub对象本身，否则返回系统封装后的Stub.proxy
->3. asBinder
->返回当前Binder对象
->4. onTransact(int code, android.os.Parcel data, android.os.Parcel reply, int flags)
->(1)运行在服务端的Binder线程池。
->(2)通过code确定Client请求的目标方法，从data中取得方法所需参数，执行目标方法。执行完毕后就向reply中写入返回值。
->(3)如果此方法返回false客户端就请求失败，我们可以用此来进行权限验证。
->5. Proxy的getBookList
->(1)运行在客户端。
->(2)创建方法所需的data(输入)、reply(输出)和list(返回)对象。把该方法的参数信息写入data，调用transact方法发起RPC远程过程调用请求，同时当前线程挂起。服务端的onTransact会被调用，到RPC过程返回后，当前线程继续执行，并从reply中取出RPC过程的返回结果，最后返回reply中的数据。
->6. Proxy的addBook
->运行在客户端。过程和getBookList类似，但是没有返回值。
-
-31、AIDL如何进行权限验证？
-> 1. 利用Binder类也就是Stub的onTransact方法
-> 2. 该方法如果返回false就代表请求失败，可以用于权限验证
-
-32、Binder注意点
->1. 客户端发起远程请求后，当前线程会被挂起直到服务器返回结果，因此不要在UI线程发起远程请求。
->2. 服务端的Binder方法运行在Binder的线程池中，所以Binder方法是否耗时都要采用同步方法实现。
-
-33、Binder的两个重要方法/Binder如何检测服务端异常终止？
->1. linkToDeath和unlinkToDeath。用于解决: 如果服务端异常终止，而会导致客户端调用失败，甚至可能客户端都不知道binder已经死亡，就会产生问题。
->2. linkToDeath作用给Binder设置一个死亡代理，Binder会收到通知，还可以重新发起连接请求从而恢复连接。
->3. binder的isBinderAlive也可以判断Binder是否死亡。
-
-### 原理深度解析
-
-34、Android如何通过Binder机制提供跨进程通信的解决方案？
->1. 进程A通过bindService方法去绑定在进程B中注册的一个service
->1. 系统收到进程A的bindService请求后，会调用进程B中相应service的onBind方法，该方法返回一个特殊对象，系统会接收到这个特殊对象
->1. 系统为这个特殊对象生成一个代理对象，再将这个代理对象返回给进程A
->1. 进程A在ServiceConnection回调的onServiceConnected方法中接收该代理对象，依靠这个代理对象的帮助，就可以解决进程间通信问题
-
-35、Binder机制的核心步骤(6)
-> 1. 进程A去绑定到进程B注册的Service
-> 1. 进程B创建Binder对象---Servcice的onBind()
-> 1. 进程A接收进程B的Binder对象
-> 1. 进程A利用进程B传过来的对象发起请求
-> 1. 进程B收到并处理进程A的请求
-> 1. 进程A获取进程B返回的处理结果
-
-36、step 2: 进程B创建的Binder对象需要有两个特性：
-> 1. 具有能被跨进程传输的能力
-> 1. 具有完成特定任务的能力(例如a+b=c)
-
-
-37、Binder对象如何具有能被跨进程传输的能力？
-> 1. Binder对象实现了IBinder接口。
-> 1. 系统会为每个实现了该接口的对象提供跨进程传输。
-
-38、Binder对象如何具有完成特定任务的能力？
-> 1. 继承IBinder接口会需要实现两个方法：attachInterface()、queryLocalInterface()
-> 2. 通过attachInterface()会建立与IInterface对象的关系，通过该对象就获取执行特定任务的能力。
-> 3. attachIInterface(): 会将IInterface对象根据key-value存入到Binder内部的Map中。
-> 4. queryLocalInterface(): 根据key值（即参数 descriptor）可以查询到对应的IInterface对象。
-> 5. 实现IInterface接口的类中，可以定义需要执行的方法。
-```java
-public class Binder implement IBinder{
-        void attachInterface(IInterface plus, String descriptor)
-        IInterface queryLocalInterface(Stringdescriptor) //从IBinder中继承而来
-        boolean onTransact(int code, Parcel data, Parcel reply, int flags)//暂时不用管，后面会讲。
-        ......
-        final class BinderProxy implements IBinder {
-        ......//Binder的一个内部类，暂时不用管，后面会讲。
-        }
-}
- public interface IPlus extends IInterface {
-         public int add(int a,int b);
-}
-
-public class Stub extends Binder {
-          @Override
-          boolean onTransact(int code, Parcel data, Parcel reply, int flags){
-          ......//这里我们覆写了onTransact方法，暂时不用管，后面会讲解。
-          }
-          ......
-}
-IInterface plus = new IPlus(){//匿名内部类
-         public int add(int a,int b){//定制我们自己的相加方法
-             return a+b;
-         }
-         public IBinder asBinder(){ //实现IInterface中唯一的方法，
-             return null ;
-        }
-};
-Binder binder = new Stub();
-binder.attachIInterface(plus,"PLUS TWO INT");
-```
-
-39、step 3: 进程A接收进程B的Binder对象
-> 1. Service的onBind中返回Binder对象。
-> 1. 系统会收到这个binder对象，然后会生成一个BinderProxy。并且返回给进程A。
-> 1. 进程A会在onServiceConnected中接收到了BinderProxy对象。
-> 1. 该对象仅仅是代理类，本身并不能去实现需要实现的功能。
-> 1. 只提供了transact()用于发起请求。
-
-40、step 4: 进程A利用进程B传过来的对象发起请求
-> 1. BinderProxy对象不能让进程A去直接完成需要的操作，但是提供了transact方法(在IBinder接口中定义的方法).
-> 1. 进程A将数据和操作通过transact方法交给Binder对象执行，最终结果会通过BinderProxy代理对象返回给进程A
-
-41、step 5: 进程B收到并处理进程A的请求
-> 1. 系统保存了Binder对象和BinderProxy对象的对应关系
-> 1. binderproxy.transact调用发生后，系统会将这个请求中的数据转发给Binder对象，Binder对象将会在onTransact中收到binderproxy传来的数据（Stub.ADD,data,reply,0）
-> 1. 根据约定好的操作Stub.ADD进行运算后，会把结果写回reply。
-
-42、step 6: 进程A获取进程B返回的处理结果
-> 1. 进程B把结果写入reply后，进程A就可以从reply读取结果。
-
-43、step 4、5、6的优化
-> 1. 进程A收到BinderProxy对象时，调用Stub.asInterface(binderproxy)
-> 1. 该方法负责利用BinderProxy生成一个PlusProxy代理对象返回给我们
-> 1. 给进程A一种假象：获取到了Plus对象(进程B中的加法操作)，并进行了add()操作。本质是内部进行了传入数据给B进行处理，最终从B中获取到结果等一系列操作。
-
-44、Binder的C/S架构
-![Binder IPC](https://upload-images.jianshu.io/upload_images/2628445-8e398eb2bcd029ba.png?imageMogr2/auto-orient/)
-> 1. Client: 用户实现的代码，如AIDL自动生成的接口类。
-> 2. Binder Driver: 内核层实现的驱动
-> 3. Server: Service中的onBind返回的IBinder对象。
->
-> 绿色区域：用户自行实现部分
-> 蓝色区域：系统实现部分(包括Servcer端的线程池-线程池实现在Binder内部的native方法中)
-
-45、Binder的Server为什么不是线程安全的？
->Server端使用了线程池决定了Server的代码`不是线程安全的`
-
-46、Binder服务端的线程池是如何实现的？
->1. 系统实现
->1. 线程池实现在Binder内部的native方法中
-
-47、ContentProvider中的CRUD是否是线程安全的？
->不是, 因为底层的Binder机制中的Server端不是线程安全的
-
-48、AIDL中在Service中实现的接口是否是线程安全的？
->不是, 理由同上
-
-49、IBinder接口作用
->1. IBinder是用于远程对象的基本接口，是轻量级远程调用机制的核心部分，用于高性能地进行进程内部和进程间调用。
->2. IBinder描述了远程对象间交互的抽象协议。
->3. 不能直接实现IBinder接口，而是应该继承自Binder类。
-
-50、Binder解析
-```java
-//Binder.java
-public Binder(){
-  init();
-  ...
-}
-...
-private native final void init();
-```
-* init()是native方法，是对底层`Binder Driver`的封装。
-* 客户端发起请求的时候(调用IBinder的transact()接口也就是调用驱动层的`mRemote.transact()`), `Binder Driver`会调用`execTransact()`，并在内部调用服务端Binder的`onTransact()`方法。
-
-51、Binder的Driver层作用
->对Binder类进行了完美的封装，开发者只需要继承`Binder`和实现`onTransact()`即可。
-
-## Android中的IPC方法
-### 1-Bundle
-52、Bundle的作用
->Bundle能携带数据-实现了Parcelable接口，常用于传递数据，如Acitivity、Service和Receiver都支持在Intent中通过Bundle传递数据。
-
-53、Bundle传递数据在特殊使用场景无法使用的解决办法？
-> 场景：A进程在完成计算后需要启动B进程的一个组件并且将结果传递给B进程，但是这个结果不支持放入Bundle，因此无法通过Intent传输。
-> 方案：A进程通过Intent启动进程B的service组件(如IntentService)进行计算，因为Service也在B进程中，目标组件就可以直接使用计算结果。
-
-### 2-文件共享
-54、文件共享的作用
->两个进程通过读/写同一个文件进行数据交换。也可以通过序列化在进程间传递对象。
-
-55、文件共享的特点：
-1. 通过序列化在进程间传递对象
-2. 只适合同步要求不高的进程间通信
-3. 要妥善处理并发读写问题，高并发情况下很容易出现数据丢失。
-
-### 3-Messenger
-56、Messenger是什么？
->1. 轻量级的IPC方案
->2. 底层实现是AIDL
->3. 一次处理一个请求，因此在服务端不考虑线程同步问题。
-
-57、 Messenger的使用
->通过messenger在两个进程之间互相发送消息。
->客户端:
->1. 绑定并启动位于新进程的服务，通过msg发送消息
->2. 设置接受新进程服务发送来的消息
-```java
-public class MessengerActivity extends Activity {
-
-    private static final String TAG = "MessengerActivity";
-
-    private Messenger mMessenger;
-
-    private ServiceConnection mServiceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-            mMessenger = new Messenger(iBinder); //
-            Message msg = Message.obtain(null, Constant.MSG_FROM_CLIENT);
-            //bundle携带消息
-            Bundle data = new Bundle();
-            data.putString("msg", "This is Client!");
-            //给msg绑定bundle
-            msg.setData(data);
-
-            //将用于服务端回复的msger发送给服务端
-            msg.replyTo = mGetReplyMessenger;
-            try {
-                //发送消息
-                mMessenger.send(msg);
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName componentName) {
-
-        }
-    };
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_messenger);
-        //绑定并启动服务
-        Intent intent = new Intent(this, MessengerService.class);
-        bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
-    }
-
-    @Override
-    protected void onDestroy() {
-        //解除服务
-        unbindService(mServiceConnection);
-        super.onDestroy();
-    }
-
-    /**-------------------
-     *  接受Service回复消息
-     * ------------------*/
-    private final Messenger mGetReplyMessenger = new Messenger(new MessengerHandler());
-    private static class MessengerHandler extends Handler{
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what){
-                case Constant.MSG_FROM_SERVICE:
-                    Log.i(TAG, "recv msg from service:" + msg.getData().getString("reply"));
-                    break;
-                default:
-                    super.handleMessage(msg);
-                    break;
-            }
-        }
-    }
-}
-```
->服务器端:
->接收消息，并通过client传送来的messenger回复消息。
-```java
-public class MessengerService extends Service {
-
-    private static final String TAG = "MessengerService";
-    private final Messenger mMessenger = new Messenger(new MessengerHandler());
-
-    private static class MessengerHandler extends Handler{
-        @Override
-        public void handleMessage(Message msg) {
-            switch (msg.what){
-                case Constant.MSG_FROM_CLIENT:
-                    //接收到Client消息
-                    Log.i(TAG, "receive msg from client: " + msg.getData().getString("msg"));
-                    /*---------------------------------------------
-                    * 回复数据给Client
-                    * --------------------------------------------*/
-                    Messenger clientMessenger = msg.replyTo; //获取到服务器传来的msger
-                    Message message = Message.obtain(null, Constant.MSG_FROM_SERVICE); //设置msg
-                    Bundle bundle = new Bundle();
-                    bundle.putString("reply", "This is Service!");
-                    message.setData(bundle);
-                    //发送消息
-                    try {
-                        clientMessenger.send(message);
-                    } catch (RemoteException e) {
-                        e.printStackTrace();
-                    }
-
-                    break;
-                default:
-                    super.handleMessage(msg);
-            }
-        }
-    }
-
-    public MessengerService() {
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return mMessenger.getBinder();
-    }
-}
-```
->AndroidManifest中注册Service:
->`android:process=":remote"`代表另开一个Service进程。
-```xml
-<service
-            android:name=".MessengerService"
-            android:enabled="true"
-            android:exported="true"
-            android:process=":remote">
-        </service>
-```
-
-58、Messenger缺点：
->1. 以串行的方式处理客户端发送的消息，如果大量的消息同时发送到服务端，服务端仍然只能一个个处理，如果有大量的并发请求，Messenger就无法胜任。
->2. 如果需要跨进程调用服务端的方法，这种情形Messenger就无法做到。
-
-### 4-AIDL
-
-59、 AIDL进程间通信流程
->1-服务端
->>1. 创建一个Service来监听客户端的连接请求。
->>2. 创建一个AIDL文件。
->>3. 将暴露给客户端的接口在该AIDL文件中声明。
->>4. 最后在Service中实现这个AIDL接口即可。
->
->2-客户端
->>1. 绑定服务端的Service
->>2. 将服务端返回的Binder对象转成AIDL接口所属的类型
->>3. 最后就可以调用AIDL中的方法。
-
-60、AIDL实例
->1. 创建你需要的接口文件：ITuringManager.aidl(这里功能就是获取图灵机列表，以及增加一个图灵机)
-```aidl
-package com.example.administrator.featherdemos;
-
-import com.example.administrator.featherdemos.TuringMachine;
-
-interface ITuringManager {
-    List<TuringMachine> getTuringMachineList();
-    void addTuringMachine(in TuringMachine machine);
-}
-```
->2. 实现TuringMachine.java(也就是接口文件导入的类，需要实现Parcelable接口)：
-```java
-package com.example.administrator.featherdemos;
-//import ....需要的包
-public class TuringMachine implements Parcelable{
-    int machineId;
-    String description;
-
-    protected TuringMachine(Parcel in) {
-        machineId = in.readInt();
-        description = in.readString();
-    }
-
-	public TuringMachine(int id, String description){
-        this.machineId = id;
-        this.description = description;
-    }
-
-    public static final Creator<TuringMachine> CREATOR = new Creator<TuringMachine>() {
-        @Override
-        public TuringMachine createFromParcel(Parcel in) {
-            return new TuringMachine(in);
-        }
-
-        @Override
-        public TuringMachine[] newArray(int size) {
-            return new TuringMachine[size];
-        }
-    };
-
-    @Override
-    public int describeContents() {
-        return 0;
-    }
-
-    @Override
-    public void writeToParcel(Parcel parcel, int i) {
-        parcel.writeInt(machineId);
-        parcel.writeString(description);
-    }
-}
-```
->3. 使用到的类(TuringMachine.java)需要一个对应aidl文件-TuringMachine.aidl:
-```aidl
-package com.example.administrator.featherdemos;
-
-parcelable TuringMachine;
-//ITuringMachine.aidl和TuringMachine.aidl需要在aidl文件夹下的包内
-//TuringMachine.java要在java文件夹下的包内。
-```
->4. 远程服务端-ITuringMachineManagerService.java
-```java
-public class ITuringMachineManagerService extends Service {
-
-    /**
-     * CopyOnWriteArrayList支持并发读/写：
-     * 1. AIDL在服务端的Binder线程池中执行，因此当多个客户端同时连接的时候，会存在多个线程同时访问的情况。
-     * 2. CopyOnWriteArrayList能进行自动的线程同步。
-     */
-    private CopyOnWriteArrayList<TuringMachine> mTuringMachineList = new CopyOnWriteArrayList<>();
-
-    private Binder mBinder = new ITuringManager.Stub(){
-
-        @Override
-        public List<TuringMachine> getTuringMachineList() throws RemoteException {
-            return mTuringMachineList;
-        }
-
-        @Override
-        public void addTuringMachine(TuringMachine machine) throws RemoteException {
-            mTuringMachineList.add(machine);
-        }
-    };
-
-    public ITuringMachineManagerService() {
-        mTuringMachineList.add(new TuringMachine(1, "Machine 1"));
-        mTuringMachineList.add(new TuringMachine(2, "Machine 2"));
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return mBinder;
-    }
-}
-```
->5. AndroidManifest中注册Service
-```xml
-<service
-            android:name=".ITuringMachineManagerService"
-            android:enabled="true"
-            android:exported="true"
-            android:process=":remote">
-```
->6. 本地客户端
-```java
-public class TuringActivity extends AppCompatActivity {
-
-    private static final String TAG = TuringActivity.class.getName();
-
-    //Service连接：从服务端获取本地AIDL接口对象，并调用远程服务端的方法。
-    private ServiceConnection mServiceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-            //Binder的asInterface()将binder对象转换为客户端需要的AIDL接口对象
-            ITuringManager iTuringManager = ITuringManager.Stub.asInterface(iBinder);
-            try {
-                //获取服务端的List
-                ArrayList<TuringMachine> turingMachineArrayList
-                        = (ArrayList<TuringMachine>) iTuringManager.getTuringMachineList();
-
-                for(TuringMachine machine : turingMachineArrayList){
-                    Log.i(TAG, "onServiceConnected: "+machine.getMachineId() + "-" + machine.getDescription());
-                }
-            } catch (RemoteException e){
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName componentName) {
-
-        }
-    };
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_turing);
-
-        //绑定远程服务端的 Service 并启动
-        Intent intent = new Intent(this, ITuringMachineManagerService.class);
-        bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
-    }
-
-    @Override
-    protected void onDestroy() {
-        unbindService(mServiceConnection); //解绑
-        super.onDestroy();
-    }
-}
-```
-
-61、AIDL支持的数据类型
-  * 基本数据类型(int、long、char、boolean、double等)
-  * String和CharSequence
-  * List：只支持ArrayList，且里面所有元素必须是AIDL支持的数据。
-  * Map：只支持HashMap，且里面所有元素必须是AIDL支持的数据，包括key和value
-  * Parcelable：所有实现Parcelable接口的对象
-  * AIDL：所有AIDL接口都可以在AIDL中使用
-
-62、AIDL中List只能用ArrayList，远程服务端为何使用了CopyOnWriteArrayList(并非继承自ArrayList)：
->Binder会根据List规范去访问数据，并且生成一个新的ArrayList传给客户端，因此没有违反数据类型的规定。
->ConcurrentHashMap也是类似功能
-
-63、AIDL实例：如何使用观察者模式
->在AIDL基础上有如下步骤：
->1. 建立观察者接口(Observer)-ITMachineObserver.aidl
->2. 在ITuringManager.aidl中增加注册和解注册功能(register\unregister)
->3. 在服务端ITuringMachineManagerService中的binder对象里实现额外增加的注册和解注册功能。
->4. 在客户端中的binder对象里实现观察者接口中的更新方法。
->
->使用：
->1. 客户端中通过从服务端获得的Binder对象，调用register/unregister等方法
->2. 服务端中通过Client客户端注册的Observer去调用客户端Binder中的更新方法
-
-64、AIDL观察者模式源码：
->1. ITMachineObserver.aidl
-```aidl
-package com.example.administrator.featherdemos;
-
-import com.example.administrator.featherdemos.TuringMachine;
-
-interface ITMachineObserver {
-    void inform(in TuringMachine machine);
-}
-```
->2. ITuringManager.aidl
-```aidl
-package com.example.administrator.featherdemos;
-
-import com.example.administrator.featherdemos.TuringMachine;
-import com.example.administrator.featherdemos.ITMachineObServer;
-
-interface ITuringManager {
-    List<TuringMachine> getTuringMachineList();
-    void addTuringMachine(in TuringMachine machine);
-    void registerListener(in ITMachineObserver observer);
-    void unregisterListener(in ITMachineObserver observer);
-}
-```
->3. ITuringMachineManagerService:
->只修改了private Binder mBinder = new ITuringManager.Stub()的内容
-```java
-public class ITuringMachineManagerService extends Service {
-
-    /**
-     * CopyOnWriteArrayList支持并发读/写：
-     * 1. AIDL在服务端的Binder线程池中执行，因此当多个客户端同时连接的时候，会存在多个线程同时访问的情况。
-     * 2. CopyOnWriteArrayList能进行自动的线程同步。
-     */
-    private CopyOnWriteArrayList<TuringMachine> mTuringMachineList = new CopyOnWriteArrayList<>();
-    private CopyOnWriteArrayList<ITMachineObserver> mObserverList = new CopyOnWriteArrayList<>();
-
-    private Binder mBinder = new ITuringManager.Stub(){
-
-        @Override
-        public List<TuringMachine> getTuringMachineList() throws RemoteException {
-            return mTuringMachineList;
-        }
-
-        @Override
-        public void addTuringMachine(TuringMachine machine) throws RemoteException {
-            mTuringMachineList.add(machine);
-            for(ITMachineObserver observer : mObserverList){
-                observer.inform(machine);
-            }
-        }
-
-        @Override
-        public void registerListener(ITMachineObserver observer) throws RemoteException {
-            mObserverList.add(observer);
-        }
-
-        @Override
-        public void unregisterListener(ITMachineObserver observer) throws RemoteException {
-            mObserverList.remove(observer);
-        }
-    };
-
-    public ITuringMachineManagerService() {
-        mTuringMachineList.add(new TuringMachine(1, "Old Machine 1949"));
-        mTuringMachineList.add(new TuringMachine(2, "Old Machine 1949-2"));
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return mBinder;
-    }
-}
-
-```
->4. TuringActivity:
->>1. private ITMachineObserver mITMachineObserver获得观察者的Binder对象，并实现接口方法
->>2. 调用iTuringManager.registerListener(mITMachineObserver)在服务端进行注册
-```java
-public class TuringActivity extends AppCompatActivity{
-
-    private static final String TAG = TuringActivity.class.getName();
-
-    //Service连接：从服务端获取本地AIDL接口对象，并调用远程服务端的方法。
-    private ServiceConnection mServiceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
-            //Binder的asInterface()将binder对象转换为客户端需要的AIDL接口对象
-            ITuringManager iTuringManager = ITuringManager.Stub.asInterface(iBinder);
-            try {
-                iTuringManager.addTuringMachine(new TuringMachine(10, "Machine 2008"));
-
-                //获取服务端的List
-                ArrayList<TuringMachine> turingMachineArrayList
-                        = (ArrayList<TuringMachine>) iTuringManager.getTuringMachineList();
-
-                for(TuringMachine machine : turingMachineArrayList){
-                    Log.i(TAG, "onServiceConnected: "+machine.getMachineId() + "-" + machine.getDescription());
-                }
-
-                iTuringManager.registerListener(mITMachineObserver);
-
-                iTuringManager.addTuringMachine(new TuringMachine(3, "New Machine 2018!"));
-            } catch (RemoteException e){
-                e.printStackTrace();
-            }
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName componentName) {
-
-        }
-    };
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_turing);
-
-        //绑定远程服务端的 Service 并启动
-        Intent intent = new Intent(this, ITuringMachineManagerService.class);
-        bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
-    }
-
-    @Override
-    protected void onDestroy() {
-        unbindService(mServiceConnection); //解绑
-        super.onDestroy();
-    }
-
-    private ITMachineObserver mITMachineObserver = new ITMachineObserver.Stub() {
-        @Override
-        public void inform(TuringMachine machine) throws RemoteException {
-            Log.i(TAG, "inform: get a new machine-"+machine.getDescription());
-        }
-    };
-
-}
-```
-
-65、AIDL观察中解除注册引发问题(RemoteCallbackList)
->1. 在onDestory时，我们可以解除在服务端的注册：
-```java
-@Override
-    protected void onDestroy() {
-        //确保远程服务的Binder任然存活，就进行unregister
-        if(mRemoteITuringManager != null && mRemoteITuringManager.asBinder().isBinderAlive()){
-            try {
-                mRemoteITuringManager.unregisterListener(mITMachineObserver);
-                Log.i(TAG, "onDestroy: unregister!");
-            } catch (RemoteException e) {
-                e.printStackTrace();
-            }
-        }
-        unbindService(mServiceConnection); //解绑
-        super.onDestroy();
-    }
-```
->2. 但在服务端却无法在列表中找到该`Observer`：因为已经是两个不同的对象了
->3. 对象的跨进程传输本身是反序列化的过程，而对象在服务端和客户端早已不是同一个对象。
->4. RemoteCallbackList
->系统专门提供用于删除跨进程Listener的接口。该类本身是一个泛型，支持任何AIDL接口。
-
-66、RemoteCallbackList工作原理
->1. 内部有一个Map结构，key是Ibinder，value是Callback类型。该结构能保存所有AIDL回调。将Listener的信息存入CallBack：
-```java
-IBinder key = listener.asBinder();
-Callback value = new Callback(key, cookie);
-```
->2. 虽然每次跨进程Client的同一个对象，会在服务端生成多个对象。但是这些对象本身的Binder都是同一个。
->以Binder作为Key，这样Listener对应着唯一Binder。
-
-67、使用RemoteCallbackList的流程和特点
->1. 客户端解注册，服务端会遍历所有listener，找出那个和解注册的listener具有相同Binder的listener，并删除。
->2. 客户端终止后，会自动移除客户端注册的所有listener
->3. 自动实现线程同步，无需额外操作。
-
-68、RemoteCallbackList的使用
->1. Service服务端
-```java
-private RemoteCallbackList<ITMachineObserver> mObserverList = new RemoteCallbackList<>();
-```
->2. 注册/解除注册
-```java
-@Override
-        public void registerListener(ITMachineObserver observer) throws RemoteException {
-            mObserverList.register(observer);
-        }
-
-        @Override
-        public void unregisterListener(ITMachineObserver observer) throws RemoteException {
-            Log.i("ITuringService", "unregisterListener: size-"+mObserverList.getRegisteredCallbackCount());
-            mObserverList.unregister(observer);
-            Log.i("ITuringService", "unregisterListener: size-"+mObserverList.getRegisteredCallbackCount());
-        }
-```
->3. 需要按照RemoteCallbackList的方法进行遍历。
-```java
-        @Override
-        public void addTuringMachine(TuringMachine machine) throws RemoteException {
-            mTuringMachineList.add(machine);
-
-            final int count = mObserverList.beginBroadcast();
-            //进行通知
-            for (int i = 0; i < count; i++){
-                mObserverList.getBroadcastItem(i).inform(machine);
-            }
-            mObserverList.finishBroadcast();
-        }
-```
-
-69、AIDL的注意点
->1. Client客户端调用远程方法，该方法运行在服务端的Binder线程池中，Client会被挂起。
->2. 服务端的方法执行过于耗时，会导致Client长时间阻塞，若该线程是UI线程，会导致ANR。
->3. 客户端的onServiceConnected和onServiceDisconnected方法都运行在UI线程中，不可以进行耗时操作
->4. 服务端的方法本身就在服务端的Binder线程池中，所以服务端方法本身就可以执行大量耗时操作，不要再开线程进行异步操作。
->5. 远程方法因为运行在Binder线程池中，如果要操作UI要通过Handler切换到UI线程(服务端通过远程方法去操作Cilent客户端的控件)
-
-70、Binder意外死亡的两种解决方法：
->1. 给Binder设置DeathRecipient监听，Binder死亡时回调binderDied
->2. 在onServiceDisconnected中重连远程服务。
-
-71、Binder意外死亡的解决方法的区别
->1. onServiceDisconnected在客户端UI线程中被回调
->2. binderDied在客户端的Binder线程池中被回调(无法操作UI)
-
-54、DeathRecipient处理Binder意外死亡的实现：
-```java
-//设置Binder死亡代理
-    private IBinder.DeathRecipient mDeathRecipient = new IBinder.DeathRecipient(){
-
-        @Override
-        public void binderDied() {
-            //远程服务端die，就不重新连接
-            if(mRemoteITuringManager == null){
-                return;
-            }
-            mRemoteITuringManager.asBinder().unlinkToDeath(mDeathRecipient, 0);
-            mRemoteITuringManager = null;
-            //重新绑定远程Service
-            //绑定远程服务端的 Service 并启动
-            Intent intent = new Intent(TuringActivity.this, ITuringMachineManagerService.class);
-            bindService(intent, mServiceConnection, Context.BIND_AUTO_CREATE);
-        }
-    };
-```
->客户端的onServiceConnected中:
-```java
-//Binder的asInterface()将binder对象转换为客户端需要的AIDL接口对象
-ITuringManager iTuringManager = ITuringManager.Stub.asInterface(iBinder);
-
-try {
-       //设置死亡代理
-       iBinder.linkToDeath(mDeathRecipient, 0); //这里！
-} catch (RemoteException e) {
-       e.printStackTrace();
-}
-```
-
-72、onServiceDisconnected解决Binder死亡问题：
->onServiceDisconnected是ServiceConnection的内部方法，在服务端Service断开后就会调用。
-
-73、AIDL中进行权限验证的方法
->1. 直接在onBind中进行权限验证，比如可以使用permission验证等等。如果验证不通过则bind服务就失败。
->2. 在服务端onTransact中验证
->验证失败直接返回false，可以通过uid和pid验证，这样就可以验证包名也可以和第一种方法一样，验证permission。
-
-#### Binder连接池
-
-74、AIDL使用流程
->1. 创建一个Service和一个AIDL接口
->2. 创建一个Binder(自定义)继承自AIDL接口中的Stub类，并实现其中抽象方法
->3. 在Service的onBind方法中返回该Binder类的对象
->4. 客户端绑定Service
->5. 建立连接后就可以访问远程服务端的方法
-
-75、大量业务模块都需要使用AIDL进行进程间通信，如何在不创建大量Service的情况下解决。
->1. 可以将所有的AIDL放在一个Service中管理。
->2. 服务端Service提供一个queryBinder接口，根据不同业务返回相应的Binder对象。
->3. 就是使用Binder池
-
-### 5-ContentProvider
-76、ContentProvider是什么
->1. ContentProvider是Android中提供的专门用于不同应用间数据共享的方式。
->2. 底层实现是Binder，但是使用比AIDL简单很多，系统进行了封装。
-
-77、ContentProvider的使用
-系统预置了许多ContentProvider，比如通讯录信息、日程表信息等。访问这些数据，只需要通过`ContentResolver`的query、update、insert和delete方法。
-
-78、自定义ContentProvider的步骤
->1. 继承ContentProvider
->2. 实现：onCreate-创建的初始化工作
->3. getType-返回url请求对应的MIME类型(媒体类型)，比如图片、视频等。不关注该类型，可以返回null或者`“*/*”`
->4. query-查数据
->5. insert-插入数据
->6. update-更新数据
->7. delete-删除数据
-
-79、ContentProvider六种方法原理：
->1. 六种方法均运行在ContentProvider的进程中
->2. onCreate由系统回调并运行在主线程里
->3. 其余五种方法由外界回调，并运行在Binder线程池中
-
-80、ContentProvider存储方式
->底层很像SQLite数据库，但是存储方式没有限制，可以使用数据，也可以使用普通文件，甚至可以采用内存中的对象存储数据。
-
-81、ContentProvider实例
->1. 第一个app用于提供Provider功能，主要包含两个文件：DbOpenHelper和PetProvider两个文件（底层使用数据库存储数据）。
->2. 第二个app使用Provider提供的数据
->DbOpenHelper:
-```java
-public class DbOpenHelper extends SQLiteOpenHelper{
-
-    private static final String DB_NAME = "pet_provider.db";
-    public static final String PET_TABLE_NAME = "pet";
-    public static final String MASTER_TABLE_NAME = "master";
-
-    private static final int DB_VERSION = 1;
-
-    private static final String CREATE_PET_TABLE = "create table if not exists "
-            + PET_TABLE_NAME + "(_id integer primary key, name text)";
-    private static final String CREATE_MASTER_TABLE = "create table if not exists "
-            + MASTER_TABLE_NAME + "(_id integer primary key, name text, sex int)";
-
-    public DbOpenHelper(Context context) {
-        //创建数据库(name和版本)
-        super(context, DB_NAME, null, DB_VERSION);
-    }
-
-    @Override
-    public void onCreate(SQLiteDatabase sqLiteDatabase) {
-        //创建数据库
-        sqLiteDatabase.execSQL(CREATE_MASTER_TABLE);
-        sqLiteDatabase.execSQL(CREATE_PET_TABLE);
-    }
-
-    @Override
-    public void onUpgrade(SQLiteDatabase sqLiteDatabase, int oldVersion, int newVersion) {
-       //TODO ignored
-    }
-}
-```
->PetProvider:
->继承自ContentProvider：将表的uri和uricode相绑定，overide五种方法并底层使用数据库实现。
-```java
-public class PetProvider extends ContentProvider{
-    private static final String TAG = PetProvider.class.getSimpleName();
-
-    private SQLiteDatabase mDb;
-    /**
-     * privoder的数据访问通过uri来实现，因此自定义Provider也采用此方法：
-     *   用UriMatcher将Content_Uri和code相关联,这样通过uri就能知道访问哪个数据库表
-     */
-    private static final String AUTHORITIES = "customPrivoderName";
-    private static final String PET_CONTENT_URI = "content://"+AUTHORITIES+"/pet";
-    private static final String MASTER_CONTENT_URI = "content://"+AUTHORITIES+"/master";
-    private static final int PET_CONTENT_CODE = 0;
-    private static final int MASTER_CONTENT_CODE = 1;
-    private static final UriMatcher sUrilMatcher = new UriMatcher(UriMatcher.NO_MATCH);
-    static{
-        sUrilMatcher.addURI(AUTHORITIES, "pet", PET_CONTENT_CODE); //指明authorites+路径：pet和CODE对应
-        sUrilMatcher.addURI(AUTHORITIES, "master", MASTER_CONTENT_CODE);
-    }
-    /**
-     *  根据uri获得相应的table name
-     */
-    private String getTableName(Uri uri){
-        String tableName = null;
-        switch (sUrilMatcher.match(uri)){
-            case PET_CONTENT_CODE:
-                tableName = DbOpenHelper.PET_TABLE_NAME;
-                break;
-            case MASTER_CONTENT_CODE:
-                tableName = DbOpenHelper.MASTER_TABLE_NAME;
-                break;
-            default:break;
-        }
-        return tableName;
-    }
-    @Override
-    public boolean onCreate() {
-        Log.i(TAG,"onCreate()");
-        //创建数据库
-        mDb = new DbOpenHelper(getContext()).getReadableDatabase();
-        return true;
-    }
-
-    @Override
-    public Cursor query(Uri uri, String[] projection, String selection, String[] selectionArgs, String sortOrder) {
-        Log.i(TAG,"query():"+uri);
-        String tableName = getTableName(uri);
-        if(tableName == null){
-            throw new IllegalArgumentException("Unsupported URI:" + uri);
-        }
-        return mDb.query(tableName, projection, selection, selectionArgs, null, null, sortOrder, null);
-    }
-
-    @Override
-    public String getType(Uri uri) {
-        Log.i(TAG,"getType()");
-        return null;
-    }
-
-    @Override
-    public Uri insert(Uri uri, ContentValues contentValues) {
-        Log.i(TAG,"insert()");
-        String tableName = getTableName(uri);
-        if(tableName == null){
-            throw new IllegalArgumentException("Unsupported URI:" + uri);
-        }
-        mDb.insert(tableName, null, contentValues);
-        getContext().getContentResolver().notifyChange(uri, null);
-        return uri;
-    }
-
-    @Override
-    public int delete(Uri uri, String selection, String[] selectionArgs) {
-        Log.i(TAG,"delete()");
-        String tableName = getTableName(uri);
-        if(tableName == null){
-            throw new IllegalArgumentException("Unsupported URI:" + uri);
-        }
-        int count = mDb.delete(tableName, selection, selectionArgs);
-        if(count > 0){
-            getContext().getContentResolver().notifyChange(uri, null);
-        }
-        return count;
-    }
-
-    @Override
-    public int update(Uri uri, ContentValues contentValues, String selection, String[] selectionArgs) {
-        Log.i(TAG,"update()");
-        String tableName = getTableName(uri);
-        if(tableName == null){
-            throw new IllegalArgumentException("Unsupported URI:" + uri);
-        }
-        int row = mDb.update(tableName, contentValues, selection, selectionArgs);
-        if(row > 0){
-            getContext().getContentResolver().notifyChange(uri, null);
-        }
-        return row;
-    }
-}
-```
->AndroidMainifest权限:
-```xml
-        <!--自定义ContentProvider-->
-        <provider
-            android:authorities="customPrivoderName"
-            android:name=".PetProvider"
-            android:exported="true"
-            >
-        </provider>
-```
->在客户端使用ContentProvider(增删改查):
->增：
-```java
-ContentValues values = new ContentValues();
-values.put("_id", 1);
-values.put("name", "dog");
-getContentResolver().insert(uri, values);
-```
->删：
-```java
-//删除
-getContentResolver().delete(uri, "_id=?", new String[]{"2"});
-```
->改：
-```java
-//更新
-ContentValues values = new ContentValues();
-values.put("_id", 3);
-values.put("name", "fox");
-getContentResolver().update(uri, values, "_id=?",new String[]{"1"});
-```
->查找：
-```java
-Cursor petCursor = getContentResolver().query(uri, new String[]{"_id", "name"}, null, null, null);
-if(petCursor != null){
-   while(petCursor.moveToNext()){
-       Log.i("MainActivity", ""+petCursor.getInt(0));
-       Log.i("MainActivity", ""+petCursor.getString(1));
-   }
-   petCursor.close();
-}
-```
-
-
-### 6-Socket
-
-82、Sokcet就可以进行进程间通信
-
-## 选用合适的IPC方式
-
-83、IPC各种方法的优缺点和适用场景：
+
+
+1. [☆] Binder的通信模型
+    > 1. Binder驱动：进程隔离的存在，进程间无法直接访问，需要借助内核层提供的系统调用来访问内核层。
+    > 1. 服务端：Server1、2、3等服务，需要借助`Binder驱动`去ServiceManager`注册`。会在存储在表中。
+    > 1. 客户端：Client借助Binder驱动去ServiceManager`查询`表。
+    > 1. 服务/客户通信：借助Binder驱动进行之间的`IPC`。
+
+
+1. 内部基于Binder的技术？(3)
+    > 1. Message
+    > 1. AIDL和Message(内部AIDL)
+
+
+1. AIDL文件的本质作用
+1. 通过AIDL快速实现Binder的步骤?(4步)
+1. 使用aidl时内部类stub是什么？
+    > Binder类
+
+
+1. Stub的内部代理类Proxy如何处理客户端和服务端是否在同一个进程的情况？
+    > 不同进程，方法调用后会走跨进程的transact过程。同一进程就不会。
+
+
+1. Binder的工作流程？(4步)
+1. 如何通过AIDL自动生成Binder的java文件?
+    > 编写好aidl后，通过“make project”生成。
+
+
+1. android studio的build中make project生成的aidl文件在哪？
+    > 位于目录`app\build\generated\source\aidl\debug\包下`
+
+1. Binder类中Stub类的DESCRIPTOR是什么？
+    > Binder的唯一标识,一般用类名表示
+
+1. Binder类中Stub类的asInterface(android.os.IBinder obj)的作用？
+    > 1. 将服务端Binder对象转换为客户端所需要的ADIL类型接口对象。
+    > 1. 服务端和客户端在同一进程，直接返回服务端的Stub对象
+    > 1. 服务端和客户端在不同一进程，返回服务端的Stub对象的代理对象Stub.proxy
+
+1. Binder类中Stub类的asBinder()的作用
+    > 返回当前Binder对象
+
+1. Binder类中Stub类的 onTransact(code, data, reply, flags)的作用？
+    > 1. 该方法运行在服务端的Binder线程池中。
+    > 1. 通过code确定Client请求的目标方法
+    > 1. 从data中取得方法所需参数，执行目标方法。
+    > 1. 执行完毕后就向reply中写入返回值。
+    > 1. 如果此方法返回false就表示客户端请求失败，我们可以用此来进行权限验证。
+
+
+1. Binder类中Stub.Proxy的自定义方法的内部流程？注意点？
+    > 1. 这些用户自定义方法，运行在客户端。
+    > 1. 将该方法的参数信息写入到data中，调用transact方法发起RPC(远程调用请求)，此时当前线程挂起。
+    > 1. 服务端的onTransact会被调用，执行完毕后，将结果写入到reply中。
+    > 1. 客户端的RPC调用返回后，当前线程继续执行，并从reply中取出返回结果，然后返回reply中的数据。
+
+
+1. AIDL如何进行权限验证？
+    > 1. 利用Binder类也就是Stub的onTransact方法
+    > 1. 该方法如果返回false就代表请求失败，可以用于权限验证
+    > 1. 在Service的onBind中进行权限验证，比如使用permission验证等等。如果验证不通过则绑定服务就失败。
+
+1. 通过Binder机制，因为具有线程池，所以客户端可以在UI线程直接发起远程调用请求？
+    >错误！！！
+    > 1. 客户端的远程调用会挂起当前线程，因此UI线程发起RPC(远程调用)会导致阻塞。
+    > 1. Binder机制中的线程池，是指服务端的onTransact()运行在Binder线程池中。
+    > 1. 服务端的方法都运行在线程池中，因此要注意同步问题。
+
+1. Binder如何检测服务端异常终止？linkToDeath和unlinkToDeath方法有什么用？
+    > 1.  异常终止问题：如果服务端异常终止，而会导致客户端调用失败，甚至可能客户端都不知道binder已经死亡，就会产生问题。
+    > 1. 利用linkToDeath和unlinkToDeath可以解决该问题。
+    > 1. linkToDeath作用给Binder设置一个死亡代理，Binder会收到通知，还可以重新发起连接请求从而恢复连接。
+    > 1. binder的isBinderAlive也可以判断Binder是否死亡。
+
+1. 有进程A和进程B，如何利用Binder机制进行两者的通信？核心步骤(6)？
+    > 1. 进程A去绑定到进程B注册的Service
+    > 1. 进程B创建Binder对象---Servcice的onBind()
+    > 1. 进程A接收进程B的Binder对象
+    > 1. 进程A利用进程B传过来的对象发起请求
+    > 1. 进程B收到并处理进程A的请求
+    > 1. 进程A获取进程B返回的处理结果
+
+
+1. Binder对象是如何具有能被跨进程传输的能力？(2)
+
+1. Binder对象如何具有完成特定任务的能力？
+1. 继承IBinder接口实现的attachInterface()、queryLocalInterface()两个方法的作用?
+    > 1. binder.attachInterface(): 将key=DESCRIPTOR和value=IInterface对象的键值对，存储在Binder内部。
+    > 1. binder.queryLocalInterface(): 通过 DESCRIPTOR查询到IInterface对象。
+
+
+1. 实现IInterface接口的类中是干什么的？
+1. attachInterface()建立了与IInterface对象的关系，为什么通过IInterface对象就能获取到执行特定任务的能力？
+1. 服务端的onBind()返回Binder对象后，系统做了什么工作？
+    > 1. 系统会收到这个binder对象，然后会生成一个BinderProxy。并且返回给客户端。
+
+
+1. 客户端在onServiceConnected()方法中就是获取到服务端的Binder对象？
+    > 错误！
+    > 1. 客户端、服务端在同一个进程，就是服务端Binder对象。
+    > 1. 不在同一个进程，就是服务端Binder对象的代理对象Proxy
+
+1. 客户端通过BinderProxy执行操作的原理?
+    > 内部借助transact()和onTransact()完成功能的实现。
+
+1.  系统保存了Binder对象和BinderProxy对象的对应关系
+2. 对BinderProxy的优化
+    > 1. 借助Stub.asInterface(binderproxy)
+    > 1. 将BinderProxy生成一个代理对象，内部封装了transact()和onTransact()的流程
+    > 1. 通过add()等自定义方法直接进行执行，给人一种获取到服务端IInterface对象的假象。
+
+1. Binder机制中transact()方法和服务端的线程池都是由系统实现的？
+1. Binder的服务端为什么不是线程安全的？
+    >Server端使用了线程池决定了Server的代码`不是线程安全的`
+
+
+1. Binder服务端的线程池是如何实现的？
+    >1. 系统实现：线程池实现在Binder内部的native方法中
+
+1. ContentProvider中的CRUD(增删改查)是否是线程安全的？
+1. AIDL中在Service中实现的接口是否是线程安全的？(mBinder = xxx.Stub())中的接口
+1. IBinder接口作用?
+    >1. IBinder是用于远程对象的基本接口，是轻量级远程调用机制的核心部分，用于高性能地进行进程内部和进程间调用。
+    >2. IBinder描述了远程对象间交互的抽象协议。
+
+1. 平时直接实现IBinder接口就可以了？
+    > 不能，系统要求去直接继承自Binder类。
+
+1. Binder源码：Binder构造方法中的init是干什么的？
+    > init()是native方法，是对底层`Binder Driver`的封装。
+
+1. 客户端发起请求时的底层流程是什么？客户端transact是如何回调到服务端的onTransact方法的？
+    > 1. 调用IBinder的`transact()`接口
+    > 1. 调用驱动层的`mRemote.transact()`
+    > 1. Binder Driver会调用`execTransact()`, 内部调用服务端Binder的`onTransact()`方法。
+
+1. Binder的Driver层作用
+    >对Binder类进行了完美的封装，开发者只需要继承`Binder`和实现`onTransact()`即可。
+
+## 6种IPC(35)
+
+1. Bundle的作用
+1. A进程在完成计算后需要启动B进程的一个组件并且将结果传递给B进程，但是这个结果不支持放入Bundle，因此无法通过Intent传输。这个该如何解决？
+1. 文件共享的作用?
+2. 文件共享可以传递对象吗？
+1. 文件共享的特点：
+1. Messenger是什么？
+
+1. Messenger中服务端是否需要考虑线程同步问题？
+    > 1. 不需要，因为一次处理一个请求
+
+
+1. 使用Messenger时，客户端的步骤
+    > 1. bindService()去绑定服务
+    > 1. 在ServiceConnection中用返回的Binder对象创建Messenger，利用该Messenger能读取或者发送信息。
+    > 1. 发送信息：1-`msg.setData(bundle)` 2-`msg.replyTo = mGetReplyMessenger` 3-`mMessenger.send(msg)` 4-mGetReplyMessenger继承自Messenger用于接收服务端回复的消息。
+
+1. 使用Messenger时，服务端的步骤?
+    > 1. `Messenger clientMessenger = msg.replyTo;`获取到客户端传来的Messenger
+    > 1. 利用该Messenger发送信息
+
+1. Messenger缺点?
+
+1. AIDL进程间通信流程
+
+
+1. [☆] AIDL是什么？
+    > 1. Android Interface Definition Language, 即Android接口定义语言。
+    > 1. 系统提供的一种快速实现Binder的工具。
+
+1. AIDL支持的数据类型
+    > 1. 基本数据类型(int、long、char、boolean、double等)
+    > 1. String和CharSequence
+    > 1. List：只支持ArrayList，且里面所有元素必须是AIDL支持的数据。
+    > 1. Map：只支持HashMap，且里面所有元素必须是AIDL支持的数据，包括key和value
+    > 1. Parcelable：所有实现Parcelable接口的对象
+    > 1. AIDL：所有AIDL接口都可以在AIDL中使用
+
+1. AIDL中List只能用ArrayList，远程服务端能使用CopyOnWriteArrayList(并非继承自ArrayList)：
+    > 1. Binder会根据List规范去访问数据，并且生成一个新的ArrayList传给客户端，因此没有违反数据类型的规定。
+    > 1. ConcurrentHashMap也是类似功能
+
+1. 如何在AIDL中使用观察者模式？
+1. AIDL观察中解除注册会导致服务端找不到该观察者，这是为什么？
+2. 如何用RemoteCallbackList解决这个问题？
+    > 系统专门提供用于删除跨进程Listener的接口。该类本身是一个泛型，支持任何AIDL接口。
+
+1. RemoteCallbackList实现原理
+    >1. 内部有一个Map结构，key是Ibinder，value是Callback类型。
+    >2. 将Listener的信息存入CallBack, Callback能保存所有AIDL回调
+    >1. 每次跨进程Client的同一个对象，会在服务端生成多个对象。但是这些对象本身的Binder都是同一个。
+    >1. 以Binder作为Key，能找到唯一的Listener。
+
+1. 使用RemoteCallbackList的流程和特点
+    >1. 客户端解注册，服务端会遍历所有listener，找出那个和解注册的listener具有相同Binder的listener，并删除。
+    >2. 客户端终止后，会自动移除客户端注册的所有listener
+    >3. 自动实现线程同步，无需额外操作。
+
+1. 客户端的onServiceConnected和onServiceDisconnected可以进行耗时操作吗？
+    > 1. 不可以，都运行在UI线程池中。
+
+1. 服务端的方法需要开线程进行异步操作吗？
+    > 不需要。本身已经运行在服务端的Binder线程池中。
+
+1. 服务端中的方法能直接去操作控件吗？
+    > 不可以，需要通过Handler切换到UI线程。
+
+1. Binder意外死亡的两种解决方法?
+
+1. Binder意外死亡的两种解决方法：
+    >1. 客户端的onServiceConnected中调用`Binder.linkToDeath(mDeathRecipient)`设置DeathRecipient监听，Binder死亡时回调DeathRecipient.binderDied()
+    >2. 或者在onServiceDisconnected中重连远程服务。
+
+1. Binder意外死亡的解决方法的区别
+    >1. onServiceDisconnected在客户端UI线程中被回调
+    >2. binderDied在客户端的Binder线程池中被回调(无法操作UI)
+
+1. onServiceDisconnected是如何解决Binder死亡问题的？何时被调用？
+1. 大量业务模块都需要使用AIDL进行进程间通信，如何在不创建大量Service的情况下解决该问题?(=Binder连接池是什么？)
+
+1. ContentProvider是什么
+1. ContentProvider的使用
+2. ContentResolver的作用
+1. 自定义ContentProvider的步骤
+    >1. 继承ContentProvider
+    >2. 实现：onCreate-创建的初始化工作
+    >3. getType-返回url请求对应的MIME类型(媒体类型)，比如图片、视频等。不关注该类型，可以返回null或者`“*/*”`
+    >4. query-查数据
+    >5. insert-插入数据
+    >6. update-更新数据
+    >7. delete-删除数据
+
+1. ContentProvider的onCreate()运行在ContentProvider进程中的主线程中？
+2. getType、增删改查这五个方法由外界回调，运行在外界的线程中？
+    > 错误！都运行在ContentProvider所在进程的Binder线程池中
+
+1. ContentProvider存储方式
+
+1. Sokcet如何可以进行进程间通信
+
+## IPC方式总结(1)
+
+1. IPC各种方法的优缺点和适用场景
+
 |名称|优点|缺点|适用场景|
 |---|---|---|---|
 |Bundle|简单易用|只能传输Bundle支持的数据类型|四大组件间的进程间通信|
