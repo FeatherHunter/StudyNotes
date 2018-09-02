@@ -1,12 +1,11 @@
 ## 王辰浩
-* 两年以上Android开发经验
+* 求职意向：Android开发工程师
+* 工作经验：近3年开发经验
 * 英语：超 100 万字英文原著和技术文档的阅读量，翻译过多份技术文档。
-* 博客：https://blog.csdn.net/feather_wch 28万访问量
+* 博客：https://blog.csdn.net/feather_wch 29万访问量
 * 电话：17714188818
 * 邮箱：975559549@qq.com
-
-## 教育经历
-* 南京工程学院 计算机科学与技术 本科
+* 教育经历：南京工程学院 计算机科学与技术 本科
 ## 专业技能
 * 精通 Android消息机制
 * 掌握
@@ -14,11 +13,11 @@
   * 掌握Window和WindowManager的原理和机制
 * 熟悉
   * 熟悉性能优化、适配、MVP
-  * 熟悉View、Drawable、绘图机制、动画
-  * 熟悉开源框架OkHttp、EventBus、Glide、ARouter等，熟悉OkHttp源码
+  * 熟悉OkHttp源码
+  * 熟悉View、Drawable、绘图机制、动画机制
   * 熟悉多线程、IPC
 * 其他
-  * 了解Drawable、RemoteView
+  * 了解Drawable、RemoteView、类加载机制、反射
   * 具有Linux系统开发、Stm32嵌入式一年以上开发经验
   * 具有html、C/C++基础
   * 编码严谨规范有代码洁癖、喜欢研究源码
