@@ -10,7 +10,7 @@ Fragment有这一篇就够了！汲取各路大神精华，亲自从源码剖析
 
 
 # Android Fragment详解
-版本: 2018/9/1-1
+版本: 2018/9/3-1(20:23)
 
 ---
 
@@ -1050,6 +1050,34 @@ void moveToState(Fragment f, int newState, int transit, int transitionStyle, boo
 1、Fragment的常见问题，以及如何处理？
 >1. `getActivity()空指针`：常见于进行异步操作的时候，此时如果`Fragment已经onDetach()`,就会遇到。解决办法：在`Fragment`里面使用一个`全局变量mActivity`，可能会导致内存泄露。但是比`崩溃`更好。
 >2. `视图重叠`：主要是因为`Fragment`的`onCreate()`中没有判断`saveInstanceSate == null`，导致重复加载了同一个`Fragment`
+
+2、Fragment的切换方式有多少种？
+> 1. add()、replace()、remove(): 会将Fragment进行移除(就是回收了实例)，每次都会新建一个实例。
+> 1. hide()、show()
+> 1. detach()、attach()
+
+3、add和replace的区别
+> 1. replace会将栈中的fragment全部remove，再add进行添加。
+> 1. add是在原有基础上进行添加。
+
+4、hide和show的作用
+> 隐藏和显示：将Fragment的显示和隐藏，占一点内存，
+
+5、detach和attach的作用
+> 1. 不会回收Fragment，detach()会将Fragment中的View销毁掉。
+> 1. attach()会重新构建View。
+> 1. 极少使用
+
+6、detach()和attach()为什么没啥用？
+> 1. 并不能节约多少内存
+> 1. 导致每次都会去重建这个View。
+
+7、FragmentTransaction报错：commit already called
+> 1. beginTransaction()和commit()要配套使用
+> 1. 多次commit会出现该问题。
+
+8、Fragment show之前需要已经被add到container中了
+> 要注意重叠显示的问题
 
 ## 额外收获
 * SparseArray：
