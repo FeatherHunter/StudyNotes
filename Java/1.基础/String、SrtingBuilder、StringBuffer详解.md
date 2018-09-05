@@ -9,9 +9,9 @@
 >1. 什么是intrinsic机制
 >1. Java 9中String的改进
 
-# String详解
+# String、SrtingBuilder、StringBuffer详解
 
-版本号：2018/9/4-1(23:59)
+版本号：2018/9/5-1(16:16)
 
 ---
 
@@ -455,8 +455,24 @@ System.out.println(object.hashCode()); //1163157884
 ```
 
 11、如何打印出String对象的地址？
-> 1. 不可以
-> 1. 只能用==来比较
+> 1-使用`System.identityHashCode(s1)`可以计算出任何对象的hashCode(根据内存地址得到)，就算重写过`hashCode()`也不会影响
+```java
+String s1 = "Hello World for Feather!";
+String s2 = "Hello World for Feather!";
+String s3 = new String(s2);
+String s4 = new String("Hello World for Feather!");
+
+System.out.println(System.identityHashCode(s1));
+System.out.println(System.identityHashCode(s2));
+System.out.println(System.identityHashCode(s3));
+System.out.println(System.identityHashCode(s4));
+\\输出结果
+s1 1163157884
+s2 1163157884
+s3 1956725890
+s4 356573597
+```
+> 2-用==来比较是否相等，但是无法比较。
 
 12、如何通过string调用Object的toString?
 > 不可以
