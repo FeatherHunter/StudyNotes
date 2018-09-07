@@ -5,14 +5,53 @@
 本文是我一点点归纳总结的干货，但是难免有疏忽和遗漏，希望不吝赐教。
 
 
-# Handler消息机制详解(24题)
-版本：2018/9/3-1(1946)
+# Handler消息机制详解(29题)
+版本：2018/9/7-1(2359)
 
 ---
 
 [TOC]
 
-## 消息机制概述
+## 问题汇总
+
+> 以问答形式将本文的所有内容进行汇总。考考你哟。
+
+1. Handler是什么？
+1. 消息机制是什么？
+1. MeesageQueue是什么？
+1. Looper是什么？
+1. ThreadLocal是什么？
+1. 为什么不能在子线程中访问UI？
+1. Handler的运行机制概述(Handler的创建、Looper的创建、MessageQueue的创建、以及消息的接收和处理)
+1. 主线程向子线程发送消息的方法？
+1. ThreadLocal的作用？
+2. ThreadLocal的应用场景
+1. ThreadLocal的使用
+1. ThreadLocal的set()源码分析
+1. ThreadLocal的get()源码分析
+1. MessageQueue的主要操作
+1. MessageQueue的插入和读取源码分析
+1. MessageQueue的next源码详解
+1. Looper的构造中做了什么？
+1. 子线程中如何创建Looper?
+1. 主线程ActivityThread中的Looper是如何创建和获取的？
+1. Looper如何退出？
+2. quit和quitSafely的区别
+1. Looper的loop()源码中的4个工作？
+1. Android如何保证一个线程最多只能有一个Looper？
+1. Looper的构造器为什么是private的？
+1. Handler消息机制中，一个looper是如何区分多个Handler的？
+1. 主线程ActivityThread的消息循环
+2. ActivityThread中Handler H是做什么的？
+1. Handler的post/send()逻辑流程
+1. Handler的postDelayed逻辑流程
+1. Handler的消息处理的流程？
+1. Handler的特殊构造方法中，为什么有Callback接口？
+1. Handler的内存泄漏如何避免？
+
+---
+
+## 消息机制概述(8)
 1、Handler是什么？
 >1. Android消息机制的上层接口(从开发角度)
 >2. 能轻松将任务切换到Handler所在的线程中去执行
@@ -48,21 +87,25 @@ void checkThread(){
 }
 ```
 
-7、Handler的要点
+7、Handler的运行机制概述(Handler的创建、Looper的创建、MessageQueue的创建、以及消息的接收和处理)
 >1. Handler创建时会采用当前线程的Looper
 >2. 如果当前线程没有`Looper`就会报错，要么创建`Looper`，要么在有`Looper`的线程中创建`Handler`
 >3. `Handler`的`post`方法会将一个`Runnable`投递到`Handler`内部的`Looper`中处理（本质也是通过`send`方法完成）
 >4. `Handler`的`send`方法被调用时，会调用`MessageQueue`的`enqueueMessage`方法将消息放入消息队列, 然后`Looper`发现有新消息到来时，就会处理这个消息，最终消息中的`Runnable`或者`Handler`的`handleMessage`就会被调用
 >5. 因为`Looper`是运行在创建`Handler`所在的线程中的，所以通过`Handler`执行的业务逻辑就会被切换到`Looper`所在的线程中执行。
 
-## ThreadLocal
+8、主线程向子线程发送消息的方法？
+> 1. 通过在主线程调用子线程中Handler的post方法，完成消息的投递。
+> 1. 通过`HandlerThread`实现该需求。
 
-8、ThreadLocal的作用
+## ThreadLocal(4)
+
+1、ThreadLocal的作用
 >1. `ThreadLocal`是线程内部的数据存储类，可以在指定线程中存储数据，之后只有在指定线程中才开业读取到存储的数据
 >2. 应用场景1：某些数据是以线程为作用域，并且不同线程具有不同的数据副本的时候。`ThreadLocal`可以轻松实现`Looper`在线程中的存取。
 >3. 应用场景2：在复杂逻辑下的对象传递，通过`ThreadLocal`可以让对象成为线程内的全局对象，线程内部通过`get`就可以获取。
 
-9、ThreadLocal的使用
+2、ThreadLocal的使用
 ```java
 mBooleanThreadLocal.set(true);
 Log.d("ThreadLocal", "[Thread#main]" + mBooleanThreadLocal.get());
@@ -85,7 +128,7 @@ new Thread("Thread#2"){
 >1. 最终`main`中输出`true`; `Thread#1`中输出`false`; `Thread#2`中输出`null`
 >2. `ThreadLocal`内部会从各自线程中取出数组，再根据当前`ThreadLocal`的索引去查找出对应的`value`值。
 
-10、ThreadLocal的set()源码分析
+3、ThreadLocal的set()源码分析
 ```java
 //ThreadLocal.java
 public void set(T value) {
@@ -137,7 +180,7 @@ static class Entry extends WeakReference<ThreadLocal<?>> {
 }
 ```
 
-11、ThreadLocal的get()源码分析
+4、ThreadLocal的get()源码分析
 ```java
 public T get() {
     //1. 获取当前线程对应的ThreadLocalMap
@@ -173,13 +216,13 @@ private T setInitialValue() {
 >2. 当前线程的`ThreadLocal`对应一个Map中的`Entry`(存在table中)
 >3. `Entry`中`key`会获取其对应的ThreadLocal, `value`就是存储的数值
 
-## 消息队列: MessageQueue
-12、MessageQueue的主要操作
+## MessageQueue(3)
+1、MessageQueue的主要操作
 >1. `enqueueMessage`: 往消息队列中插入一条消息
 >2. `next`：取出一条消息，并且从消息队列中移除
 >3. 本质采用`单链表`的数据结构来维护消息队列，而不是采用队列
 
-13、MessageQueue的插入和读取源码分析
+2、MessageQueue的插入和读取源码分析
 ```java
 //MessageQueue.java：插入数据
 boolean enqueueMessage(Message msg, long when) {
@@ -201,7 +244,7 @@ Message next() {
 }
 ```
 
-14、MessageQueue的next源码详解
+3、MessageQueue的next源码详解
 ```java
     Message next() {
         int nextPollTimeoutMillis = 0;
@@ -273,10 +316,10 @@ Message next() {
 > 1. 如果是同步屏障，会去循环查找异步消息，没有获取到会进行阻塞。获取到直接返回Msg。
 > 1. 如果是延时消息，会计算时间间隔，并进行精准定时阻塞(native方法)。直到时间到达或者被enqueueMessage插入消息而唤醒。时间到后就返回Msg。
 
-## Looper
+## Looper(8)
 
 
-15、Looper的构造
+1、Looper的构造
 ```java
 private Looper(boolean quitAllowed) {
     //1. 会创建消息队列: MessageQueue
@@ -286,7 +329,7 @@ private Looper(boolean quitAllowed) {
 }
 ```
 
-16、为线程创建Looper
+2、为线程创建Looper
 ```java
 //1. 在没有Looper的线程创建Handler会直接异常
 new Thread("Thread#2"){
@@ -311,18 +354,18 @@ new Thread("Thread#2"){
 }.start();
 ```
 
-17、主线程ActivityThread中的Looper
+3、主线程ActivityThread中的Looper
 >1. 主线程中使用`prepareMainLooper()`创建`Looper`
 >2. `getMainLooper`能够在任何地方获取到主线程的`Looper`
 
-18、Looper的退出
+4、Looper的退出
 >1. `Looper`的退出有两个方法：`quit`和`quitSafely`
 >2. `quit`会直接退出`Looper`
 >3. `quitSafely`只会设置退出标记，在已有消息全部处理完毕后才安全退出
 >4. `Looper`退出后，`Handler`的发行的消息会失败，此时`send`返回`false`
 >5. `子线程`中如果手动创建了`Looper`，应该在所有事情完成后调用`quit`方法来终止消息循环
 
-19、Looper的loop()源码分析
+5、Looper的loop()源码分析
 ```java
 //Looper.java
 public static void loop() {
@@ -357,9 +400,72 @@ public static void loop() {
 }
 ```
 
-## Handler
+6、Android如何保证一个线程最多只能有一个Looper？
+> 1-Looper的构造方法是private，不能直接构造。需要通过Looper.prepare()进行创建，
+```java
+private Looper(boolean quitAllowed) {
+    mQueue = new MessageQueue(quitAllowed);
+    mThread = Thread.currentThread();
+}
+```
+> 2-如果在已有Looper的线程中调用`Looper.prepare()`会抛出RuntimeException异常
+```java
+public class Looper {
 
-20、Handler使用实例post/sendMessage
+    static final HashMap<Long, Looper> looperRegistry = new HashMap<Long, Looper>();
+
+    private static void prepare() {
+        synchronized(Looper.class) {
+            long currentThreadId = Thread.currentThread().getId();
+            // 根据线程ID查询Looper
+            Looper l = looperRegistry.get(currentThreadId);
+            if (l != null)
+                throw new RuntimeException("Only one Looper may be created per thread");
+            looperRegistry.put(currentThreadId, new Looper(true));
+        }
+    }
+    ...
+}
+```
+
+7、Handler消息机制中，一个looper是如何区分多个Handler的？
+> 1. Looper.loop()会阻塞于MessageQueue.next()
+> 1. 取出msg后，msg.target成员变量就是该msg对应的Handler
+> 1. 调用msg.target的disptachMessage()进行消息分发。这样多个Handler是很容易区分的。
+
+
+### 主线程的消息循环
+
+8、主线程ActivityThread的消息循环
+```java
+//ActivityThread.java
+public static void main(String[] args) {
+    //1. 创建主线程的Looper和MessageQueue
+    Looper.prepareMainLooper();
+    ......
+    //2. 开启消息循环
+    Looper.loop();
+}
+/**=============================================
+ * ActivityThread中需要Handler与消息队列进行交互
+ * -内部定义一系列消息类型：主要有四大组件等
+ * //ActivityThread.java
+ *=============================================*/
+private class H extends Handler {
+    public static final int LAUNCH_ACTIVITY         = 100;
+    public static final int PAUSE_ACTIVITY          = 101;
+    public static final int PAUSE_ACTIVITY_FINISHING= 102;
+    ......
+}
+```
+>1. `ActivityThread`通过`ApplicationThread`和`AMS`进行`IPC通信`
+>2. `AMS`完成请求的工作后会回调`ApplicationThread`中的`Binder`方法
+>3. `ApplicationThread`会向`Handler H`发送消息
+>4. `H`接收到消息后会将`ApplicationThread`的逻辑切换到`ActivityThread`中去执行
+
+## Handler(6)
+
+1、Handler使用实例post/sendMessage
 > post
 ```java
 handler.post(new Runnable() {
@@ -396,7 +502,7 @@ class MsgHandler extends android.os.Handler{
 ```
 > post内部还是通过sendMessage实现的。
 
-21、Handler的post/send()源码分析
+2、Handler的post/send()源码分析
 ```java
 //Handler.java: post最终是通过send系列方法实现的
 //Handler.java
@@ -436,7 +542,7 @@ private boolean enqueueMessage(MessageQueue queue, Message msg, long uptimeMilli
 >2. `MessageQueue`的`next`方法就会返回这条消息交给`Looper`
 >3. 最终`Looper`会把消息交给`Handler`的`dispatchMessage`
 
-22、Handler的postDelayed源码分析
+3、Handler的postDelayed源码分析
 ```java
     //Handler.java---层层传递，和一般的post调用的同一个底层方法.
     public final boolean postDelayed(Runnable r, long delayMillis)
@@ -461,7 +567,7 @@ private boolean enqueueMessage(MessageQueue queue, Message msg, long uptimeMilli
 > 5. 唤醒后会拿出队列头部的消息B，进行处理。然后会继续因为消息A而阻塞。
 > 6. 如果达到了消息A延迟的时间，会取出消息A进行处理。
 
-23、Handler的消息处理源码
+4、Handler的消息处理源码
 ```java
 //Handler.java
 public void dispatchMessage(Message msg) {
@@ -493,7 +599,7 @@ public interface Callback {
 }
 ```
 
-24、Handler的特殊构造方法
+5、Handler的特殊构造方法
 >1. `Handler handle = new Handler(callback);`-不需要派生Handler
 >2. 通过特定`Looper`构造`Handler`
 ```java
@@ -516,71 +622,8 @@ public Handler(Callback callback, boolean async) {
     mAsynchronous = async;
 }
 ```
-
-## 主线程的消息循环
-
-25、主线程ActivityThread的消息循环
-```java
-//ActivityThread.java
-public static void main(String[] args) {
-    //1. 创建主线程的Looper和MessageQueue
-    Looper.prepareMainLooper();
-    ......
-    //2. 开启消息循环
-    Looper.loop();
-}
-/**=============================================
- * ActivityThread中需要Handler与消息队列进行交互
- * -内部定义一系列消息类型：主要有四大组件等
- * //ActivityThread.java
- *=============================================*/
-private class H extends Handler {
-    public static final int LAUNCH_ACTIVITY         = 100;
-    public static final int PAUSE_ACTIVITY          = 101;
-    public static final int PAUSE_ACTIVITY_FINISHING= 102;
-    ......
-}
-```
->1. `ActivityThread`通过`ApplicationThread`和`AMS`进行`IPC通信`
->2. `AMS`完成请求的工作后会回调`ApplicationThread`中的`Binder`方法
->3. `ApplicationThread`会向`Handler H`发送消息
->4. `H`接收到消息后会将`ApplicationThread`的逻辑切换到`ActivityThread`中去执行
-
-## 面试题：练一练
-
-1、Android如何保证一个线程最多只能有一个Looper？
-> 1-Looper的构造方法是private，不能直接构造。需要通过Looper.prepare()进行创建，
-```java
-private Looper(boolean quitAllowed) {
-    mQueue = new MessageQueue(quitAllowed);
-    mThread = Thread.currentThread();
-}
-```
-> 2-如果在已有Looper的线程中调用`Looper.prepare()`会抛出RuntimeException异常
-```java
-public class Looper {
-
-    static final HashMap<Long, Looper> looperRegistry = new HashMap<Long, Looper>();
-
-    private static void prepare() {
-        synchronized(Looper.class) {
-            long currentThreadId = Thread.currentThread().getId();
-            // 根据线程ID查询Looper
-            Looper l = looperRegistry.get(currentThreadId);
-            if (l != null)
-                throw new RuntimeException("Only one Looper may be created per thread");
-            looperRegistry.put(currentThreadId, new Looper(true));
-        }
-    }
-    ...
-}
-```
-
-2、Handler消息机制中，一个looper是如何区分多个Handler的？
-> 1. Looper.loop()会阻塞于MessageQueue.next()
-> 1. 取出msg后，msg.target成员变量就是该msg对应的Handler
-> 1. 调用msg.target的disptachMessage()进行消息分发。这样多个Handler是很容易区分的。
-
-3、主线程向子线程发送消息的方法？
-> 1. 通过在主线程调用子线程中Handler的post方法，完成消息的投递。
-> 1. 通过`HandlerThread`实现该需求。
+### 内存泄漏
+6、Handler的内存泄漏如何避免？
+> 1. 采用静态内部类：`static handler = xxx`
+> 1. Activity结束时，调用`handler.removeCallback()`、然后handler设置为null
+> 1. 如果使用到Context等引用，要使用`弱引用`
