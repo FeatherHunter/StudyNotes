@@ -1,9 +1,9 @@
-转载请注明链接:
+转载请注明链接: https://blog.csdn.net/feather_wch/article/details/51504255
 
 
 # AsyncTask详解
 
-版本：2018.9.8-1(11:11)
+版本：2018.9.9-1(1:0)
 
 ---
 
