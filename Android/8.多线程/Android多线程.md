@@ -5,9 +5,9 @@ Android之多线程，包括线程、Java同步问题、阻塞队列、线程池
 
 有帮助的话请点个赞！万分感谢！
 
-# Android多线程(99题)
+# Android多线程(88题)
 
-2018/9/8(20:45)
+2018/9/9(10:10)
 
 [TOC]
 
@@ -593,149 +593,18 @@ ScheduledThreadPoolExecutor mScheduledThreadPoolExecutor = new ScheduledThreadPo
 >2. 但是使用的`阻塞队列`是`DelayedWorkQueue`, 该队列是`无界队列（会自动扩容）`
 >3. `根据线程池的处理流程`，永远不会出现`任务数 >= 核心线程数 + 任务队列总数`的情况，因此`根本是用不到 线程数最大为Integer.MAX这个参数`
 
-## HandlerThread
-
-68、HandlerThread是什么?(6)
->1. `Thread`中如果要使用`Handler`需要创建`Looper`等操作，比较繁琐。
->1. `HandlerThread`就是内部创建了`Looper`的`Thread`.
->1. 内部具有队列，任务会串行处理。(如果一个任务执行时间过长，会阻塞后续任务)
->2. 执行任务：外界需要通过`Hanlder`的消息方式来通知`HandlerThread`来执行一个具体任务
->3. 退出：`HandlerThread`的`run`方法是`无限循环`执行的，需要通过`HandlerThread`的`quit或quitSafely`方法来终止`线程的执行`
->4. 使用场景：`HandlerThread`典型使用场景是`IntentService`
-```java
-/**=============================
- *  创建并开启HandlerThread
- *==============================*/
-        //创建一个线程,线程名字：handler-thread
-        HandlerThread mHandlerThread = new HandlerThread( "handler-thread") ;
-        //开启一个线程
-        mHandlerThread.start();
-/**===========================
- *  创建Handler并实现具体任务
- *============================*/
-        //在这个线程中创建一个handler对象
-        Handler handler = new Handler( mHandlerThread.getLooper() ){
-            @Override
-            public void handleMessage(Message msg) {
-                super.handleMessage(msg);
-                //这个方法是运行在 handler-thread 线程中的 ，可以执行耗时操作
-                Log.d( "handler " , "消息： " + msg.what + "  线程： " + Thread.currentThread().getName()  ) ;
-            }
-        };
-/**===========================
- *  开启任务的执行
- *=============================*/
-        //在主线程给handler发送消息
-        handler.sendEmptyMessage(1) ;
-```
-
-## IntentService
-69、IntentService是什么?
->1. 是一种特殊`Service`
->1. 为`抽象类`,必须创建`子类`才可以使用`IntentService`
->1. 可用于执行后台耗时的任务，任务执行后会`自动停止`
->3. 具有`高优先级`(服务的原因),优先级比单纯的`线程`高很多，适合`高优先级`的后台任务，且不容易被系统杀死。
->4. 封装了`HandlerThread`和`Handler`
-
-70、IntentService的原理解析
-```java
-public abstract class IntentService extends Service {
-        private volatile Looper mServiceLooper;
-        private volatile ServiceHandler mServiceHandler;
-        ...省略...
-        //IntentService第一次启动调用
-        public void onCreate() {
-            super.onCreate();
-            //1. 创建一个HanlderThread
-            HandlerThread thread = new HandlerThread("IntentService[" + mName + "]");
-            thread.start();
-            //2. 通过HanlderThread的Looper来构建Handler对象mServiceHandler
-            mServiceLooper = thread.getLooper();
-            mServiceHandler = new ServiceHandler(mServiceLooper);
-        }
-        //IntentService每次启动都会调用
-        public int onStartCommand(Intent intent, int flags, int startId) {
-            //3. 直接调用onStart
-            onStart(intent, startId);
-            return mRedelivery ? START_REDELIVER_INTENT : START_NOT_STICKY;
-        }
-        public void onStart(Intent intent, int startId) {
-            //4. 通过mServiceHandler发送一个消息(该消息会在HanlderThread中处理)
-            Message msg = mServiceHandler.obtainMessage();
-            msg.arg1 = startId;
-            msg.obj = intent;
-            mServiceHandler.sendMessage(msg);
-        }
-        //ServiceHandler接收并处理onStart()方法中发送的Msg
-        private final class ServiceHandler extends Handler {
-            public ServiceHandler(Looper looper) {
-                super(looper);
-            }
-            @Override
-            public void handleMessage(Message msg) {
-                //1. 直接在onHandleIntent中处理(由子类实现)
-                onHandleIntent((Intent)msg.obj);
-                /**=================================================
-                 * 3. 尝试停止服务(会等待所有消息都处理完毕后，才会停止)
-                 *   不能采用stopSelf()——会立即停止服务
-                 *================================================*/
-                stopSelf(msg.arg1); //会判断启动服务次数是否与startId相等
-            }
-        }
-        //2. 该Intent与startService(intent)中的Intent完全一致
-        protected abstract void onHandleIntent(Intent intent);
-
-        public void onDestroy() {
-            mServiceLooper.quit();
-        }//销毁时会停止looper
-}
-```
->1. `IntentService`通过发送消息的方式向`HandlerThread`请求执行任务
->2. `HandlerThread`中的`looper`是顺序处理消息，因此有多个后台任务时，都会按照外界发起的顺序`排队执行`
->3. 启动流程：onCreate()->onStartCommand()->onStart()
->4. 消息处理流程：ServiceHandler.handleMessage()->onHandleIntent()
-
-71、IntentService实例:
->1. 自定义LocalIntentService继承自IntentService
-```java
-public class LocalIntentService extends IntentService{
-    public LocalIntentService(String name) {
-        super(name);
-    }
-    @Override
-    protected void onHandleIntent(@Nullable Intent intent) {
-        String action = intent.getStringExtra("task_action");
-        Log.d("IntentService", "receive task :" + action);
-        SystemClock.sleep(3000); //即使第一个任务休眠，后续的任务也会等待其执行完毕
-        if("com.example.action.TASK1".equals(action)){
-            Log.d("IntentService", "handle task :" + action);
-        }
-    }
-}
-```
->2. 开启IntentService
-```java
-Intent service = new Intent(this, LocalIntentService.class);
-service.putExtra("tast_action", "com.example.action.TASK1");
-startService(service);
-service.putExtra("tast_action", "com.example.action.TASK2");
-startService(service);
-service.putExtra("tast_action", "com.example.action.TASK3");
-startService(service);
-```
-
-## 补充题
-72、Thread的run()和start()的区别
+## 补充题(28)
+1、Thread的run()和start()的区别
 >1. `start()`会让线程去排队(处于就绪状态)，之后会调用`run()`
 >2. `run()`是线程需要执行的内容
 
-73、Synchronized三种应用的锁是什么？
+2、Synchronized三种应用的锁是什么？
 >* Java中每一个对象都可以作为锁，这是synchronized实现同步的基础：
 >    1. 普通同步方法，锁是当前实例对象
 >    2. 静态同步方法，锁是当前类的class对象
 >    3. 同步方法块，锁是括号里面的对象
 
-74、现在有T1、T2、T3三个线程，你怎样保证T2在T1执行完后执行，T3在T2执行完后执行？
+3、现在有T1、T2、T3三个线程，你怎样保证T2在T1执行完后执行，T3在T2执行完后执行？
 >考察对Join是否熟悉：父线程会等待子线程运行结束
 ```java
 Thread thread3 = new Thread(new Runnable() {
@@ -774,55 +643,55 @@ thread3.start();
 
 ```
 
-75、在Java中Lock接口比synchronized块的优势是什么？你需要实现一个高效的缓存，它允许多个用户读，但只允许一个用户写，以此来保持它的完整性，你会怎样去实现它？
+4、在Java中Lock接口比synchronized块的优势是什么？你需要实现一个高效的缓存，它允许多个用户读，但只允许一个用户写，以此来保持它的完整性，你会怎样去实现它？
 
-76、在java中wait和sleep方法的不同？
+5、在java中wait和sleep方法的不同？
 
-77、用Java实现阻塞队列。
+6、用Java实现阻塞队列。
 
-78、用Java写代码来解决生产者——消费者问题。
+7、用Java写代码来解决生产者——消费者问题。
 
-79、用Java编程一个会导致死锁的程序，你将怎么解决？
+8、用Java编程一个会导致死锁的程序，你将怎么解决？
 
-80、什么是原子操作，Java中的原子操作是什么？如何同步一个原子操作？
+9、什么是原子操作，Java中的原子操作是什么？如何同步一个原子操作？
 
-81、Java中的volatile关键是什么作用？怎样使用它？在Java中它跟synchronized方法有什么不同？
+10、Java中的volatile关键是什么作用？怎样使用它？在Java中它跟synchronized方法有什么不同？
 
-82、什么是竞争条件？你怎样发现和解决竞争？
+11、什么是竞争条件？你怎样发现和解决竞争？
 
-83、你将如何使用thread dump？你将如何分析Thread dump？
+12、你将如何使用thread dump？你将如何分析Thread dump？
 
-84、为什么我们调用start()方法时会执行run()方法，为什么我们不能直接调用run()方法？
+13、为什么我们调用start()方法时会执行run()方法，为什么我们不能直接调用run()方法？
 
-85、Java中你怎样唤醒一个阻塞的线程？
+14、Java中你怎样唤醒一个阻塞的线程？
 
-86、在Java中CycliBarriar和CountdownLatch有什么区别？
+15、在Java中CycliBarriar和CountdownLatch有什么区别？
 
-87、什么是不可变对象，它对写并发应用有什么帮助？
+16、什么是不可变对象，它对写并发应用有什么帮助？
 
-88、你在多线程环境中遇到的共同的问题是什么？你是怎么解决它的？
+17、你在多线程环境中遇到的共同的问题是什么？你是怎么解决它的？
 
-89、在java中绿色线程和本地线程区别？
+18、在java中绿色线程和本地线程区别？
 
-90、线程与进程的区别？
+19、线程与进程的区别？
 
-91、什么是多线程中的上下文切换？
+20、什么是多线程中的上下文切换？
 
-92、死锁与活锁的区别，死锁与馅饼的区别？
+21、死锁与活锁的区别，死锁与馅饼的区别？
 
-93、Java中用到的线程调度算法是什么？
+22、Java中用到的线程调度算法是什么？
 
-94、在Java中什么是线程调度？
+23、在Java中什么是线程调度？
 
-95、在线程中你怎么处理不可捕捉异常？
+24、在线程中你怎么处理不可捕捉异常？
 
-96、什么是线程组，为什么在Java中不推荐使用？
+25、什么是线程组，为什么在Java中不推荐使用？
 
-97、为什么使用Executor框架比使用应用创建和管理线程好？
+26、为什么使用Executor框架比使用应用创建和管理线程好？
 
-98、在Java中Executor和Executors的区别？
+27、在Java中Executor和Executors的区别？
 
-99、如何在Windows和Linux上查找哪个线程使用的CPU时间最长？
+28、如何在Windows和Linux上查找哪个线程使用的CPU时间最长？
 
 ## Java并发进阶
 
