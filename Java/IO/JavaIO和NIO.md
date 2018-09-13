@@ -4,13 +4,13 @@
 
 # Java IO和NIO
 
-版本号：2018/9/13-1(0:22)
+版本号：2018/9/13-1(18:22)
 
 ---
 
-[TOC]
-
 ![IO 和  NIO](https://static001.geekbang.org/resource/image/68/54/689506651da549777f11cfb98f1c5a54.jpg)
+
+[TOC]
 
 ---
 
@@ -325,6 +325,120 @@ if(fileFolder.isDirectory() == false)
 > 1. print()参数为(String)null，会打印出null
 > 1. write()参数为null，会有空指针异常。
 
+## 网络IO(4)
+
+1、Socket简单实现客户端和服务端通信
+> 1-服务端：建立ServerSocket，等待客户端连接，然后处理数据。
+```java
+public class DemoSocketServer extends Thread{
+    private ServerSocket serverSocket;
+    public int getPort(){
+        return serverSocket.getLocalPort();
+    }
+    @Override
+    public void run() {
+        try {
+            // 1、服务端启动ServerSocket，端口=0，表示自动绑定一个空闲端口
+            serverSocket = new ServerSocket(0);
+            while (true){
+                // 2、阻塞等待一客户端的连接
+                Socket socket = serverSocket.accept();
+                // 3、处理客户端(新建一个线程)
+                RequestHandler requestHandler = new RequestHandler(socket);
+                requestHandler.start();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }finally {
+            // 任何情况下都要保障Socket资源关闭。
+            if(serverSocket != null){
+                try {
+                    serverSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+    // 客户端请求的Handler
+    public static class RequestHandler extends Thread{
+        private Socket mSocket;
+        RequestHandler(Socket socket){
+            mSocket = socket;
+        }
+        @Override
+        public void run() {
+            try {
+                // 1、Socket的输出流来创建printWriter
+                PrintWriter printWriter = new PrintWriter(mSocket.getOutputStream());
+                // 2、写入数据
+                printWriter.println("Hello World!");
+                printWriter.flush();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+> 2-客户端(简单的打印数据)：借助try-with-resources，用Reader去读取数据。
+```
+// 客户端
+public class Main {
+    public static void main(String[] args) throws IOException {
+        DemoSocketServer server = new DemoSocketServer();
+        server.start();
+        // 1、Socket客户端，绑定Server端Host地址，和Server端的端口。(这边是本机)
+        try (Socket client = new Socket(InetAddress.getLocalHost(), server.getPort())) {
+            // 2、通过客户端的inpustream，创建Reader
+            BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(client.getInputStream()));
+            // 3、从Reader中读取到数据，并且打印。
+        }
+    }
+}
+```
+
+2、线程池改进服务端
+> 1. 需要减少线程频繁创建和销毁的开销
+```java
+// 线程池
+private Executor mExecutor;
+@Override
+public void run() {
+    try {
+        serverSocket = new ServerSocket(0);
+        // 1、创建线程池：只有核心线程数，没有非核心线程数。任务队列无限。空闲线程会立即停止
+        mExecutor = Executors.newFixedThreadPool(8);
+        while (true){
+            Socket socket = serverSocket.accept();
+            RequestHandler requestHandler = new RequestHandler(socket);
+            // 2、线程池进行处理
+            mExecutor.execute(requestHandler);
+        }
+    } catch (IOException e) {
+        e.printStackTrace();
+    }finally {
+        // 任何情况下都要保障Socket资源关闭。
+        if(serverSocket != null){
+            try {
+                serverSocket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+```
+
+3、服务端采用线程池来提供服务的典型工作模式图
+![典型工作模式](https://static001.geekbang.org/resource/image/da/29/da7e1ecfd3c3ee0263b8892342dbc629.png)
+
+4、服务端采用线程池处理客户端连接的缺点？
+> 1. 连接数几百时，这种模式没有问题。
+> 1. 但是在高并发，客户端及其多的情况下，就会出现问题。
+> 1. 线程上下文切换的开销会在高并发时非常明显。
+> 1. 这就是同步阻塞方式的低扩展性的体现
+
 ## NIO
 
 1、NIO的主要组成部分
@@ -351,8 +465,7 @@ if(fileFolder.isDirectory() == false)
 
 5、Selector的作用
 > 1. 是 NIO 实现多路复用的基础，
-> 1. 它提供了一种高效的机制，可以检测到注册在Selector 上的多个 Channel 中，是否有 Channel 处于就绪状态，进而实现了单线程对多
-Channel 的高效管理。
+> 1. 它提供了一种高效的机制，可以检测到注册在Selector 上的多个 Channel 中，是否有 Channel 处于就绪状态，进而实现了单线程对多Channel 的高效管理。
 > 1. Selector也是基于底层操作系统机制的，不同模式、不同版本都存在区别。
 > 1. Linux 上依赖于epoll
 > 1. Windows 上 NIO2（AIO）模式则是依赖于iocp
@@ -367,26 +480,224 @@ Channel 的高效管理。
 Charset.defaultCharset().encode("Hello world!"));
 ```
 
-8、NIO能解决什么问题？
+### SelectionKey
+8、SelectionKey是什么？
+> 1. 表示`SelectableChannel`在Selector中注册的句柄/标记
+> 1. `serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);`会返回注册事件的句柄。
 
-9、为什么需要多路复用？
+9、一个Selector对象包含三种类型的SelectionKey集合
+||||
+|---|---|---|
+|all-keys|当前所有向Selector注册的Channel的句柄(SelectionKey)的集合|           selector.keys()|
+|selected-keys|相关事件已经被Selector捕获的SelectionKey的集合|           selector.selectedKeys()|
+|cancelled-keys|已经被取消的SelectionKey的集合|          无API|
 
 
-2、NIO 提供的高性能数据操作方式是基于什么原理，如何使用？
+10、SelectionKey何时被新建？何时会被加入到Selector的all-keys集合中？
+> 1. Channel注册到Selector中时, 会新建一个SelectionKey，然后加入到all-keys集合中。
+> 1. serverSocketChannel.register(selector, xxx)
 
-3、从开发者的角度来看，NIO 自身实现存在哪些问题？有什么改进的想法吗？
+11、SelectionKey对象何时会被遗弃(加入到cancelled-keys集合中)？
+> 1. SelectionKey相关的Channel被关闭
+> 1. 调用了`SelectionKey.cancel()`方法
 
-### NIO2
-2、NIO2的基本组成。
+### ChartSet
 
-或者，从开发者的角度来看，你觉得 NIO 自身实现存在哪些问题？有什么改进的想法吗？
-IO 的内容比较多，专栏一讲很难能够说清楚。IO 不仅仅是多路复用，
+12、ByteBuffer转换为String
+```java
+Charset charset = Charset.defaultCharset();
+// asReadOnlyBuffer将Buffer复制一份出来。
+CharBuffer charBuffer = charset.decode(byteBuffer.asReadOnlyBuffer());
+String string = charBuffer.toString();
+```
+
+### ByteBuffer
+13、ByteBuffer是什么？
+> 1. NIO中使用的Byte Buffer
+> 1. 包含两个实现方法：
+>       1. HeapByteBuffer: 基于Java堆的实现
+>       1. DirectByteBuffer: 堆外的实现方法，采用了`unsafe API`
+
+14、从Channel中读取数据到ByteBuffer中
+```java
+byteBuffer = ByteBuffer.allocate(N);
+//读取数据，写入byteBuffer
+socketChannel.read(byteBuffer);
+
+// 翻转，才能打印出来
+byteBuffer.flip();
+System.out.println("receive msg from client: "+Charset.defaultCharset().decode(byteBuffer.asReadOnlyBuffer()).toString());
+```
+
+15、向Channel中写入数据
+```java
+socketChannel.write(Charset.defaultCharset().encode("Hello World!"));
+```
+
+#### flip
+
+16、ByteBuffer.flip()
+> 1. 进行翻转。将limit设置到position，然后将position复位到0。
+> 1. 从Channel中read后，立即用于写数据。
+```java
+ByteBuffer byteBuffer = ByteBuffer.allocate(1024);
+// 1、读取到数据
+socketChannel.read(byteBuffer);
+// 2、翻转
+byteBuffer.flip();
+// 3、发送给Client
+socketChannel.write(byteBuffer);
+```
+
+
+
+### NIO实例
+
+
+17、NIO优化服务端连接问题的实例
+```
+public class NIOServer extends Thread{
+    @Override
+    public void run() {
+        try (// 1、创建Selector。调度员的角色。
+             Selector selector = Selector.open();
+             /**-------------------------
+              * 2、创建Channel。并进行配置。
+              *---------------------------*/
+             ServerSocketChannel serverSocketChannel = ServerSocketChannel.open()){
+             // 1. 绑定IP和端口
+             serverSocketChannel.bind(new InetSocketAddress(InetAddress.getLocalHost(), 8888));
+             // 2. 非阻塞模式。因为阻塞模式下是不允许注册的。
+             serverSocketChannel.configureBlocking(false);
+            /**-------------------------
+             * 3、向Selector进行注册。通过OP_ACCEPT，表明关注的是新的连接请求
+             *---------------------------*/
+             serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
+             while(true){
+                 // 4、Selector调度员，阻塞在select操作。当有Channel有接入请求是，会被唤醒
+                 selector.select();
+                 // 5、被唤醒，获取到事件已经被捕获的SelectionKey的集合
+                 Set<SelectionKey> selectionKeys = selector.selectedKeys();
+                 Iterator<SelectionKey> iterator = selectionKeys.iterator();
+                 while (iterator.hasNext()){
+                     SelectionKey selectionKey = iterator.next();
+                     // 6、从SelectionKey中获取到对应的Channel
+                     handleRequest((ServerSocketChannel) selectionKey.channel());
+                     iterator.remove();
+                 }
+             }
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // 处理客户端的请求
+    private void handleRequest(ServerSocketChannel server){
+        // 1、获取到连接到该Channel Socket的连接
+        try(SocketChannel client = server.accept()) {
+            // 2、向Channel中写入数据
+            client.write(Charset.defaultCharset().encode("Hello World!"));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+18、NIO为什么比IO同步阻塞模式要更好？
+> 1. 同步阻塞模式需要多线程来处理多任务。
+> 1. NIO利用了单线程轮询事件的机制，高效定位就绪的Channel。
+> 1. 仅仅是`select`阶段是阻塞的，可以避免大量客户端连接时，频繁切换线程带来的问题。
+
+19、NIO实现网络通信的工作模式图
+![工作模式图](https://static001.geekbang.org/resource/image/ad/a2/ad3b4a49f4c1bff67124563abc50a0a2.png)
+
+
+20、NIO能解决什么问题？
+> 1. 服务端多线程并发处理任务，即使使用线程池，高并发处理依然会因为上下文切换，导致性能问题。
+> 1. NIO是利用单线程轮询事件的机制，高效的去选择来请求连接的Channel仅提供服务。
+
+21、为什么需要多路复用？
+
+22、NIO多路复用的局限性
+> 1. 当有IO请求在数据拷贝阶段。
+> 1. 由于资源类型过于庞大，会导致线程长期阻塞
+> 1. 造成性能瓶颈
+
+
+22、NIO 提供的高性能数据操作方式是基于什么原理，如何使用？
+
+23、从开发者的角度来看，NIO 自身实现存在哪些问题？有什么改进的想法吗？
+
+24、NIO的请求接收和处理都是在一个线程处理，如果有多个请求的处理顺序是什么？
+> 1. 多个请求会按照顺序处理
+> 1. 如果一个处理具有耗时操作，会阻塞后续操作。
+> 1.
+
+25、NIO是否应该在服务端开启多线程进行处理？
+> 1. 我觉得是可以的
+
+25、NIO遇到大量耗时操作该怎么办？
+> 1. 如果有大量耗时操作，那么整个`NIO模型`就不适用于这种场景。？？感觉可以开多线程。
+> 1. 过多的耗时操作，可以采用传统的IO方式。
+
+26、selector在单线程下的处理监听任务会成为性能瓶颈？
+> 1. 是的。单线程中需要依次处理监听。会导致性能问题。
+> 1. 在并发数数万、数十万的情况下，会导致性能问题。
+> 1. Doug Lea推荐使用多个`selector`，在多个线程中并发监听Socket事件
+
+## NIO2
+1、NIO2
+> 1. Java 7引入了NIO 2
+> 1. 提供了一种额外的异步IO模式
+> 1. 利用事件和回调，处理`Accept、Read`等操作。
 
 3、NIO 2 也不仅仅是异步
 
+2、Future
+
+3、CompletionHandler
+
+4、Reactor和Proactor模式需要和Netty主题一起
+
+5、NIO和NIO2的类似处
+> 1. AsynchronousServerSocketChannel对应ServerSocketChannel
+> 1. AsynchronousSocketChannel对应SocketChannel
+
+6、NIO2的局限性
+
+### AsynchronousServerSocketChannel
+
+1、AsynchronousServerSocketChannel
+```
+// 1、创建AsynchronousServerSocketChannel
+AsynchronousServerSocketChannel serverSocketChannel = AsynchronousServerSocketChannel.open()){
+// 2、绑定IP和端口
+serverSocketChannel.bind(new InetSocketAddress(InetAddress.getLocalHost(), 8888));
+
+// 3、为异步操作，指定CompletionHandler回调。
+serverSocketChannel.accept(serverSocketChannel, new CompletionHandler<AsynchronousSocketChannel, AsynchronousServerSocketChannel>() {
+        @Override
+        public void completed(AsynchronousSocketChannel result, AsynchronousServerSocketChannel attachment) {
+               serverSocketChannel.accept(serverSocketChannel, this);
+            handleRequest(result);
+        }
+
+        @Override
+        public void failed(Throwable exc, AsynchronousServerSocketChannel attachment) {
+
+        }});
+```
+
+## 知识扩展
+
+1、开启一个线程需要多少内存消耗？(32位和64位)
 
 ## 问题汇总
 
 ## 参考资料
 1. [极客时间-第11讲 | Java提供了哪些IO方式？ NIO如何实现多路复用？](https://time.geekbang.org/column/article/8369)
 1. [Java NIO 英文博客详解](http://tutorials.jenkov.com/java-nio/nio-vs-io.html)
+1. [【Java.NIO】Selector，及SelectionKey](https://blog.csdn.net/robinjwong/article/details/41792623)
+1. [图解ByteBuffer](https://my.oschina.net/flashsword/blog/159613)
