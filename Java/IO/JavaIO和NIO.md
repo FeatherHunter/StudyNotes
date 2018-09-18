@@ -5,7 +5,7 @@
 
 # Java IO和NIO
 
-版本号：2018/9/18-1(20:00)
+版本号：2018/9/19-1(8:00)
 
 ---
 
@@ -62,6 +62,8 @@
 > 1. 引入了异步非阻塞 IO 方式，也
 > 1. 异步 IO 操作基于事件和回调机制---应用操作直接返回，而不会阻塞，当后台处理完成后，操作系统会通知相应线程进行后续工作。
 
+
+10、带缓冲区的io和nio哪个性能更好?
 
 ### 同步和异步
 
@@ -349,6 +351,19 @@ if(fileFolder.isDirectory() == false)
 > 1. 例如，DMA（Direct Memory Access）等。
 > 1. 不同层次的抽象是相互关联的，Socket和Channel之间能相互获取。
 
+3、如何在channel读取时，将不同片段写入到对应的Buffer中(类似二进制消息拆分为消息头、消息体)？可以采用NIO的什么机制？
+> 1. 可以采用NIO分散-scatter机制来写入不同Buffer。
+> 1. 但是需要请求头的长度固定：
+```java
+// 消息头
+ByteBuffer header = ByteBuffer.allocate(128);
+// 消息体
+ByteBuffer body = ByteBuffer.allocate(1024);
+
+// 从channel中读取不同片段
+ByteBuffer[] bufferArray = {header, body}; channel.read(bufferArray);
+```
+
 ### Buffer
 
 4、Buffer的作用？
@@ -497,12 +512,18 @@ public static LongBuffer allocate(int capacity) {
 > 1. 内部就是对应的数组；byte数组、int数组、long数组等等，
 > 1. position、limit、mark、capacity的赋值，都是在基类Buffer的构造方法中执行。
 
+21、使用堆内Buffer操作相关的api，jdk会额外进行Direct Buffer缓存
+> 1. 使用堆内Buffer操作相关的api, jdk会将其复制为Direct buffer，并且在线程内部进行缓存。
+> 1. 早期jdk对Direct Buffer的缓存大小没有限制，但是容易出现OOM，后续jdk进行了限制。
+> 1. 因此建议：尽量不要使用堆内的ByteBuffer操作Channel类api。
+
 ##### MappedByteBuffer
 
 21、DirectByteBuffer是什么?
 > 1. 继承自抽象类`MappedByteBuffer`
 > 1. 实现了`DirectBuffer`接口
 > 1. Direct-堆外相关的类都无法在JDK之外去引用
+> 1. 底层利用了unsafe_allocatememory
 
 22、MappedByteBuffer的内部原理
 > 1. 将文件按照指定大小，直接映射为`内存区域`
@@ -552,8 +573,12 @@ public interface DirectBuffer {
 26、DirectBuffer的性能优势？为什么会有性能优势？
 > 1. 实际使用中，Java会尽量对Direct Buffer只做`本地IO操作`
 > 1. 对于很多大数据量的`IO密集操作`，性能会比较高
-> 1. Direct Buffer 生命周期内内存地址都不会再发生改变，因此内核可以安全的进行访问，`IO操作会很高效`。
+> 1. Direct Buffer 生命周期内内存地址都不会再发生改变，因此内核可以安全的进行访问，`IO操作会很高效`。(本质就是寻址简单，跟锁没关系)
 > 1. 减少了Heap堆内对象存储时的维护工作，`访问效率会提高`。
+
+27、为什么Direct Buffer 生命周期内内存地址都不会再发生改变，因此IO操作会很高效?是否是因为没有锁竞争?
+> 1. 本质就是寻址简单
+> 1. 跟锁完全没有关系
 
 27、DirectBuffer的性能缺点？什么场景下才适合使用DirectBuffer?
 > 1. `DirectBuffer`在创建和销毁中，相比`Heap Buffer`会有额外的开销
@@ -564,6 +589,68 @@ public interface DirectBuffer {
 > 短期使用、数据量较少时还是`堆内Heap Buffer`更好一些。
 
 ##### 垃圾回收
+
+29、Direct Buffer对内存和JVM参数的影响
+> 1. 不在堆上，Xmx之类的参数，不能影响Direct Buffer等堆外成员所使用的内存额度
+> 1. 堆外Buffer设置内存额度的JVM参数: -xx:MaxDirectMemorySize=512M
+> 1. 计算Java可以使用的内存大小，除了需要考虑堆内，还需要考虑DirectBuffer等堆外元素
+
+30、Direct Buffer什么时候会被垃圾回收?
+> 1. 实际无法预测
+> 1. 依赖于cleanner
+> 1. 一般是延迟到`full GC`时期，快满时会被`System.gc()`触发ref处理。
+
+30、Java可使用的内存大小只和堆有关？
+> 错误！
+> 1. 不仅需要考虑Heap
+> 1. 还需要考虑堆外元素
+
+31、如果出现内存不足，可能有哪些原因？
+> 1. 需要考虑堆外内存占用
+
+32、垃圾回收是否会回收Direct Buffer?Direct Buffer是如何回收的?
+> 1. 绝大部分GC都不会主动收集Direct Buffer
+> 1. Direct Buffer的垃圾回收是基于`Cleaner`机制和`PhantomReference-虚引用、幻想引用`
+> 1. Direct Buffer本身不是public类型，内部具有一个`Deallocator`负责销毁逻辑
+> 1. 其销毁主要是在`full GC`的时候，使用不当会`OOM`
+
+33、Direct Buffer垃圾回收上的注意点
+> 1. 应用程序中，要显式地调用`System.gc()`来强制触发GC
+> 1. 在大量使用Direct Buffer的时候，主动去调用释放方法。(可以参考Netty框架，实现在PlatformDependent中)
+> 1. 重复使用Direct Buffer
+
+34、Direct Memory一定不会引起Full GC, 只有在Full GC和调用System.gc()时才会去回收?
+> 1. 不是，还是利用`sun.misc.Cleaner`
+> 1. 但是具体实现有瑕疵，进场需要依赖`System.gc()`
+> 1. 后续的jdk版本有改进
+
+34、如何跟踪和诊断Direct Buffer的内存占用?
+> 1. 通常的垃圾回收日志不会包含Direct Buffer的信息
+> 1. JDK8之后，可以使用`Native Memory Tracking(NMT)`特性进行诊断
+> 1. NMT的参数: `-XX:NativeMemoryTracking=(summary | detail)`
+> 1. 激活NMT通常会导致`JVM`出现`5%~10%`的性能下降
+
+35、NMT可以在运行时采用命令进行交互式对比
+> 1-打印NMT信息
+```
+// 打印NMT信息
+jcmd <pid> VM.native_memory detail
+```
+> 2-进行baseline，并且对比分配内存变化
+```
+// 进行baseline
+jcmd <pid> VM.native_memory baseline
+
+// 对比分配内存变化
+jcmd <pid> VM.native_memory detail.diff
+```
+> 3-输出结果的Internal部分会包含Direct Buffer内存使用情况
+```
+-Internal (reserved=679KB +4KB, committed=679KB +4KB)
+          (malloc=615KB +4KB #1571 +4)
+          (mmap: reserved=64KB, committed=64KB)
+```
+> 4-底层利用了unsafe_allocatememory, 但是本质并不是JVM内部使用的内存，在JDK11之后，将其分类在other部分
 
 ### Selector
 
@@ -954,6 +1041,10 @@ public class Main {
 ![NIO transferTo](https://static001.geekbang.org/resource/image/b0/ea/b0c8226992bb97adda5ad84fe25372ea.png)
 
 
+9、为什么copy要设计成需要进行上下文切换的方式？为什么不和nio的transfer一样设计为不需要用户态切换的开销？
+> 1. 大部分工作需要用户态。为什么？
+> 1. transfer是特定场景而不是通用长焦
+
 ### BIO
 
 9、利用javaio的InputStream和OutputStream进行文件拷贝
@@ -1032,6 +1123,10 @@ File dst = new File("D:\\dst.txt");
 // nio拷贝
 copyFileByChannel(src, dst);
 ```
+
+
+11、Nio的transferTo一定会快于BIO吗?
+> 1. 需要看实际场景，比如普通的笔记本电脑。?
 
 ### Files.copy
 
@@ -1154,10 +1249,23 @@ public static long copy(Path source, OutputStream out) throws IOException {
     }
 }
 ```
-10、JDK10中Files.copy()实现的轻微改变:InoutStream.transferTo
+10、JDK10中Files.copy()实现的轻微改变:InputStream.transferTo
 > 1. copy(Path, Path, CopyOption...)内部机制没有变化
-> 1. 剩余copy()方法，将输入流、输出流的读写封装到了方法中：`InputStream.transferTo()`，也就是用户态的读写
-
+> 1. 剩余copy()方法，将输入流、输出流的读写封装到了方法中：`InputStream.transferTo()`，也就是处于用户态的读写
+```java
+public long transferTo(OutputStream out) throws IOException {
+        Objects.requireNonNull(out, "out");
+        long transferred = 0;
+        byte[] buffer = new byte[DEFAULT_BUFFER_SIZE];
+        int read;
+        //IO读写操作
+        while ((read = this.read(buffer, 0, DEFAULT_BUFFER_SIZE)) >= 0) {
+            out.write(buffer, 0, read);
+            transferred += read;
+        }
+        return transferred;
+}
+```
 
 ### 拷贝性能
 
@@ -1177,6 +1285,7 @@ public static long copy(Path source, OutputStream out) throws IOException {
 
 ## 参考资料
 1. [极客时间-第11讲 | Java提供了哪些IO方式？ NIO如何实现多路复用？](https://time.geekbang.org/column/article/8369)
+2. [极客时间-第12讲 | Java有几种文件拷贝方式？哪一种最高效？](https://time.geekbang.org/column/article/8393)
 1. [Java NIO 英文博客详解](http://tutorials.jenkov.com/java-nio/nio-vs-io.html)
 1. [【Java.NIO】Selector，及SelectionKey](https://blog.csdn.net/robinjwong/article/details/41792623)
 1. [图解ByteBuffer](https://my.oschina.net/flashsword/blog/159613)
