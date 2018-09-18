@@ -1,3 +1,4 @@
+
 Android之多线程，包括线程、Java同步问题、阻塞队列、线程池、AsyncTask、HandlerThread、IntentService等内容。
 
 >本文是我一点点归纳总结的干货，但是难免有疏忽和遗漏，希望不吝赐教。
@@ -7,10 +8,11 @@ Android之多线程，包括线程、Java同步问题、阻塞队列、线程池
 
 # Android多线程(88题)
 
-2018/9/9(10:10)
+版本号: 2018/9/18(10:10)
 
-[TOC]
+---
 
+[toc]
 ## 问题汇总
 
 ---
@@ -703,3 +705,9 @@ thread3.start();
 1. [volatile有什么用？如何解决的DLC问题？](https://blog.csdn.net/hxpjava1/article/details/55188908)
 1. [Java并发编程深入理解-Synchronized和volatile原理](https://www.cnblogs.com/paddix/p/5367116.html)
 2. [深入理解Synchronized](https://blog.csdn.net/shandian000/article/details/54927876/)
+
+### 面试题
+1. [java多线程编程题之连续打印abc的几种解法](https://www.cnblogs.com/Huaran1chendu/p/7474010.html)
+1. [15个顶级多线程面试题及答案](https://www.cnblogs.com/huajiezh/p/5790942.html)
+1. [
+](https://www.cnblogs.com/Jansens520/p/8624708.html)

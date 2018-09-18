@@ -1,28 +1,13 @@
+
 转载请注明链接:https://blog.csdn.net/feather_wch/article/details/82594685
 
 # Base64编码和AES加密
 
-版本:2018/9/10-1(20:18)
+版本:2018/9/18-1(20:18)
 
 ---
 
-[TOC]
-
-## 问题汇总
-
-1. Base64是什么？
-1. Base64末尾采用=结束
-1. Base64每76个字符增加一个换行符
-1. 标准的Base64包含64个字符
-1. Url Safe的Base64编码
-1. Java中的Base64类所在包？
-1. Java标准版本的base64和Url安全版本的base64如何使用？
-1. Android中的Base64类所在包？
-1. Android中String如何进行编码和解码？
-1. Android中Base64和java的差异
-1. Android的Base64类具有哪些flag?
-1. 文件如何进行Base64编码和解码？
-1. AES是什么？
+@[toc]
 
 ---
 
@@ -95,7 +80,7 @@ byte[] decodeResult = Base64.decode(encodeResult, DEFAULT | NO_PADDING | NO_WRAP
 > 1. DEFAULT :  默认模式
 > 1. NO_PADDING :过滤结束符=
 > 1. NO_WRAP : 过滤换行符，和CRLF互斥。
-> 1. CRLF : 采用CRLF而不是LF作为换行符，也就是才用Window中的换行符，而不是unix中的换行符。
+> 1. CRLF : 采用CRLF而不是LF作为换行符，也就是采用Window中的换行符，而不是unix中的换行符。
 > 1. URL_SAFE: 将+,/换成-,_
 > 1. NO_CLOSE
 
@@ -287,6 +272,111 @@ byte[] encryptBytes = AesUtils.encryptByte(msg, "1234567890ABCDEF");
 // 解密
 AesUtils.decryptString(encryptBytes, "1234567890ABCDEF".getBytes());
 ```
+
+## 时间戳
+
+1、Android如何获取指定格式的时间戳(YYYYMMDDHH24MISS)?
+```java
+// 时间戳
+String timeStamp = new SimpleDateFormat("yyyyMMddHHmmss")
+        .format(new Date(System.currentTimeMillis()));
+```
+
+
+## 随机字符串
+
+1、java中如何生成随机字符串
+```java
+import java.util.Random;
+/**=========================
+ * @function: 字符工具
+ *  1. 生成随机的字符串
+ * @author 6005001819
+ * @date 20180918
+ *=========================*/
+public class CharacterUtils {
+
+    /**
+     * @function 生成随机字符串
+     *     从62个字符中随机选取一个字符
+     * @param length 字符串的长度
+     * @return 随机字符串
+     */
+    public static String getRandomString(int length){
+        //定义一个字符串（A-Z，a-z，0-9）即62位；
+        String str="zxcvbnmlkjhgfdsaqwertyuiopQWERTYUIOPASDFGHJKLZXCVBNM1234567890";
+        //由Random生成随机数
+        Random random=new Random();
+        StringBuffer sb=new StringBuffer();
+        //长度为几就循环几次
+        for(int i=0; i<length; ++i){
+            //产生0-61的数字
+            int number=random.nextInt(62);
+            //将产生的数字通过length次承载到sb中
+            sb.append(str.charAt(number));
+        }
+        //将承载的字符转换成字符串
+        return sb.toString();
+    }
+
+    /**
+     * @function 生成随机字符串(两次random，性能低)
+     *     随机产生1~3的int数，对应于a-z，A-Z，0-9三种可能
+     *     然后再产生随机数，从对应范围中取出字符
+     * @param length 字符串的长度
+     * @return 随机字符串
+     */
+    public static String getRandomString2(int length){
+        //产生随机数
+        Random random=new Random();
+        StringBuffer sb=new StringBuffer();
+        //循环length次
+        for(int i=0; i<length; i++){
+            //产生0-2个随机数，既与a-z，A-Z，0-9三种可能
+            int number=random.nextInt(3);
+            long result=0;
+            switch(number){
+                //如果number产生的是数字0；
+                case 0:
+                    //产生A-Z的ASCII码
+                    result=Math.round(Math.random()*25+65);
+                    //将ASCII码转换成字符
+                    sb.append(String.valueOf((char)result));
+                    break;
+                case 1:
+                    //产生a-z的ASCII码
+                    result=Math.round(Math.random()*25+97);
+                    sb.append(String.valueOf((char)result));
+                    break;
+                case 2:
+                    //产生0-9的数字
+                    sb.append(String.valueOf
+                            (new Random().nextInt(10)));
+                    break;
+            }
+        }
+        return sb.toString();
+    }
+}
+```
+
+## 问题汇总
+
+1. Base64是什么？
+1. Base64末尾采用=结束
+1. Base64每76个字符增加一个换行符
+1. 标准的Base64包含64个字符
+1. Url Safe的Base64编码
+1. Java中的Base64类所在包？
+1. Java标准版本的base64和Url安全版本的base64如何使用？
+1. Android中的Base64类所在包？
+1. Android中String如何进行编码和解码？
+1. Android中Base64和java的差异
+1. Android的Base64类具有哪些flag?
+1. 文件如何进行Base64编码和解码？
+1. AES是什么？
+1. Android如何获取指定格式的时间戳(YYYYMMDDHH24MISS)?
+1. java中如何生成随机字符串?
 
 ## 参考资料
 1. [Base64编码算法](https://www.cnblogs.com/whoislcj/p/5887859.html)
