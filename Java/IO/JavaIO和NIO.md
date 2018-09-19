@@ -1,24 +1,23 @@
 
+
+
 转载请注明链接：https://blog.csdn.net/feather_wch/article/details/82665902
 
 > Java提供了哪些IO方式？ NIO如何实现多路复用？
 
 # Java IO和NIO
 
-版本号：2018/9/19-1(8:00)
+版本号：2018/9/19-1(14:00)
 
 ---
 
 ![IO 和  NIO](https://static001.geekbang.org/resource/image/68/54/689506651da549777f11cfb98f1c5a54.jpg)
 
-[toc]
-
----
-
-## 基本概念(12)
+@[toc]
+## 基本概念(15)
 
 1、Java IO方式有哪些?
-> 1. 传统java.io包：文件的抽象、输入流输出流
+> 1. 传统java.io包：对文件进行了抽象、通过输入流输出流进行IO
 > 1. java.net包: 网络通信同样是IO行为
 > 1. java.nio包：Java1.4中引入了NIO框架
 > 1. java7的NIO2：引入了异步非阻塞IO方式
@@ -62,12 +61,29 @@
 > 1. 引入了异步非阻塞 IO 方式，也
 > 1. 异步 IO 操作基于事件和回调机制---应用操作直接返回，而不会阻塞，当后台处理完成后，操作系统会通知相应线程进行后续工作。
 
+10、nio和io相比性能优势在于哪里?(@Deprecated的说法)
+> 1. IO面向流，从Stream中逐步读取数据，并且没有缓冲区。
+> 1. NIO面向面向缓冲区，数据整体操作更加高效。
+> 1. IO是阻塞的，当前线程在没有数据可读时会出现阻塞。
+> 1. NIO是非阻塞的，通过Selector选择器选择合适的Channel进行数据操作。当一个Channel没有数据时，会切换到有效的Channel处理其他io，更搞笑。
 
-10、带缓冲区的io和nio哪个性能更好?
+11、NIO的性能就一定比IO高?如果是带缓冲的IO和NIO相比呢?
+> 1. 传统的IO理论上是没有NIO快的: 用IO进行一个字节一个字节的读取。
+> 1. 但是如果合理使用，如带缓冲区的IO(BufferedInputStream、BufferedReader)时会很快。
+> 1. 此外根据测试在进行文件拷贝等IO操作时，会发现`NIO`并没有比`IO`更快，甚至在个别场景还会出现`NIO`更慢的情况
+> 1. IBM官方指明：JDK1.4时已经将`java.io`以`nio`为基础重新进行了实现，可以利用一些NIO的特性。因此处理方面的性能并不比NIO差。
+
+12、NIO的真正优势并不是体现在速度上?
+> 1. 随着JDK1.4对IO进行了重构。NIO在速度上的优势并不存在了。
+> 1. NIO真正优势体现在:
+>       1. 分散和聚集: 利用`Scatter/Gather`委托操作系统完成数据分散和聚集的工作
+>       1. 文件锁定功能:
+>       1. 网络异步IO: 非阻塞IO、IO多路复用(解决服务端多线程时的线程占用问题)
+
 
 ### 同步和异步
 
-10、同步和异步的区别？
+13、同步和异步的区别？
 > 1. 同步-synchronous
 > 1. 异步-asynchronous
 > 1. 同步是一种可靠的有序运行机制，同步操作时，后续的任务会等待当前调用的返回。
@@ -75,13 +91,13 @@
 
 ### 阻塞和非阻塞
 
-11、阻塞和非阻塞的区别?
+14、阻塞和非阻塞的区别?
 > 1. 阻塞-blocking
 > 1. 非阻塞-non-blocking
 > 1. 阻塞操作时，当前线程会处于阻塞状态，无法进行其他任务，只有当满足一定条件时，才继续执行
 > 1. 非阻塞状态，不会去等待IO操作结束，会立即返回。相应操作会在后台处理
 
-12、阻塞和同步就是低效的操作？
+15、阻塞和同步就是低效的操作？
 > 错误！
 > 需要根据应用的实际场景。有些时候必须要进行阻塞和同步。
 
@@ -329,7 +345,7 @@ if(fileFolder.isDirectory() == false)
 > 1. print()参数为(String)null，会打印出null
 > 1. write()参数为null，会有空指针异常。
 
-## NIO(29)
+## NIO(62)
 
 1、NIO的主要组成部分
 > 1. Buffer
@@ -350,19 +366,6 @@ if(fileFolder.isDirectory() == false)
 > 1. 使得 NIO 得以充分利用现代操作系统底层机制，获得特定场景的性能优化，
 > 1. 例如，DMA（Direct Memory Access）等。
 > 1. 不同层次的抽象是相互关联的，Socket和Channel之间能相互获取。
-
-3、如何在channel读取时，将不同片段写入到对应的Buffer中(类似二进制消息拆分为消息头、消息体)？可以采用NIO的什么机制？
-> 1. 可以采用NIO分散-scatter机制来写入不同Buffer。
-> 1. 但是需要请求头的长度固定：
-```java
-// 消息头
-ByteBuffer header = ByteBuffer.allocate(128);
-// 消息体
-ByteBuffer body = ByteBuffer.allocate(1024);
-
-// 从channel中读取不同片段
-ByteBuffer[] bufferArray = {header, body}; channel.read(bufferArray);
-```
 
 ### Buffer
 
@@ -519,19 +522,28 @@ public static LongBuffer allocate(int capacity) {
 
 ##### MappedByteBuffer
 
-21、DirectByteBuffer是什么?
+22、DirectByteBuffer是什么?
 > 1. 继承自抽象类`MappedByteBuffer`
 > 1. 实现了`DirectBuffer`接口
 > 1. Direct-堆外相关的类都无法在JDK之外去引用
 > 1. 底层利用了unsafe_allocatememory
 
-22、MappedByteBuffer的内部原理
+23、MappedByteBuffer的内部原理
 > 1. 将文件按照指定大小，直接映射为`内存区域`
 > 1. 程序访问该内存区域时，可以直接操作文件的数据。
-> 1. 从而省去了将数据从`内核空间`向`用户空间`传输的损耗
+> 1. 直接将数据拷贝到了用户空间, 从而省去了将数据从`内核空间`向`用户空间`传输的损耗。
 > 1. 本质上就是一种`Direct Buffer`
 
-23、MappedByteBuffer的创建
+24、MappedByteBuffer会影响NIO性能?
+> 1. 错误观点:  NIO如果使用不当，速度会比传统IO慢几十倍。比如用`MappedByteBuffer`将文件映射到内存时。
+> 1. 因为本质是节省了上下文切换的性能开销，性能应该更好。
+
+25、内存映射的效率比系统调用`read、write`还要高?
+> 1. read、write作为系统调用，将数据拷贝到内存中，需要经过两次拷贝：磁盘文件到内核缓存区，内核缓存区到用户空间缓存区。
+> 1. 内存映射，直接将文件数据从硬盘拷贝到了`用户空间`，只有一次数据拷贝。
+> 1. NIO中直接内存映射到Buffer相当于直接在内存中存取数据，不需要经过内核态的缓冲区，性能更高。
+
+26、MappedByteBuffer的创建
 > 1-实例
 ```java
 // 只读、文件的起始位置10、map的size为30-最大位置是40
@@ -555,10 +567,10 @@ public static final MapMode READ_WRITE;
 public static final MapMode PRIVATE;
 ```
 
-24、copy-on-write是什么意思?(COW)
+27、copy-on-write是什么意思?(COW)
 > 1. 写时拷贝技术-COW
 
-25、DirectBuffer接口有什么用?
+28、DirectBuffer接口有什么用?
 > 1-内部定义了三个方法
 ```java
 public interface DirectBuffer {
@@ -570,67 +582,67 @@ public interface DirectBuffer {
 
 ##### 性能开销
 
-26、DirectBuffer的性能优势？为什么会有性能优势？
+29、DirectBuffer的性能优势？为什么会有性能优势？
 > 1. 实际使用中，Java会尽量对Direct Buffer只做`本地IO操作`
 > 1. 对于很多大数据量的`IO密集操作`，性能会比较高
 > 1. Direct Buffer 生命周期内内存地址都不会再发生改变，因此内核可以安全的进行访问，`IO操作会很高效`。(本质就是寻址简单，跟锁没关系)
 > 1. 减少了Heap堆内对象存储时的维护工作，`访问效率会提高`。
 
-27、为什么Direct Buffer 生命周期内内存地址都不会再发生改变，因此IO操作会很高效?是否是因为没有锁竞争?
+30、为什么Direct Buffer 生命周期内内存地址都不会再发生改变，因此IO操作会很高效?是否是因为没有锁竞争?
 > 1. 本质就是寻址简单
 > 1. 跟锁完全没有关系
 
-27、DirectBuffer的性能缺点？什么场景下才适合使用DirectBuffer?
+31、DirectBuffer的性能缺点？什么场景下才适合使用DirectBuffer?
 > 1. `DirectBuffer`在创建和销毁中，相比`Heap Buffer`会有额外的开销
 > 1. 适合长期使用、数据较大的场景。
 
-28、Direct Buffer(堆外)比Heap Buffer更高效，所以应该尽可能都用Direct Buffer?
+32、Direct Buffer(堆外)比Heap Buffer更高效，所以应该尽可能都用Direct Buffer?
 > 错误！
 > 短期使用、数据量较少时还是`堆内Heap Buffer`更好一些。
 
 ##### 垃圾回收
 
-29、Direct Buffer对内存和JVM参数的影响
+33、Direct Buffer对内存和JVM参数的影响
 > 1. 不在堆上，Xmx之类的参数，不能影响Direct Buffer等堆外成员所使用的内存额度
 > 1. 堆外Buffer设置内存额度的JVM参数: -xx:MaxDirectMemorySize=512M
 > 1. 计算Java可以使用的内存大小，除了需要考虑堆内，还需要考虑DirectBuffer等堆外元素
 
-30、Direct Buffer什么时候会被垃圾回收?
+34、Direct Buffer什么时候会被垃圾回收?
 > 1. 实际无法预测
 > 1. 依赖于cleanner
 > 1. 一般是延迟到`full GC`时期，快满时会被`System.gc()`触发ref处理。
 
-30、Java可使用的内存大小只和堆有关？
+35、Java可使用的内存大小只和堆有关？
 > 错误！
 > 1. 不仅需要考虑Heap
 > 1. 还需要考虑堆外元素
 
-31、如果出现内存不足，可能有哪些原因？
+36、如果出现内存不足，可能有哪些原因？
 > 1. 需要考虑堆外内存占用
 
-32、垃圾回收是否会回收Direct Buffer?Direct Buffer是如何回收的?
+37、垃圾回收是否会回收Direct Buffer?Direct Buffer是如何回收的?
 > 1. 绝大部分GC都不会主动收集Direct Buffer
 > 1. Direct Buffer的垃圾回收是基于`Cleaner`机制和`PhantomReference-虚引用、幻想引用`
 > 1. Direct Buffer本身不是public类型，内部具有一个`Deallocator`负责销毁逻辑
 > 1. 其销毁主要是在`full GC`的时候，使用不当会`OOM`
 
-33、Direct Buffer垃圾回收上的注意点
+38、Direct Buffer垃圾回收上的注意点
 > 1. 应用程序中，要显式地调用`System.gc()`来强制触发GC
 > 1. 在大量使用Direct Buffer的时候，主动去调用释放方法。(可以参考Netty框架，实现在PlatformDependent中)
 > 1. 重复使用Direct Buffer
 
-34、Direct Memory一定不会引起Full GC, 只有在Full GC和调用System.gc()时才会去回收?
+39、Direct Memory一定不会引起Full GC, 只有在Full GC和调用System.gc()时才会去回收?
 > 1. 不是，还是利用`sun.misc.Cleaner`
 > 1. 但是具体实现有瑕疵，进场需要依赖`System.gc()`
 > 1. 后续的jdk版本有改进
 
-34、如何跟踪和诊断Direct Buffer的内存占用?
+40、如何跟踪和诊断Direct Buffer的内存占用?
 > 1. 通常的垃圾回收日志不会包含Direct Buffer的信息
 > 1. JDK8之后，可以使用`Native Memory Tracking(NMT)`特性进行诊断
 > 1. NMT的参数: `-XX:NativeMemoryTracking=(summary | detail)`
 > 1. 激活NMT通常会导致`JVM`出现`5%~10%`的性能下降
 
-35、NMT可以在运行时采用命令进行交互式对比
+41、NMT可以在运行时采用命令进行交互式对比
 > 1-打印NMT信息
 ```
 // 打印NMT信息
@@ -654,24 +666,24 @@ jcmd <pid> VM.native_memory detail.diff
 
 ### Selector
 
-9、Selector的作用
+42、Selector的作用
 > 1. 是 NIO 实现多路复用的基础，
 > 1. 它提供了一种高效的机制，可以检测到注册在Selector 上的多个 Channel 中，是否有 Channel 处于就绪状态，进而实现了单线程对多Channel 的高效管理。
 > 1. Selector也是基于底层操作系统机制的，不同模式、不同版本都存在区别。
 > 1. Linux 上依赖于epoll
 > 1. Windows 上 NIO2（AIO）模式则是依赖于iocp
 
-10、Linux中的epoll是什么?
+43、Linux中的epoll是什么?
 
-11、Windows中的iocp是什么?
+44、Windows中的iocp是什么?
 
 #### SelectionKey
 
-12、SelectionKey是什么？
+45、SelectionKey是什么？
 > 1. 表示`SelectableChannel`在Selector中注册的句柄/标记
 > 1. `serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);`会返回注册事件的句柄。
 
-13、一个Selector对象包含三种类型的SelectionKey集合
+46、一个Selector对象包含三种类型的SelectionKey集合
 ||||
 |---|---|---|
 |all-keys|当前所有向Selector注册的Channel的句柄(SelectionKey)的集合|           selector.keys()|
@@ -679,18 +691,18 @@ jcmd <pid> VM.native_memory detail.diff
 |cancelled-keys|已经被取消的SelectionKey的集合|          无API|
 
 
-14、SelectionKey何时被新建？何时会被加入到Selector的all-keys集合中？
+47、SelectionKey何时被新建？何时会被加入到Selector的all-keys集合中？
 > 1. Channel注册到Selector中时, 会新建一个SelectionKey，然后加入到all-keys集合中。
 > 1. serverSocketChannel.register(selector, xxx)
 
-15、SelectionKey对象何时会被遗弃(加入到cancelled-keys集合中)？
+48、SelectionKey对象何时会被遗弃(加入到cancelled-keys集合中)？
 > 1. SelectionKey相关的Channel被关闭
 > 1. 调用了`SelectionKey.cancel()`方法
 
 ### CharSet
 
 
-16、Chartset的作用
+49、Chartset的作用
 > 1. 提供 Unicode 字符串定义，
 > 1. NIO 也提供了相应的编解码器等，
 > 1. 例如，通过下面的方式将字符串转换到 ByteBuffer：
@@ -698,7 +710,7 @@ jcmd <pid> VM.native_memory detail.diff
 Charset.defaultCharset().encode("Hello world!"));
 ```
 
-17、ByteBuffer转换为String
+50、ByteBuffer转换为String
 ```java
 Charset charset = Charset.defaultCharset();
 // asReadOnlyBuffer将Buffer复制一份出来。
@@ -709,42 +721,59 @@ String string = charBuffer.toString();
 
 ### 多路复用
 
-18、为什么需要多路复用？
+51、为什么需要多路复用？
+> 1. 传统IO是一个线程处理一个链接
+> 1. 采用多路复用可以一个线程处理多个链接
 
-19、NIO多路复用的局限性
+52、NIO多路复用的局限性
 > 1. 当有IO请求在数据拷贝阶段。
 > 1. 由于资源类型过于庞大，会导致线程长期阻塞
 > 1. 造成性能瓶颈
 
+### Scatter/Gather
 
-20、NIO 提供的高性能数据操作方式是基于什么原理，如何使用？
+53、NIO的Scatter/Gather机制是什么?
+> 1. 作为一个强大的工具，将数据的分散和聚集的任务委托给操作系统来完成。
+> 1. Scatter: 将读取到的数据分开放置到多个存储桶中(Bucket)
+> 1. Gather: 将不同的数据区块合并成一个整体
 
-21、从开发者的角度来看，NIO 自身实现存在哪些问题？有什么改进的想法吗？
 
+54、如何在channel读取时，将不同片段写入到对应的Buffer中(类似二进制消息拆分为消息头、消息体)？可以采用NIO的什么机制？
+> 1. 可以采用NIO分散-scatter机制来写入不同Buffer。
+> 1. 但是需要请求头的长度固定：
+```java
+// 消息头
+ByteBuffer header = ByteBuffer.allocate(128);
+// 消息体
+ByteBuffer body = ByteBuffer.allocate(1024);
+
+// 从channel中读取不同片段
+ByteBuffer[] bufferArray = {header, body}; channel.read(bufferArray);
+```
 
 ### NIO2
-22、NIO2
+55、NIO2
 > 1. Java 7引入了NIO 2
 > 1. 提供了一种额外的异步IO模式
 > 1. 利用事件和回调，处理`Accept、Read`等操作。
 
-23、NIO 2 也不仅仅是异步
+56、NIO 2 也不仅仅是异步
 
-24、Future
+57、Future
 
-25、CompletionHandler
+58、CompletionHandler
 
-26、Reactor和Proactor模式需要和Netty主题一起
+59、Reactor和Proactor模式需要和Netty主题一起
 
-27、NIO和NIO2的类似处
+60、NIO和NIO2的类似处
 > 1. AsynchronousServerSocketChannel对应ServerSocketChannel
 > 1. AsynchronousSocketChannel对应SocketChannel
 
-28、NIO2的局限性
+61、NIO2的局限性
 
 #### AsynchronousServerSocketChannel
 
-29、AsynchronousServerSocketChannel进行网络请求
+62、AsynchronousServerSocketChannel进行网络请求
 ```
 // 1、创建AsynchronousServerSocketChannel
 AsynchronousServerSocketChannel serverSocketChannel = AsynchronousServerSocketChannel.open()){
@@ -765,7 +794,7 @@ serverSocketChannel.accept(serverSocketChannel, new CompletionHandler<Asynchrono
         }});
 ```
 
-## 网络IO(12)
+## 网络IO(13)
 
 ### IO/BIO
 
@@ -968,37 +997,42 @@ public class Main {
 }
 ```
 
-6、NIO为什么比IO同步阻塞模式要更好？
+6、NIO在Socket编程上的优势
+> 1. 使用非阻塞的IO方式
+> 1. 支持IO多路复用
+> 1. 这些特性改变了传统网络编程中一个线程只能管理一个链接的情况，现在可以采用一个线程管理多个链接。
+
+7、NIO为什么比IO同步阻塞模式要更好？
 > 1. 同步阻塞模式需要多线程来处理多任务。
 > 1. NIO利用了单线程轮询事件的机制，高效定位就绪的Channel。
 > 1. 仅仅是`select`阶段是阻塞的，可以避免大量客户端连接时，频繁切换线程带来的问题。
 
-7、NIO实现网络通信的工作模式图
+8、NIO实现网络通信的工作模式图
 ![工作模式图](https://static001.geekbang.org/resource/image/ad/a2/ad3b4a49f4c1bff67124563abc50a0a2.png)
 
-8、NIO能解决什么问题？
+9、NIO能解决什么问题？
 > 1. 服务端多线程并发处理任务，即使使用线程池，高并发处理依然会因为上下文切换，导致性能问题。
 > 1. NIO是利用单线程轮询事件的机制，高效的去选择来请求连接的Channel仅提供服务。
 
-9、NIO的请求接收和处理都是在一个线程处理，如果有多个请求的处理顺序是什么？
+10、NIO的请求接收和处理都是在一个线程处理，如果有多个请求的处理顺序是什么？
 > 1. 多个请求会按照顺序处理
 > 1. 如果一个处理具有耗时操作，会阻塞后续操作。
 > 1.
 
-10、NIO是否应该在服务端开启多线程进行处理？
+11、NIO是否应该在服务端开启多线程进行处理？
 > 1. 我觉得是可以的
 
-11、NIO遇到大量耗时操作该怎么办？
+12、NIO遇到大量耗时操作该怎么办？
 > 1. 如果有大量耗时操作，那么整个`NIO模型`就不适用于这种场景。？？感觉可以开多线程。
 > 1. 过多的耗时操作，可以采用传统的IO方式。
 
-12、selector在单线程下的处理监听任务会成为性能瓶颈？
+13、selector在单线程下的处理监听任务会成为性能瓶颈？
 > 1. 是的。单线程中需要依次处理监听。会导致性能问题。
 > 1. 在并发数数万、数十万的情况下，会导致性能问题。
 > 1. Doug Lea推荐使用多个`selector`，在多个线程中并发监听Socket事件
 
 
-## 文件拷贝(19)
+## 文件拷贝(22)
 
 1、Java有几种文件拷贝方式？哪一种效率最高？
 > 1. java.io类库: 为源文件构建FileInputStream，为目标文件构建FileOutputStream，从input中读取，写入到output中
@@ -1047,7 +1081,7 @@ public class Main {
 
 ### BIO
 
-9、利用javaio的InputStream和OutputStream进行文件拷贝
+10、利用javaio的InputStream和OutputStream进行文件拷贝
 > 1-实现文件拷贝
 ```
     /**========================================
@@ -1081,7 +1115,7 @@ copyFileByIO(src, dst);
 
 ### NIO
 
-10、利用NIO实现文件的拷贝
+11、利用NIO实现文件的拷贝
 ```
 /**===================================
  * java.nio: 实现文件复制
@@ -1125,12 +1159,12 @@ copyFileByChannel(src, dst);
 ```
 
 
-11、Nio的transferTo一定会快于BIO吗?
+12、Nio的transferTo一定会快于BIO吗?
 > 1. 需要看实际场景，比如普通的笔记本电脑。?
 
 ### Files.copy
 
-11、利用Files.copy()进行文件拷贝
+13、利用Files.copy()进行文件拷贝
 ```java
 Path srcPath = Paths.get("D:\\src.txt");
 Path dstPath = Paths.get("D:\\dst.txt");
@@ -1142,7 +1176,7 @@ try {
 }
 ```
 
-12、Files.copy()有哪4种方法？
+14、Files.copy()有哪4种方法？
 > 1-文件间进行copy
 ```java
 public static Path copy(Path source, Path target, CopyOption... options);
@@ -1160,7 +1194,7 @@ public static long copy(Path source, OutputStream out);
 private static long copy(InputStream source, OutputStream sink);
 ```
 
-13、Path copy(Path, Path, CopyOption...)源码分析
+15、Path copy(Path, Path, CopyOption...)源码分析
 ```java
 public static Path copy(Path source, Path target, CopyOption... options)
 {
@@ -1179,7 +1213,7 @@ public static Path copy(Path source, Path target, CopyOption... options)
 > 1. 根据内部实现的说明，这只是简单的用户态空间拷贝。
 > 1. 因此这个`copy(path, path)`并不是利用`transferTo`，而是本地技术实现的`用户态拷贝`
 
-14、FileSystemProvider是什么？如何提供文件系统的？
+16、FileSystemProvider是什么？如何提供文件系统的？
 > 1. 文件系统的服务的提供者
 > 1. 是一个抽象类
 > 1. 内部通过`ServiceLoader机制`加载一系列`文件系统`，然后提供服务。
@@ -1196,11 +1230,11 @@ private static List<FileSystemProvider> loadInstalledProviders() {
 }
 ```
 
-15、平台特有的文件系统服务提供者: FileSystemProvider
+17、平台特有的文件系统服务提供者: FileSystemProvider
 ![系统相关的文件系统提供者](https://static001.geekbang.org/resource/image/5e/f7/5e0bf3130dffa8e56f398f0856eb76f7.png)
 
 
-16、copy(InputStream, OutputStream)源码分析
+18、copy(InputStream, OutputStream)源码分析
 > 1. 直接进行`inoputstream和outputstream`的read和write操作，本质和一般IO操作是一样的。
 > 1. 也就是用户态的读写
 ```java
@@ -1217,7 +1251,7 @@ private static long copy(InputStream source, OutputStream sink)
 }
 ```
 
-17、copy(InputStream, Path, CopyOption...)源码分析
+19、copy(InputStream, Path, CopyOption...)源码分析
 > 本质调用的copy(InputStream, OutputStream)方法
 ```
 public static long copy(InputStream in, Path target, CopyOption... options)
@@ -1237,7 +1271,7 @@ public static long copy(InputStream in, Path target, CopyOption... options)
 }
 ```
 
-18、copy(Path, OutputStream)源码分析
+20、copy(Path, OutputStream)源码分析
 > 本质调用的copy(InputStream, OutputStream)方法
 ```
 public static long copy(Path source, OutputStream out) throws IOException {
@@ -1249,7 +1283,9 @@ public static long copy(Path source, OutputStream out) throws IOException {
     }
 }
 ```
-10、JDK10中Files.copy()实现的轻微改变:InputStream.transferTo
+
+
+21、JDK10中Files.copy()实现的轻微改变:InputStream.transferTo
 > 1. copy(Path, Path, CopyOption...)内部机制没有变化
 > 1. 剩余copy()方法，将输入流、输出流的读写封装到了方法中：`InputStream.transferTo()`，也就是处于用户态的读写
 ```java
@@ -1269,7 +1305,7 @@ public long transferTo(OutputStream out) throws IOException {
 
 ### 拷贝性能
 
-19、如何提升类似拷贝等IO操作的性能？
+22、如何提升类似拷贝等IO操作的性能？
 > 1. 合理使用缓存等机制，合理减少IO次数
 > 1. 使用transferTo等机制，减少上下文切换和额外的IO操作
 > 1. 减少不必要的转换过程, 如：
@@ -1279,15 +1315,23 @@ public long transferTo(OutputStream out) throws IOException {
 
 ## 知识扩展
 
-1、开启一个线程需要多少内存消耗？(32位和64位)
+1、NIO 提供的高性能数据操作方式是基于什么原理，如何使用？
+
+2、从开发者的角度来看，NIO 自身实现存在哪些问题？有什么改进的想法吗？
+> 1. NIO的多路复用存在系能瓶颈
+
+3、开启一个线程需要多少内存消耗？(32位和64位)
+
 
 ## 问题汇总
 
 ## 参考资料
-1. [极客时间-第11讲 | Java提供了哪些IO方式？ NIO如何实现多路复用？](https://time.geekbang.org/column/article/8369)
-2. [极客时间-第12讲 | Java有几种文件拷贝方式？哪一种最高效？](https://time.geekbang.org/column/article/8393)
+1. [极客时间-Java提供了哪些IO方式？ NIO如何实现多路复用？](https://time.geekbang.org/column/article/8369)
+2. [极客时间-Java有几种文件拷贝方式？哪一种最高效？](https://time.geekbang.org/column/article/8393)
 1. [Java NIO 英文博客详解](http://tutorials.jenkov.com/java-nio/nio-vs-io.html)
 1. [【Java.NIO】Selector，及SelectionKey](https://blog.csdn.net/robinjwong/article/details/41792623)
 1. [图解ByteBuffer](https://my.oschina.net/flashsword/blog/159613)
 1. [Java NIO Files 操作文件](http://blog.sina.com.cn/s/blog_9f8ffdaf0102wpeo.html)
 1. [Java NIO系列教程（十 五）Java NIO Path](http://ifeve.com/java-nio-path-2/)
+1. [MappedByteBuffer以及ByteBufer的底层原理](http://www.cnblogs.com/xubenben/p/4424398.html)
+1. [NIO文件锁实现进程独占](https://blog.csdn.net/u010666119/article/details/53455734)
