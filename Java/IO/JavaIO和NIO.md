@@ -13,7 +13,8 @@
 
 ![IO 和  NIO](https://static001.geekbang.org/resource/image/68/54/689506651da549777f11cfb98f1c5a54.jpg)
 
-@[toc]
+[toc]
+
 ## 基本概念(15)
 
 1、Java IO方式有哪些?
