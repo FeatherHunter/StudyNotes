@@ -2,7 +2,7 @@
 
 # Activity的生命周期和启动模式
 
-版本:2018/8/30-1(15:15)
+版本:2018/9/23-1(23:23)
 
 ---
 
@@ -137,7 +137,7 @@ Note left of activity1: 直接执行onResume()
 > 5. 之后`handleLauchActivity`中执行`handleResumeActivity()`调用`onResume`方法
 > * 生命周期调用顺序：旧onPause->新onCreate->新onStart->新onResume->旧onStop
 
-## 异常生命周期(8)
+## 异常生命周期(14)
 
 1、Activity异常生命周期
 >是指`Activity`被系统回收或者由于当前设备的`Configuration(方向)`发生改变从而导致`Activity`被销毁重建
@@ -147,16 +147,28 @@ Note left of activity1: 直接执行onResume()
 |☆onSaveInstanceState(Bundle outState)|Activity被动销毁时调用，保存重要信息，用于恢复|
 |☆onRestoreInstanceState(Bundle savedInstanceState|重建时调用，会将Bundle传递到onCreate()中|
 > 1. 用户主动销毁Activity不会触发`onSaveInstanceState()`如finish()、按下回退键退出Activity
-> 1. 按下HOME键、按下电源键、启动其他Activity、横竖屏切换: 会触发onSaveInstanceState()
+> 1. 按下HOME键、按下电源键、启动其他Activity、横竖屏切换: 如果导致了Activity的重建，会触发onSaveInstanceState()
 
-2、资源相关的系统配置改变导致Activity的杀死并重建
+2、什么情况下可能会导致Activity的重建?
+> 1. 按下HOME键
+> 1. 按下电源键
+> 1. 启动其他Activity
+> 1. 横竖屏切换
+
+3、如果Activity被意外关闭，如何判断Activity是否被重建？
+> 1. 通过onRestoreInstanceState()和onCreate方法来判断。
+> 1. onRestoreInstanceStae()被调用，或者onCreate()的参数Bundle不为null。都表明Activity被重建
+> 1. 因为Activity被异常关闭后，那么系统会调用onSaveInstanceState保存当前Activity的状态。
+
+
+4、资源相关的系统配置改变导致Activity的杀死并重建
 >场景： Activity的横竖屏切换
 > 1. 系统配置改变后，`Activity`会被销毁，其`onPause`、`onStop`、`onDestory`均会被调用
 > 2. 系统会额外调用`onSaveInstanceState`来保存当前`Activity`的状态, 调用时机在`onPause`前后(onStop之前)
 > 3. `Activity`重新创建后，会调用`onRestoreInstanceState()`并且把`onSaveInstanceState`保存的`Bundle`对象作为参数同时传递给`onRestoreInstanceState()和onCreate()`, 其调用时机在`onStart`之后
 > 4. 系统会默认保存当前Activity的视图结构并且恢复一定数据。根据每个View的`onSaveInstanceState()`和`onRestoreInstanceState()`可以知道系统能自动恢复哪些数据。
 
-3、系统保存和恢复View层次结构的工作流程
+5、系统保存和恢复View层次结构的工作流程
 >1. `Activity`被意外终止时，会调用`onSaveInstanceState()`去保存数据
 > 2. `Activity`去委托`Window`保存数据
 > 3. `Window`再委托顶层容器去保存数据(ViewGroup：一般是DecorView)
@@ -164,7 +176,7 @@ Note left of activity1: 直接执行onResume()
 
 ### View的保存和恢复
 
-4、TextView的onSaveInstanceState()
+6、TextView的onSaveInstanceState()
 ```java
 @Override
 public Parcelable onSaveInstanceState() {
@@ -197,7 +209,7 @@ public Parcelable onSaveInstanceState() {
 }
 ```
 
-5、TextView的onRestoreInstanceState()
+7、TextView的onRestoreInstanceState()
 ```java
     @Override
     public void onRestoreInstanceState(Parcelable state) {
@@ -229,7 +241,7 @@ public Parcelable onSaveInstanceState() {
 
 ### Activity的保存和恢复
 
-6、onSaveInstanceState、onRestoreInstanceState、onCreate的数据存储与恢复
+8、onSaveInstanceState、onRestoreInstanceState、onCreate的数据存储与恢复
 ```java
     //存储数据：
     @Override
@@ -258,39 +270,150 @@ public Parcelable onSaveInstanceState() {
 ```
 > 因为`onCreate`中恢复数据需要额外判断，官方建议在`onRestoreInstanceState`中恢复数据。
 
+#### onSaveInstanceState()源码流程
+
+9、onSaveInstanceState()源码分析
+```java
+    // Activity.java-保存状态
+    protected void onSaveInstanceState(Bundle outState) {
+        // 1、保存Window的层次状态。
+        outState.putBundle(WINDOW_HIERARCHY_TAG, mWindow.saveHierarchyState());
+        outState.putInt(LAST_AUTOFILL_ID, mLastAutofillId);
+        // 2、保存所有Fragment的状态
+        Parcelable p = mFragments.saveAllState();
+        outState.putParcelable(FRAGMENTS_TAG, p);
+        if (mAutoFillResetNeeded) {
+            outState.putBoolean(AUTOFILL_RESET_NEEDED, true);
+            // 3、自动填充功能，保存状态信息
+            getAutofillManager().onSaveInstanceState(outState);
+        }
+        // 4、Application执行dispatchActivitySaveInstanceState(), 内部调用ActivityLifecycleCallbacks.onActivitySaveInstanceState()
+        getApplication().dispatchActivitySaveInstanceState(this, outState);
+    }
+
+    // PhoneWindow.java-保存层次状态
+    public Bundle saveHierarchyState() {
+        Bundle outState = new Bundle();
+        // DecorView
+        if (mContentParent == null) {
+            return outState;
+        }
+        // 1、DecorView保存层次状态
+        SparseArray<Parcelable> states = new SparseArray<Parcelable>();
+        mContentParent.saveHierarchyState(states);
+        outState.putSparseParcelableArray(VIEWS_TAG, states);
+        // 2、保存具有焦点的View的ID
+        final View focusedView = mContentParent.findFocus();
+        if (focusedView != null && focusedView.getId() != View.NO_ID) {
+            outState.putInt(FOCUSED_ID_TAG, focusedView.getId());
+        }
+        // 3、保存Panel的状态(Menu中面板)。比如自定义Menu的样式，需要在AppCompatActivity的onPrepareOptionsPanel()中利用反射，才能在Menu中显示出图标。
+        SparseArray<Parcelable> panelStates = new SparseArray<Parcelable>();
+        savePanelState(panelStates);
+        if (panelStates.size() > 0) {
+            outState.putSparseParcelableArray(PANELS_TAG, panelStates);
+        }
+        // 4、保存Toolbar的层次状态
+        if (mDecorContentParent != null) {
+            SparseArray<Parcelable> actionBarStates = new SparseArray<Parcelable>();
+            mDecorContentParent.saveToolbarHierarchyState(actionBarStates);
+            outState.putSparseParcelableArray(ACTION_BAR_TAG, actionBarStates);
+        }
+        return outState;
+    }
+
+    // View.java-DecorView会执行dispatchSaveInstanceState，分发层层保存状态
+    public void saveHierarchyState(SparseArray<Parcelable> container) {
+        dispatchSaveInstanceState(container);
+    }
+
+    // ViewGroup.java-DecorView(ViewGroup)重写了该方法并且遍历子View
+    @Override
+    protected void dispatchSaveInstanceState(SparseArray<Parcelable> container) {
+        // xxx省略xxx
+        final View[] children = mChildren;
+        for (int i = 0; i < mChildrenCount; i++) {
+            View c = children[i];
+            // 遍历view并且执行dispatchSaveInstanceState()
+            c.dispatchSaveInstanceState(container);
+        }
+    }
+
+    // View.java-执行onSaveInstanceState()保存View的状态
+    protected void dispatchSaveInstanceState(SparseArray<Parcelable> container) {
+        // 1、执行onSaveInstanceState(), 保存View的状态。(自定义View时，可以重写该方法来保存View中需要恢复的数据)
+        Parcelable state = onSaveInstanceState();
+        if (state != null) {
+            // 2、将以mID作为key, 保存到SparseArray中。外部最终将SparseArray保存到PhoneWindow中的Bundle中，
+            container.put(mID, state);
+        }
+    }
+```
+
+10、请简述下关于保存和恢复Activity的状态信息，内部的工作流程是怎么样的？
+> 1. Activity: 执行onSaveInstanceState()
+>       1. 保存Window的层次状态
+>       1. 保存所有Fragment的状态
+>       1. 保存自动填充功能的状态信息(Android8.0推出):[Android 8.0上的自动填充功能](https://www.jianshu.com/p/531ce99bd961)
+>       1. Application.dispatchActivitySaveInstanceState()-涉及到LifeCycle这个谷歌新推出的内容。
+> 1. Window: saveHierarchyState()保存状态信息。
+>       1. mContentParent.saveHierarchyState(states): 交给DecorView层层保存View的信息
+>       1. 保存具有焦点的View的ID
+>       1. 保存Panel的状态(Panel属于菜单Menu中的内容):
+>       1. 保存Toolbar的状态
+> 1. DecorView(ViewGroup): 层层保存所有View的信息
+>       1. saveHierarchyState()->dispatchSaveInstanceState()
+
+11、在Activity中调用onRestoreInstanceState()恢复数据和在onCreate中恢复数据区别是？
+
+> 1. onRestoreInstanceState一旦被调用，那么其参数Bundle saveInstanceState一定是有值的，不需要而外判断是否为空；
+> 1. onCreate需要额外判断`Bundle saveInstanceState`是否为null。
+> 1. 官方建议采用OnRestoreInstanceState恢复数据。
+
+
+12、如何利用onCreate()的参数savedInstanceState解决因为Activity的重建导致Fragment的重叠问题?
+> 1. Activity的onCreate()需要在`savedInstanceState==null`时才添加Fragment
+> 2. 否则会出现因为重建导致多次添加Fragment，从而导致重叠。
 
 ### 进程优先级
 
-7、资源内存不足导致低优先级的Activity被杀死
+13、资源内存不足导致低优先级的Activity被杀死
 >场景：系统内存不足时，会按照优先级去杀死目标Activity所在的进程
 >Activity优先级-从高到低：
 >1. 前台Activity——正在和用户交互的Activity
 >2. 可见但非前台Activity——比如对话框弹出导致Activity可见但不可交互
 >3. 后台Activity——已经被暂停的Activity，已经执行了`onStop`，优先级最低
 
-8、Android进程优先级
+14、Android进程优先级
 > 1. 前台: 正在交互的Activity，或者和前台Activity交互的Service
 > 1. 可见: 可见，但是不可以交互的Activity
 > 1. 服务：Service
 > 1. 后台：处于后台，不可见，不可交互的Activity。
 > 1. 空：没有任何活动组件，用于提高组件的响应速度。随时可以被销毁。
 
-## 横竖屏切换(3)
+## 横竖屏切换(5)
 
-1、Activity禁止横竖屏切换的方法
+1、如何在Activity禁止横竖屏切换?
 >1. 在`AndroidManifest`中给相应的`Activity`添加上属性`android:screenOrientation="portrait"`
 >2.  `portrait`为竖屏
 >3. `landscape`为横屏
 >4. 或者可以在`onCreate`中添加代码`setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT/LANDSCAPE);`
 >5. 最终会禁止横竖屏切换，也不会触发`保存数据/恢复数据`的回调
 
-2、Activity在横竖屏切换时，禁止Activity的重建——通过configChanges
+2、如何实现Activity在横竖屏切换时，禁止Activity的重建?(通过configChanges实现)
 >1. 给`Activity`添加属性：`android:configChanges="orientation|screenSize"`
 >2. `Activity`不会再销毁和重建，只会调用`onConfigurationChanged()`方法，可以进行特殊处理。
 
+3、禁止了Activity的横竖屏切换(重建)后, 什么回调方法会在横竖屏切换时被调用?
+> onConfigurationChanged()
+
+4、通过禁止了横竖屏从而禁止了Activity的重建，既然Activity不再会重建，也就不需要再去处理数据的保存和恢复?
+> 错误！
+> 1. 内存不足时，依旧可能会出现Activity被杀死并且重建的情况。
+
 ### configChanges
 
-3、configChanges包含的系统配置
+5、configChanges包含的系统配置
 |条目|含义|
 |---|---|
 |orientation|屏幕方向改变, 如横竖屏切换|
@@ -472,3 +595,5 @@ getTaskId();
 1. [Android的taskAffinity对四种launchMode的影响](https://www.cnblogs.com/yyz666/p/4674173.html)
 1. [Android任务栈的完全解析](https://blog.csdn.net/qq_31860607/article/details/51956239)
 1. [android 获取栈顶activty的方法总结（兼容API 5.0）](https://blog.csdn.net/djy1992/article/details/51728301)
+1. [Android 8.0上的自动填充功能](https://www.jianshu.com/p/531ce99bd961)
+1. [Panel: Android更改默认menu界面颜色及显示图标](https://www.jianshu.com/p/ca6fb42062f1)
