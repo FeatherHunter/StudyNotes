@@ -5,7 +5,7 @@
 
 [TOC]
 
-##CoordinatorLayout
+## CoordinatorLayout
 
 1、导入包：
 ```xml
