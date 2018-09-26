@@ -1,13 +1,14 @@
+
+
 转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79279307
 
 # Activity的生命周期和启动模式
 
-版本:2018/9/23-1(23:23)
+版本:2018/9/26-1(20:23)
 
 ---
 
-[TOC]
-
+[toc]
 ## 四种状态(1)
 
 1、Activity的四种状态
@@ -45,16 +46,17 @@
 
 
 5、打开新Activity的流程图
-```sequence
+```mermaid
+sequenceDiagram
 Note left of activity1: 1.onCreate
 Note left of activity1: 2.onStart
 Note left of activity1: 3.onResume
-activity1->activity2: 4.onPause
+activity1->>activity2: 4.onPause
 Note right of activity2: 5.onCreate
 Note right of activity2: 6.onStart
 Note right of activity2: 7.onResume
 Note left of activity1: 8.onStop
-activity2->activity1: 9.onPause
+activity2->>activity1: 9.onPause
 Note left of activity1: 10.onRestart
 Note left of activity1: 11.onStart
 Note left of activity1: 12.onResume
@@ -69,16 +71,17 @@ Note right of activity2: 14.onDestroy
 Android:theme="@android:style/Theme.Dialog"
 ```
 
-```sequence
+```mermaid
+sequenceDiagram
 Note left of activity1: onCreate
 Note left of activity1: onStart
 Note left of activity1: onResume
-activity1->activity2: onPause
+activity1->>activity2: onPause
 Note right of activity2: onCreate
 Note right of activity2: onStart
 Note right of activity2: onResume
 Note left of activity1: 没有执行onStop()
-activity2->activity1: onPause
+activity2->>activity1: onPause
 Note left of activity1: 直接执行onResume()
 ```
 
@@ -430,7 +433,7 @@ public Parcelable onSaveInstanceState() {
 |【不重要】touchscreen|触摸屏发生改变, 正常情况下不会发生|
 |【不重要】navigation|系统导航方式发生改变, 比如采用轨迹球导航|
 
-## 启动模式(21)
+## 启动模式(23)
 
 1、任务栈是什么?
 > 1. Android采用任务栈来管理`Activity`
@@ -503,9 +506,25 @@ for (ActivityManager.AppTask task : appTasks) {
 getTaskId();
 ```
 
+#### 返回栈的清理
+
+11、返回栈的清理工作
+> 1. 如果用户长时间离开App，则系统会清除所有任务栈中的Activity，根 Activity除外。
+> 1. 当用户再次返回到App时，仅恢复根Activity。
+> 1. 系统这样做的原因是，经过很长一段时间后，用户可能已经放弃之前执行的操作，并且开始执行新的操作。
+
+12、如何修改系统清理返回栈的默认行为?
+> 可以使用下列几个 Activity 属性修改此行为:
+> 1. alwaysRetainTaskState
+如果在根 Activity 中将此属性设置为 "true"。即使在很长一段时间后，仍将所有 Activity 保留在其任务栈中。
+> 1. clearTaskOnLaunch
+如果在根 Activity 中将此属性设置为 "true"。只要用户离开app，会立即清除所有任务栈中的Activity，仅仅保留根Activity。与 alwaysRetainTaskState 正好相反。
+> 1. finishOnTaskLaunch
+仅对单个 Activity 起作用。 设置为“true”时，只要离开了App，就会立即清除该Activity。
+
 ### taskAffinity属性
 
-11、 android:taskAffinity的作用
+13、 android:taskAffinity的作用
 > 1. taskAffinity(任务相关性)用于Activity-标识一个Activity所需的任务栈名字，默认时为应用的`包名`
 > 1. 决定了Activity和任务栈的依附关系
 > 1. 有两个应用场景：`android:launchMode="singleTask"`以及`android:allowTaskReparenting="true"`
@@ -519,53 +538,53 @@ getTaskId();
 ```
 
 
-12、allowTaskReparenting
+14、allowTaskReparenting
 > 1. 成true时，Activity就拥有了更改所在任务栈的能力。
 > 1. allowTaskReparenting默认是继承至application中的allowTaskReparenting=false。
 
 
-13、 taskAffinity和allowTaskReparenting配合使用
+15、 taskAffinity和allowTaskReparenting配合使用
 > 1. 作用：根据`taskAffinity`重新为`Activity`选择宿主。
 > 1. 一个Activity处于某个Task中，本身具有和另一个Task相同的`taskAffinity`，启动时该Activity会切换到目标Task(任务栈)中，
 > 1. `应用A`启动了`应用B`的一个`Activity C`(allowTaskReparenting属性为true), 此时去打开应用B，会发现出现的是`Activity C`，因为`Activity C`从`A的任务栈`过渡到了`B的任务栈`中
 
 
-14、taskAffinity配合singleTask使用
+16、taskAffinity配合singleTask使用
 > 1. 作用：启动的`Activity`会运行在该指定的`任务栈`中
 > 1. taskAffinity中的内容是`任务栈`名字。
 > 1. 会先查找目标Activity的`taskAffinity`和当前`Task`的`taskAffinity`是否一致，一致就加入到当前`Task任务栈`中
 > 1. 如果不同，会去查找是否存在着`taskAffinity`相同的Task，存在就将其`切换到前台`，并将Activity加入其中。
 > 1. 如果依旧没有，会创建一个新的`Task任务栈`，并将Activity加入其中。
 
-15、任务栈的要点
+17、任务栈的要点
 > 1. 任务栈分为`前台任务栈`和`后台任务栈`
 > 1. 后台任务栈中的`Activity`属于`暂停状态`,
 > 1. 用户可以通过切换将`后台任务栈`再次调到`前台`，利用`taskAffinity`
 
 #### 对launchMode的影响
 
-16、android:launchMode="standard"
+18、android:launchMode="standard"
 > 1. ActivityA和ActivityB的taskAffinity不相同。
 > 1. A启动B。
 > 1. 结果：A和B都加入到同一个任务栈中，taskAffinity无效。
 
-17、android:launchMode="singleTop"
+19、android:launchMode="singleTop"
 > 1. ActivityA和ActivityB的taskAffinity不相同。
 > 1. 结果：和standrad一样，A和B都加入到同一个任务栈中，taskAffinity无效。
 
-18、android:launchMode="singleInstance"
+20、android:launchMode="singleInstance"
 > 1. singleInstance会导致创建新Task(任务栈)，并且该栈中只有一个Activity实例。且该Activity也是唯一实例。
 > 1. 结果：B会创建新栈，并且加入其中。
 
 ### Flags标志位
 
-19、标志位有什么用？
+21、标志位有什么用？
 >1. 可以指定`Activity的启动模式`：`FLAG_ACTIVITY_NEW_TASK`和`FLAG_ACTIVITY_SINGLE_TOP`
 > 2. 可以影响`Activity的运行状态`:`FLAG_ACTIVITY_CLEAR_TOP`和`FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS`
 > 注意：一般不需要我们指定标志位，有些标志位用于系统内部-我们不要使用。
 
 
-20、主要标志位含义
+22、主要标志位含义
 
 | 标志位 | 作用 |
 | ------------- | ---------------------------- |
@@ -576,7 +595,7 @@ getTaskId();
 | FLAG_ACTIVITY_NO_HISTORY| 当该`Activity`启动其他`Activity`后, 该`Activity`就会消失了|
 
 
-21、Activity属性中的标志
+23、Activity属性中的标志
 |Activity属性|作用|
 |---|---|
 |android:clearTaskOnLaunch="true"| 每次返回该`Activity`都会清除之上所有`Activity`|
