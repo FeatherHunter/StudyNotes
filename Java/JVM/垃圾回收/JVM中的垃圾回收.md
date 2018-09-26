@@ -485,6 +485,54 @@ if (CARD_TABLE [this address >> 9] != DIRTY)
   CARD_TABLE [this address >> 9] = DIRTY;
 ```
 
+## 具体垃圾回收器
+
+1、新生代的垃圾回收器共有哪三个?
+> 1. Serial-单线程的
+> 1. Parallel New-多线程版本
+> 1. Parallel Scavenge-和Parallel New 类似，但更加注重吞吐率。
+
+2、新生代的垃圾回收器采用什么算法?
+> 都是标记 - 复制算法。
+
+3、Parallel Scavenge 不能与CMS一起使用？为什么？
+
+4、老年代的垃圾回收器共有哪几种?
+> 1. Serial Old-单线程，标记 - 压缩算法(没有碎片、压缩算法代价高)
+> 1. Parallel Old-多线程版本，标记 - 压缩算法
+> 1. CMS-多线程，采用标记 - 清除算法(会产生碎片)
+
+5、垃圾回收三种算法在垃圾回收器中的应用？
+> 1. 标记 - 复制算法: Serial、Parallel New、Parallel Scavenge
+> 1. 标记 - 压缩算法：Serial Old、Parallel Old
+> 1. 标记 - 清除算法：CMS
+
+6、CMS垃圾回收器的特点？
+> 1. 采用的是标记 - 清除算法
+> 1. 是并发的
+> 1. 除了少数几个操作需要STW，可以在应用程序运行过程中进行垃圾回收。在并发收集失败的情况下，JVM会使用其他两个压缩型垃圾回收器进行一次垃圾回收。
+
+7、老年代在Java8以及之前是如何进行垃圾回收的?
+> 1. 先使用CMS并发进行垃圾回收。除了少数几个操作需要STW，可以在应用程序运行过程中进行垃圾回收。
+> 1. 在并发收集失败的情况下，JVM会采用Serial Old和Parallel Old进行垃圾回收
+
+8、CMS 在 Java 9 中已被废弃? G1是什么？
+> 1. 由于 G1 的出现，CMS 在 Java 9 中已被废弃 [3]。
+> 1. G1（Garbage First）是一个横跨新生代和老年代的垃圾回收器。
+
+9、G1的特点?
+> 1. 采用的是标记 - 压缩算法，
+> 1. 和CMS 一样都能够在应用程序运行过程中并 发地进行垃圾回收。
+> 1. G1已经打乱了常规的堆结构，直接将堆分成极其多个区域。每个区域都可以充当 Eden 区、Survivor 区或者老 年代中的一个。
+> 1. G1 能够针对每个细分的区域来进行垃圾回收。
+> 1. G1 会优先回收死 亡对象较多的区域。(Garbage First)
+
+10、Java11中引入的ZGC是什么?
+> 1. Java 11 引入了 ZGC
+> 1. 宣称暂停时间不超过 10ms。
+> 1. 参考资料中有 R 大的文章。
+
+
 ## 知识扩展
 
 1、Java是跨平台的语言，可是又能调用本地方法，而本地方法用C实现，不就破坏了其平台无关性？
@@ -497,3 +545,5 @@ if (CARD_TABLE [this address >> 9] != DIRTY)
 
 ## 参考资料
 1. [极客时间-JVM垃圾回收(下)](https://time.geekbang.org/column/article/13137)
+1. [垃圾收集器GC中parallel scavenge收集器为什么不能CMS配合使用？](https://blog.csdn.net/qq_33915826/article/details/79672772)
+1. [ZGC 原理是什么，它为什么能做到低延时？](https://www.zhihu.com/question/287945354/answer/458761494)
