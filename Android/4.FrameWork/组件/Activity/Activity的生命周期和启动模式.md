@@ -4,7 +4,7 @@
 
 # Activity的生命周期和启动模式
 
-版本:2018/9/26-1(20:23)
+版本:2018/9/28-1(0:30)
 
 ---
 
@@ -602,13 +602,34 @@ getTaskId();
 |android:finishOnTaskLaunch="true"| 作用于本身，返回时，该`Activity`会被`finish`|
 |android:alwaysRetainTaskState="true"| 免死金牌，不会被清理|
 
-## 面试题
+## 知识扩展
 
 1、静态和动态设置启动模式，来启动Activity的区别？
 > 1. 静态通过在xml中设置`android:lauchMode`属性来设置
 > 1. 动态通过调用`intent.addFlags()`来设置Flags
 > 1. 静态设置无无法为Activity设定`FLAG_ACTIVITY_CLEAR_TOP`标识
 > 1. 动态设置无法为Activity指定`singleInstance`模式
+
+2、有三个Activity：OneActivity、TwoActivity、ThreeActivity。OneActivity为Standard启动模式，TwoActivity和ThreeActivity均为SingleTask启动模式（OneActivity的`android:taskAffinity=".task1"`, TwoActivity和ThreeActivity的`android:taskAffinity=".task2"`-相同），这个时候先在OneActivity启动TwoActivity,然后在TwoActivity中启动ThreeActivity，接着在ThreeActivity中启动OneActivity，最后在OneActivity中启动TwoActivity，接着按下返回键，请问最后是什么情况？
+> 1. 第一次返回键：返回OneActivity(task1)
+> 1. 第二次返回键：返回桌面
+
+3、如果上题中OneActivity、TwoActivity、ThreeActivity的TaskAffinity均不相同(`.task1 .task2 .task3`)，按照题目中流程，最后点击返回键有什么效果?
+> 1. 第一次返回键：返回OneActivity(task3)
+> 1. 第二次返回键：返回ThreeActivity(task3)
+> 1. 第三次返回键: 返回OneActivity(task1)
+> 1. 第四次返回键：返回桌面
+
+4、使用singleTask会导致最近任务列表中有多个app?
+> 1. 一个任务栈可以判定为一个app
+
+5、Activity的回退栈是怎么一回事?
+> 1. 如果Activity跳转过程中，经历过多个Activity栈
+> 1. 会逆向按顺序回退每一个栈中的每一个Activity，直至所有栈都清除完毕，最终回到根Activity
+
+6、为什么在后续的Activity中点击Home回到桌面，然后点击图标重新进入app会发现一直处于OneActivity?
+> 1. 因为系统默认认为用户放弃了所有操作，自动将根Activity以外的Activity全部清除
+> 1. 根Activity使用`android:alwaysRetainTaskState="true"`属性，系统就不再会清除栈中的Activity，这种解决方法错误！！！效果依旧。
 
 ## 参考资料
 1. [Android的taskAffinity对四种launchMode的影响](https://www.cnblogs.com/yyz666/p/4674173.html)
