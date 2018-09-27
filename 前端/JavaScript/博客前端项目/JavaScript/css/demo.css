@@ -1,0 +1,73 @@
+body {
+    margin: 0;
+    padding: 0;
+}
+
+ul {
+    margin: 0;
+    padding: 0;
+}
+
+li {
+    list-style: none;
+    /*display: none;*/
+}
+
+#box {
+    font-size: 120px;
+}
+
+.a {
+    border: 1px solid gray;
+}
+
+.logo {
+    float: left;
+    width: 100px;
+    height: 30px;
+}
+
+.info {
+    width: 70px;
+    height: 30px;
+    line-height: 30px;
+    font-size: 12px;
+    background: url("../img/icon.png") no-repeat 57px -343px;
+    cursor: pointer;
+    float: right;
+}
+
+.nav {
+    width: 78px;
+    height: 90px;
+    background: #fbf7e1;
+    position: absolute;
+    top: 30px;
+    left: 434px;
+    padding: 5px 0 0 0;
+    border: 1px solid #999;
+    border-top: none;
+    /*display: none;*/
+}
+
+.nav li {
+    /*background: red;*/
+    font-size: 14px;
+    height: 20px;
+    line-height: 20px;
+    text-indent: 20px;
+}
+
+.nav li a {
+    display: block;
+    text-decoration: none;
+    color: #333;
+    background: url("../img/icon.png") no-repeat 6px -347px;
+
+}
+
+.nav li a:hover {
+    color: #f03;
+    background: url("../img/icon.png") no-repeat 4px -438px;
+
+}
