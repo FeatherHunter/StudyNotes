@@ -603,7 +603,7 @@ if (CARD_TABLE [this address >> 9] != DIRTY)
 
 ### GC Roots
 
-9、什么一些对象可以作为GC roots?
+9、为什么一些特定对象可以作为GC roots?
 > 因为这些东西被认为是在被使用。根据JVM规范将他们作为GC Roots 。
 
 10、到底GC Roots是什么？
@@ -745,7 +745,7 @@ if (CARD_TABLE [this address >> 9] != DIRTY)
 1. 堆区(Heap)是什么?
 1. 方法区(Method Area)是什么?
 1. 运行时常量池(Runtime Constant Pool)是什么?
-1. 什么一些对象可以作为GC roots?
+1. 为什么一些特定对象可以作为GC roots?
 1. 到底GC Roots是什么？
 1. GC Roots存放在哪里？
 1. GC Roots是引用还是对象？
