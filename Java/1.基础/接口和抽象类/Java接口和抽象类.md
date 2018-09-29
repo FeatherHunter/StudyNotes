@@ -7,14 +7,22 @@
 
 # Java 接口和抽象类
 
-版本号: 2018/9/29-1(18:40)
+版本号: 2018/9/29-1(22:40)
 
-![极客窝](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/qq/hackerhome.png?raw=true)
-[点我加入极客窝！](https://jq.qq.com/?_wv=1027&k=5Ov9m7b)
 
 ---
 
 [toc]
+
+**交流平台：极客窝-QQ群:779213122**
+
+> 有任何问题，欢迎交流。
+> 每周末有技术交流会，只招募有分享精神和极客精神的小伙伴。
+> 非诚勿扰！非诚勿扰！非诚勿扰！
+
+[点我加入极客窝！](https://jq.qq.com/?_wv=1027&k=5Ov9m7b)
+![极客窝](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/qq/hackerhome.png?raw=true)
+
 ## 接口(27)
 
 1、接口是什么?
@@ -569,8 +577,6 @@ class RealVIPServiceProvider implements ServiceProvider{
 ```
 
 
-
-
 ## 问题汇总
 
 ## 参考资料
@@ -579,3 +585,12 @@ class RealVIPServiceProvider implements ServiceProvider{
 1. [什么是函数式接口](https://www.cnblogs.com/runningTurtle/p/7092632.html)
 1. [了解 lambda](http://www.importnew.com/26080.html)
 1. [Java 8 默认方法](http://ebnbin.com/2015/12/20/java-8-default-methods/)
+
+**交流平台：极客窝-QQ群:779213122**
+
+> 有任何问题，欢迎交流。
+> 每周末有技术交流会，只招募有分享精神和极客精神的小伙伴。
+> 非诚勿扰！非诚勿扰！非诚勿扰！
+
+[点我加入极客窝！](https://jq.qq.com/?_wv=1027&k=5Ov9m7b)
+![极客窝](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/qq/hackerhome.png?raw=true)
