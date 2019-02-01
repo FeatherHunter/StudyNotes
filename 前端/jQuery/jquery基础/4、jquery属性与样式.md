@@ -106,3 +106,126 @@ $("p").text($('#see').val());            //将p标签内的文本内容设置为
 >9.但是.text()和他们不一样，如果.text()应用在多个元素上时，将会读取所有选中元素的文本内容。
 >10.html(htmlString),text(textString)和val(value)三种方法都是用来替换选中元素的内容，如果三个方法同时运用在多个元素上时，那么将会替换所有选中元素的内容。
 >11.html(),text(),val()都可以使用回调函数的返回值来动态的改变多个元素的内容。
+
+11、addClass(className)方法
+> 1.作用：动态增加类名，来增加样式；
+```
+<style type="text/css">
+    div{
+        width:200px;
+        height:200px;
+    }
+    .bg{
+        background:red;
+    }
+</style>
+
+<div id="div">php 中文网</div>
+
+$("#div").addClass('bg');       //增加"class='bg'"
+```
+
+12、removeClass(className)方法
+> 1.作用：动态去除类名，来去除样式；
+```
+<style type="text/css">
+    div{
+        width:200px;
+        height:200px;
+    }
+    .bg{
+        background:red;
+    }
+</style>
+
+<div id="div" class="bg">php 中文网</div>
+
+$("#div").removeClass('bg');       //去除类名为bg的样式
+```
+
+13、toggleClass()方法
+> 1.作用：addClass()与removeClass()方法的切换，动态增加和删除样式；
+> 2.在匹配的元素集合中的每个元素上添加或删除一个或多个样式，取决于这个样式是否存在或值切换属性；
+> 3.如果不存在，就添加类名，如果存在，就删除类名。
+> 4.toggleClass(className)：在匹配的元素集合中的每个元素上用来切换的一个或多个（用空格隔开）样式类名；
+> 5.toggleClass([switch])：一个用来判断样式类添加还是移除的布尔值；
+> 6.toggleClass(className,switch)：一个布尔值，用于判断样式是否应该被添加或移除；
+> 7.toggleClass( function(index, class, switch) [, switch ] )：用来返回在匹配的元素集合中的每个元素上用来切换的样式类名的一个函数。接收元素的索引位置和元素旧的样式类作为参数
+```
+<style type="text/css">
+body,table,td,{
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+}
+
+.h {
+    background: #f3f3f3;
+    color: #000;
+}
+
+.c {
+    background: #ebebeb;
+    color: #000;
+}
+</style>
+
+<table id="table" width="50%" border="0" cellpadding="3" cellspacing="1">
+    <tr>
+        <td>php中文网</td>
+        <td>php.cn</td>
+    </tr>
+    <tr>
+        <td>php中文网</td>
+        <td>php.cn</td>
+    </tr>
+    <tr>
+        <td>php中文网</td>
+        <td>php.cn</td>
+    </tr>
+    <tr>
+        <td>php中文网</td>
+        <td>php.cn</td>
+    </tr>
+    <tr>
+        <td>php中文网</td>
+        <td>php.cn</td>
+    </tr>
+</table>
+
+<script type="text/javascript">
+//给所有的tr元素加一个class="c"的样式
+$("#table tr").toggleClass("c");
+</script>
+<script type="text/javascript">
+//给所有的偶数tr元素切换class="c"的样式
+//所有基数的样式保留，偶数的被删除
+$("#table tr:odd").toggleClass("c");
+</script>
+<script type="text/javascript">
+//第二个参数判断样式类是否应该被添加或删除
+//true，那么这个样式类将被添加;
+//false，那么这个样式类将被移除
+//所有的奇数tr元素，应该都保留class="c"样式
+$("#table tr:even").toggleClass("c", true); //这个操作没有变化，因为样式已经是存在的
+</script>
+```
+
+14、css()方法
+> 1.作用：获取元素样式属性的计算值或者设置元素的CSS属性；
+> 2.css( propertyName ) ：获取匹配元素集合中的第一个元素的样式属性的计算值;
+> 3.css( propertyNames )：传递一组数组，返回一个对象结果;
+> 4.css(propertyName, value )：设置CSS;
+> 5.css( propertyName, function )：可以传入一个回调函数，返回取到对应的值进行处理;
+> 6.css( properties )：可以传一个对象，同时设置多个样式;
+> **注意：浏览器属性获取方式不同，在获取某些值的时候都jQuery采用统一的处理，比如颜色采用RBG，尺寸采用px**
+```
+<div>php 中文网</div>
+
+$('div').css('color','red');
+
+$("div").css({
+    width:'200px',
+    height:'200px',
+    background:'#ccc'
+});
+```
