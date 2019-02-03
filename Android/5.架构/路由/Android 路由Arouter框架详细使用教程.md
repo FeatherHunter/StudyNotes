@@ -1,15 +1,15 @@
+
 转载请注明链接：https://blog.csdn.net/feather_wch/article/details/81605300
 
 >可以从文章末尾的参考资料中进行学习
 
-# Android 路由
+# Android 路由ARouter框架详细使用教程
 
-版本：2018/8/12-1
+版本：2019/2/3-1(12:28)
 
 ---
 
-[TOC]
-
+[toc]
 1、什么是路由？
 >1. 根据路由表将页面请求分发到指定页面
 >1. 映射页面跳转关系，也包含跳转相关的一切功能。
@@ -112,7 +112,7 @@
 
 [阿里巴巴ARouter-Github链接点击这里](https://github.com/alibaba/ARouter)
 
-### 基础功能
+### 基础入门
 
 #### 依赖添加
 
@@ -202,7 +202,7 @@ ARouter.getInstance().build(ARouterConstants.ACTIVITY_URL_LOGIN)
 -keep class * implements com.alibaba.android.arouter.facade.template.IProvider
 ```
 #### 路由表自动加载
->使用 Gradle 插件实现路由表的自动加载
+>使用 Gradle 插件实现路由表的自动加载(在整个项目的build.gradle中添加)
 ```xml
 apply plugin: 'com.alibaba.arouter'
 
@@ -220,7 +220,151 @@ buildscript {
 >1. 该插件必须搭配 api 1.3.0 以上版本使用！
 >1. 通过 ARouter 提供的注册插件进行路由表的自动加载(power by AutoRegister)， 默认通过扫描 dex 的方式 进行加载通过 gradle 插件进行自动注册可以缩短初始化时间解决应用加固导致无法直接访问 dex 文件，初始化失败的问题，
 
+### 基础用法
+
+#### 跳转到Activity
+
+1、跳转到Activity
+```java
+ARouter.getInstance().build(ARouterConstants.ACTIVITY_URL_LOGIN).navigation();
+```
+
+#### 跳转到Fragment
+
+2、跳转到Fragment
+> 1. 先获取到Fragment
+> 2. 在Activity中将该Fragment加载到容器中
+```java
+//1. 获取到目标Fragment
+Fragment fragment = (Fragment) ARouter.getInstance().build(ARouterConstants.FRGAMENT_URL).navigation();
+//2. 在Activity中加载该Frgment
+getSupportFragmentManager()
+        .beginTransaction()
+        .replace(R.id.container, fragment)
+        .commit();
+```
+
 ### 进阶用法
+
+#### 监听路由操作/降级策略
+
+1、监听路由操作, 回调相应方法
+```java
+ARouter.getInstance()
+        .build(ARouterConstants.ACTIVITY_URL_HOST)
+        .navigation(MDActivity.this, new NavigationCallback() {
+
+            @Override
+            public void onFound(Postcard postcard) {
+                // 找到目标
+            }
+
+            @Override
+            public void onLost(Postcard postcard) {
+                // 丢失目标
+            }
+
+            @Override
+            public void onArrival(Postcard postcard) {
+                // 已经跳转到目标页面
+            }
+
+            @Override
+            public void onInterrupt(Postcard postcard) {
+                // 跳转被拦截
+            }
+        });
+```
+
+##### 降级策略
+
+2、降级策略是什么?
+> 1. 跳转过程中如果出现错误，可以进行处理，比如跳转到其他页面。
+> 1. 处理方法1：利用坚挺路由操作的回调方法`NavigationCallback`
+> 1. 处理方法2: 全局处理(实现`DegradeService`接口)
+
+
+3、实现DegradeService进行全局处理
+> 1. 如果同时有单个的`NavigationCallback`，优先级比全局处理的高，不会再进入DegradeService。
+> 1. 实现`DegradeService`，Route注解采用任意的Path都可以。
+> 1. onLost()会在跳转失败后回调。
+```java
+@Route(path = "/degrade/Service")
+public class DegradeServiceImpl implements DegradeService {
+
+    private static final String TAG = DegradeServiceImpl.class.getName();
+
+    private Context mContext;
+
+    @Override
+    public void onLost(Context context, Postcard postcard) {
+        Logger.t(TAG).d(postcard.toString());
+        ARouter.getInstance()
+                .build(ARouterUtils.ARouterConstants.ACTIVITY_URL_MAIN)
+                .withString(MAIN_FRAGMENT_TYPE, FRAGMENT_URL_LOGIN)
+                .navigation();
+    }
+
+    @Override
+    public void init(Context context) {
+        mContext = context;
+    }
+}
+```
+
+#### 拦截器
+
+1、拦截器的作用
+> 1. 修改参数
+> 2. 拦截跳转(比如未登陆时进行操作，先跳转到登陆页面。)
+
+2、拦截器的使用
+```java
+/**
+ * priority: 优先级，适用于多个拦截器的情况。
+ */
+@Interceptor(priority = 8,name = "拦截器")
+public class MyInterceptor implements IInterceptor{
+    @Override
+    public void process(Postcard postcard, InterceptorCallback callback) {
+
+        // 如果目标是"影视页面"
+        if(postcard.getPath().equals(ARouterConstants.FRGAMENT_URL_MOVIE)){
+            // 如果没有登录，跳转到登陆页面。
+            if(true){
+                postcard.setPath(ARouterConstants.FRGAMENT_URL_LOGIN);
+            }
+            // 也可以增加参数
+            postcard.withString("account", "10001");
+        }
+
+        /**
+         * 继续跳转或者终止跳转，如果不调用，路由直接结束。
+         */
+        // 1.继续跳转
+        callback.onContinue(postcard);
+
+        // 2.终止跳转
+        //callback.onInterrupt(null)
+        //callback.onInterrupt(new RuntimeException()) // 抛出异常
+    }
+
+    @Override
+    public void init(Context context) {
+        // 会在sdk初始化的时候调用且仅调用一次
+        Log.d("feather","拦截器初始化");
+    }
+}
+```
+
+##### 拦截器的process没有调用
+
+3、在触发路由操作后，拦截器的process方法并没有调用
+> 1. 出现该场景是在路由到Fragment时出现，Activity不会出现该问题。
+> 1. 根据官方的Issue和源码，Fragment采用绿色通道，不会进行拦截，因此无法使用拦截器拦截Fragment的跳转。
+> 1. 解决办法:
+>    1. 使用PathReplaceService(只能根据判断来修改Path，感觉用处不大)
+>    1. 不能直接navigation目标Fragment了，Navigation一个Activity，并且将Fragment通过参数传入，这样就能被拦截器所拦截，并进行后续的处理。
 
 #### 跳转到Uri指定的目标
 
@@ -545,6 +689,17 @@ public class LoginActivity{
 
 ##### 网页url跳转-传递json自动转为自定义对象
 
+#### 跳转拦截
+
+### 报错/处理
+
+#### ARouter::There is no route match the path
+解决办法:
+> 1. 不同module的一级路径必须不同，否则会导致一个moudle中的一级路径失效.
+> 2. 原因:
+> Aouter通过一级目录"app"找到了route，并且在groupIndex中删除了这个路径，代表已经加载到了内存。不同的module使用了相同的一级路径，在Arouter第一次寻找到route的时候便删除了这个一级路径的group，因为一级路径的重复，再调用另一个module的一级路径是"app"的路由时，由于之前Warehouse.groupsIndex已经删除，便导致了there's no route matched的错误。
+
+
 ### 总结
 1、href跳转到app的流程
 > 1. 系统浏览器发现要加载一个连接，是以arouter开头的协议，但是其自身无法处理该协议，此时就会把此协议往系统层抛
@@ -586,3 +741,4 @@ public class LoginActivity{
 2. [Android 路由框架ARouter最佳实践](https://blog.csdn.net/zhaoyanjun6/article/details/76165252)
 1. [谈谈App的统一跳转和ARouter](https://www.jianshu.com/p/c0eecbbf1481)
 1. [安卓AOP三剑客:APT,AspectJ,Javassist](https://www.jianshu.com/p/dca3e2c8608a)
+1. [ARouter there's no route matched解决方法](https://juejin.im/post/5b1e0be051882513c10390da)
