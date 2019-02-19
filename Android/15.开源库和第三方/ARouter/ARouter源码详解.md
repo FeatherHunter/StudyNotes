@@ -4,7 +4,7 @@
 
 # ARouter源码详解
 
-版本：2019/2/19-19:38
+版本：2019/2/20-1:38
 
 ---
 
@@ -1032,8 +1032,148 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
 > 1. Fragment会设置`绿色通道`
 > 1. 在`_ARouter.navigation()`中通过`LogisticsCenter.completion(postcard)`对`Postcard进行填充时`，发现是`Fragment`会直接调用`postcard.greenChannel(); `进行设置。
 
+## Interceptor拦截器
+
+### InterceptorServiceImpl
+
+1、InterceptorServiceImpl.doInterceptions()进行拦截的源码分析
+> 1. `InterceptorServiceImpl`实现`InterceptorService接口`
+> 1. `_ARouter`的navigation方法中如果当前的Postcard没有开启绿色通道，会调用`interceptorService.doInterceptions`进行拦截器处理。
+```java
+    // 1、InterceptorService.java - 拦截服务，继承自IProvider
+    public interface InterceptorService extends IProvider {
+        void doInterceptions(Postcard postcard, InterceptorCallback callback);
+    }
+    /**========================================
+     *  2、InterceptorServiceImpl.java - InterceptorService的具体实现，包含方法: init()、doInterceptions()
+     *======================================*/
+    @Route(path = "/arouter/service/interceptor")
+    public class InterceptorServiceImpl implements InterceptorService {
+        private static boolean interceptorHasInit;
+        private static final Object interceptorInitLock = new Object();
+        // xxx
+    }
+    /**========================================
+     *  3、InterceptorServiceImpl.java - 拦截操作
+     *======================================*/
+    public void doInterceptions(final Postcard postcard, final InterceptorCallback callback) {
+        // 1、存在拦截器。如：此时有个拦截器MainInterceptor.java
+        if (null != Warehouse.interceptors && Warehouse.interceptors.size() > 0) {
+            // 2、等待init()初始化完成后，才继续执行，否则wait。
+            checkInterceptorsInitStatus();
+            // 3、等待10s都没有初始化完成，调用拦截的回调，报错“Interceptors initialization takes too much time.”
+            if (!interceptorHasInit) {
+                callback.onInterrupt(new HandlerException("Interceptors initialization takes too much time."));
+                return;
+            }
+            // 4、线程池中调用拦截器的方法，避免拦截操作耗时导致ANR。
+            LogisticsCenter.executor.execute(new Runnable() {
+                @Override
+                public void run() {
+
+                    // 5、设置interceptorCounter的count = 拦截器数量
+                    CancelableCountDownLatch interceptorCounter = new CancelableCountDownLatch(Warehouse.interceptors.size());
+                    try {
+                        /**========================================
+                         * 6、层层处理interceptors列表中index = 0、1、2...的拦截器，执行其process方法。
+                         *   1. 如果回调了onContinue则继续层层处理。
+                         *   2. 如果回调了onInterrupt则中断处理，设置Postcard的Tag为对应的Exception信息。
+                         *=======================================*/
+                        _excute(0, interceptorCounter, postcard);
+                        // 7、等待postcard.getTimeout()秒，本例中，等待300。interceptorCounter默认值为interceptors列表的size。每处理一个拦截器，interceptorCounter - 1.
+                        interceptorCounter.await(postcard.getTimeout(), TimeUnit.SECONDS);
+                        /**========================================
+                         * 8、interceptorCounter的count > 0，表明没有处理完所有拦截器。
+                         *   1. 此时一定是拦截器处理出现了超时。等待了300秒。
+                         *   2. 如果是拦截一定会进入第二个分支，而不是当前第一个分支。
+                         *   3. 会传递到上层去执行NavigationCallback.onInterrupt()方法
+                         *=======================================*/
+                        if (interceptorCounter.getCount() > 0) {
+                            callback.onInterrupt(new HandlerException("The interceptor processing timed out."));
+                        }
+                        /**========================================
+                         * 9、出现了拦截操作，传递到上层去执行NavigationCallback.onInterrupt()方法。
+                         *   1. onInterrupt()拦截操作后，会调用counter.cancel()调用，此时count = 0。
+                         *   2. 一定会设置postcard的Tag，因此一定进入该分支。
+                         *=======================================*/
+                        else if (null != postcard.getTag()) {
+                            callback.onInterrupt(new HandlerException(postcard.getTag().toString()));
+                        }
+                        // 10、剩下的情况就是处理好所有拦截器，继续进行路由。调用_Arouter._navigation()继续路由。
+                        else {
+                            callback.onContinue(postcard);
+                        }
+                    } catch (Exception e) {
+                        // 11、过程中出现异常，都直接拦截，不继续路由。
+                        callback.onInterrupt(e);
+                    }
+                }
+            });
+        } else {
+            // 12、不存在拦截器，继续路由。
+            callback.onContinue(postcard);
+        }
+    }
+
+    /**========================================
+     *  4、MainInterceptor.java - 用户自定义的一个Interceptor
+     *======================================*/
+    @Interceptor(priority = 1)
+    public class MainInterceptor implements IInterceptor {
+        // xxx
+    }
+
+    /**========================================
+     *  5、InterceptorServiceImpl.java
+     *   - 在InterceptorServiceImpl调用init()初始化后，才进行后续操作，否则进行等待wait 10秒钟。
+     *======================================*/
+    private static void checkInterceptorsInitStatus() {
+        synchronized (interceptorInitLock) {
+            while (!interceptorHasInit) {
+                try {
+                    interceptorInitLock.wait(10 * 1000);
+                } catch (InterruptedException e) {
+                    throw new HandlerException(TAG + "Interceptor init cost too much time error! reason = [" + e.getMessage() + "]");
+                }
+            }
+        }
+    }
+
+    /**========================================
+     *  6、InterceptorServiceImpl.java - 遍历执行所有拦截器
+     *======================================*/
+    private static void _excute(final int index, final CancelableCountDownLatch counter, final Postcard postcard) {
+        // 1、有下一个拦截器。
+        if (index < Warehouse.interceptors.size()) {
+            // 2、获取到interceptors中的拦截器(下标为index)。
+            IInterceptor iInterceptor = Warehouse.interceptors.get(index);
+            // 3、执行拦截器的process方法
+            iInterceptor.process(postcard, new InterceptorCallback() {
+                // 4、拦截器中选择执行onContinue(), 继续路由或者处理下个拦截器。
+                public void onContinue(Postcard postcard) {
+                    // 5、计数减1。
+                    counter.countDown();
+                    // 6、执行后一个拦截器。依次处理index = 1、2、3、4、5.....的拦截器
+                    _excute(index + 1, counter, postcard);
+                }
+
+                @Override
+                public void onInterrupt(Throwable exception) {
+                    // 7、拦截，将exception存入postcard的tag字段
+                    postcard.setTag(null == exception ? new HandlerException("No message.") : exception.getMessage());    // save the exception message for backup.
+                    // 8、计数器归零
+                    counter.cancel();
+                }
+            });
+        }
+        // 9、不存在拦截器，直接返回。
+    }
+```
+
+
 # 参考资料
 1. [可能是最详细的ARouter源码分析](https://www.jianshu.com/p/bc4c34c6a06c)
 2. [Java注解处理器](https://race604.com/annotation-processing/)
 3. [路由方案之ARouter源码分析](https://blog.csdn.net/byhook/article/details/79945460)
 4. [什么时候使用CountDownLatch](http://www.importnew.com/15731.html)
+1. [CountDownLatch理解一：与join的区别](https://blog.csdn.net/zhutulang/article/details/48504487)
