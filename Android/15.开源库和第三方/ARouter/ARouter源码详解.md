@@ -1,11 +1,10 @@
-
 转载请注明链接：https://blog.csdn.net/feather_wch/article/details/87376462
 
 >详细分析Router的源码。
 
 # ARouter源码详解
 
-版本：2019/2/18-19:38
+版本：2019/2/19-19:38
 
 ---
 
@@ -111,7 +110,7 @@ static synchronized void openDebug() {
 }
 ```
 
-### _ARouter
+### \_ARouter
 
 4、`_ARouter`的作用?
 > 1. ARouter的相关操作，内部都是通过`_ARouter`实现。
@@ -441,6 +440,8 @@ class Warehouse {
 }
 ```
 
+##### IRouteGroup、IProvider、IInterceptor
+
 8、IRouteGroup、IProvider、IInterceptor接口的作用?
 ```java
 /**==========================================================
@@ -469,12 +470,14 @@ public interface IInterceptor extends IProvider {
 }
 ```
 
+##### RouteMeta、RouteType
+
 9、RouteMeta分析
 > RouteMeta是一个数据bean，封装了被注解类的一些信息
 ```java
 public class RouteMeta {
     /**=========================================
-     * 1、路由类型。是一个枚举，表示被注解类的路由类型
+     * 1、路由类型。是一个枚举，表示被注解类的路由类型。例如: PROVIDER
      *   1. Activity
      *   2. Service // 目前不支持
      *   3. Provider
@@ -484,11 +487,11 @@ public class RouteMeta {
      *   7. Fragment
      *   8. UNKNOWN
      *========================================*/
-    private RouteType type;         // Type of route
+    private RouteType type;
     private Element rawType;        // Raw type of route
-    private Class<?> destination;   // Destination
-    private String path;            // Path of route
-    private String group;           // Group of route
+    private Class<?> destination;   // Destination. 例如: class com.alibaba.android.arouter.core.AutowiredServiceImpl; class com.alibaba.android.arouter.core.InterceptorServiceImpl;
+    private String path;            // Path of route. 例如: /arouter/service/autowired; /arouter/service/interceptor
+    private String group;           // Group of route. 例如: arouter
     private int priority = -1;      // The smaller the number, the higher the priority
     private int extra;              // Extra data
     private String name;
@@ -600,8 +603,437 @@ public static Set<String> getFileNameByPackageName(Context context, final String
 > 1. 需要调用`ARouter.openDebug()`方法将标志位`debuggable`设置为`true`。不进入Debug模式不会弹出Toast，只会打印日志。
 > 1. 不同module的一级路径相同，导致moudle中的一级路径失效，因此跳转到第二个module的某个页面时出现该错误。
 
-## 参考资料
+## Navigation路由
+
+### build
+
+1、ARouter.getInstance().build()源码分析
+> 1. 本质就是构建出内部保存了`path`和`group`的`Postcard`
+> 1. 会先通过官方预留的`PathReplaceService`对`path`进行`动态处理`
+> 1. 需要注意在`PathReplaceService`处理path前进行判断处理，避免`build(path, group)和build(path)`对路径进行了重复的两次动态处理。
+```java
+/**==============================================
+ * 1、构建加载的路径。例如: path = /app/HostActivity
+ * //ARouter.java
+ *==============================================*/
+public Postcard build(String path) {
+    // 交给_ARouter构建出path相关的Postcard
+    return _ARouter.getInstance().build(path);
+}
+/**==============================================
+ * 2、_ARouter通过路径path和默认分组group构建出postcard。
+ *   例如: path = /app/HostActivity
+ * //_ARouter.java
+ *==============================================*/
+protected Postcard build(String path) {
+    // ...确保path不为空
+    // 1、Navigation出PathReplaceService对象。PathReplaceService继承自IProvider接口，是预留给用户实现路径动态变化的功能。
+    PathReplaceService pService = ARouter.getInstance().navigation(PathReplaceService.class);
+    if (null != pService) {
+        // 2、通过该方法中由用户自定义实现的路径path动态变化的逻辑进行处理后，获取到最终的path路径。
+        path = pService.forString(path);
+    }
+    /**=======================================================
+     * 3、进一步构建。extractGroup(path)是提取出该path路径中的默认group分组。
+     *    1. 该build(path, group)和build(path)中都会通过PathReplaceService对path进行处理。
+     *    2. 在PathReplaceService的路径动态变化前需要进行判断工作，避免两次变化.
+     *     path = /app/HostActivity
+     *     group = app
+     *========================================================*/
+    return build(path, extractGroup(path));
+}
+/**==============================================
+ * 3、通过路径path和分组group构建出postcard。
+ *
+ * //_ARouter.java
+ *==============================================*/
+protected Postcard build(String path, String group) {
+    // ...确保path不为空
+    // 1、PathReplaceService的动态路径变换。
+    PathReplaceService pService = ARouter.getInstance().navigation(PathReplaceService.class);
+    if (null != pService) {
+        path = pService.forString(path);
+    }
+    // 2、使用该path和group构造出Postcard(明信片)对象
+    return new Postcard(path, group);
+}
+
+/**==============================================
+ * 4、Postcard继承自RouterMeta
+ *  构建明信片Postcard就是内部保存path(/app/HostActivity)和group(app)
+ * //Postcard.java
+ *==============================================*/
+public final class Postcard extends RouteMeta {
+    // xxx
+    // 属性均省略
+    public Postcard(String path, String group) {
+        this(path, group, null, null);
+    }
+
+    public Postcard(String path, String group, Uri uri, Bundle bundle) {
+        setPath(path);
+        setGroup(group);
+        // xxx
+    }
+}
+```
+
+### navigation
+
+2、ARouter.getInstance().build(path).navigation()源码分析
+> 1. 也就是对`Postcard`的`navigation`进行源码分析
+```java
+/**==============================================
+ * 1、进行路由。路由到postcard中path所指定的路径中。
+ *   1. 没有参数，默认使用application的context
+ * // Postcard.java
+ *==============================================*/
+public Object navigation() {
+    return navigation(null);
+}
+/**==============================================
+ * 2、使用参数指定的Context进行路由。
+ * // Postcard.java
+ *==============================================*/
+public Object navigation(Context context) {
+    return navigation(context, null);
+}
+/**==============================================
+ * 3、使用参数指定的Context进行路由。并且使用NavigationCallback对路由操作进行监听回调.
+ * // Postcard.java
+ *==============================================*/
+public Object navigation(Context context, NavigationCallback callback) {
+    return ARouter.getInstance().navigation(context, //Context
+            this, // 该Postcard
+            -1,  // requestCode
+            callback); // 路由操作监听的回调接口
+}
+/**==============================================
+ * 4、启动路由。
+ * // ARouter.java
+ *==============================================*/
+public Object navigation(Context mContext, Postcard postcard, int requestCode, NavigationCallback callback) {
+    return _ARouter.getInstance().navigation(mContext, postcard, requestCode, callback);
+}
+
+/**==============================================
+ * 5、_ARouter实际进行路由操作。
+ * // _ARouter.java
+ *==============================================*/
+protected Object navigation(final Context context, final Postcard postcard, final int requestCode, final NavigationCallback callback) {
+    try {
+        // 1、补全Postcard(该postcard的数据并不完整, 目前只有一个path和group)
+        LogisticsCenter.completion(postcard);
+    } catch (NoRouteFoundException ex) {
+        // 2、没有找到符合该path和group的Route
+        if (debuggable()) { // Show friendly tips for user.
+            Toast.makeText(mContext, "There's no route matched!\n" +
+                    " Path = [" + postcard.getPath() + "]\n" +
+                    " Group = [" + postcard.getGroup() + "]", Toast.LENGTH_LONG).show();
+        }
+        // 3、存在NavigationCallback，回调其onLost()方法表明路径没有找到.
+        if (null != callback) {
+            callback.onLost(postcard);
+        } else {
+            // 4、如果没有设置NavigationCallback，会使用全局降级服务进行处理.
+            DegradeService degradeService = ARouter.getInstance().navigation(DegradeService.class);
+            if (null != degradeService) {
+                // 5、调用降级服务的onLost()进行处理
+                degradeService.onLost(context, postcard);
+            }
+        }
+        return null;
+    }
+    // 6、表明已经找到该Route
+    if (null != callback) {
+        callback.onFound(postcard);
+    }
+
+    /**========================================
+     * 7、没有开启绿色通道时，进行拦截器的拦截处理。
+     *    1. 此处的拦截器是InterceptorServiceImpl, 内部的doInterceptions()方法采用了线程池进行处理
+     *    2. 如果拦截器的处理不在异步线程中处理，拦截器的耗时操作可能会导致ANR
+     *==========================================*/
+    if (!postcard.isGreenChannel()) {
+        // 8、interceptorService在初始化时的_ARouter.afterInit()中设置，实现类为InterceptorServiceImpl。
+        interceptorService.doInterceptions(postcard, new InterceptorCallback() {
+            // 9、onContinue()后继续进行路由
+            @Override
+            public void onContinue(Postcard postcard) {
+                _navigation(context, postcard, requestCode, callback);
+            }
+            // 10、中断路由操作。回调NavigationCallback.onInterrupt()方法表明路由被中断。
+            @Override
+            public void onInterrupt(Throwable exception) {
+                if (null != callback) {
+                    callback.onInterrupt(postcard);
+                }
+            }
+        });
+    } else {
+        // 11、存在绿色通道直接进行路由。
+        return _navigation(context, postcard, requestCode, callback);
+    }
+
+    return null;
+}
+
+
+/**==============================================
+ * 6、最终的路由操作，根据Postcard的类型进行处理.
+ * // _ARouter.java
+ *==============================================*/
+private Object _navigation(final Context context, final Postcard postcard, final int requestCode, final NavigationCallback callback) {
+    final Context currentContext = null == context ? mContext : context;
+
+    switch (postcard.getType()) {
+        // 1、Activity的路由
+        case ACTIVITY:
+            // 2、创建Intent。Destination = HostActivity.class
+            final Intent intent = new Intent(currentContext, postcard.getDestination());
+            // 3、intent存入Extras
+            intent.putExtras(postcard.getExtras());
+            // 4、设置Flag, Activity的启动模式
+            int flags = postcard.getFlags();
+            if (-1 != flags) {
+                intent.setFlags(flags);
+            } else if (!(currentContext instanceof Activity)) {
+                // 5、当前的Context不是Activity的Context，因此采用FLAG_ACTIVITY_NEW_TASK进行启动.
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+
+            // 6、设置Action。常用于隐式意图，可以传递参数。如: intent.setAction("android.intent.action.VIEW");
+            String action = postcard.getAction();
+            if (!TextUtils.isEmpty(action)) {
+                intent.setAction(action);
+            }
+
+            // 7、在主线程中打开该Activity
+            if (Looper.getMainLooper().getThread() != Thread.currentThread()) {
+                mHandler.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        startActivity(requestCode, currentContext, intent, postcard, callback);
+                    }
+                });
+            } else {
+                startActivity(requestCode, currentContext, intent, postcard, callback);
+            }
+
+            break;
+        case PROVIDER:
+            return postcard.getProvider();
+        case BOARDCAST:
+        case CONTENT_PROVIDER:
+        case FRAGMENT:
+            // 8、Fragment目标的Class对象
+            Class fragmentMeta = postcard.getDestination();
+            try {
+                // 9、创建Fragment对象，并且传入参数.
+                Object instance = fragmentMeta.getConstructor().newInstance();
+                if (instance instanceof Fragment) {
+                    ((Fragment) instance).setArguments(postcard.getExtras());
+                } else if (instance instanceof android.support.v4.app.Fragment) {
+                    ((android.support.v4.app.Fragment) instance).setArguments(postcard.getExtras());
+                }
+                // 10、直接返回Fragment对象.
+                return instance;
+            } catch (Exception ex) {
+                logger.error(Consts.TAG, "Fetch fragment instance error, " + TextUtils.formatStackTrace(ex.getStackTrace()));
+            }
+        case METHOD:
+        case SERVICE:
+        default:
+            return null;
+    }
+
+    return null;
+}
+
+/**==============================================
+ * 7、startActivity，两种启动方式。
+ *    1. 需要返回值: startActivityForResult
+ *    2. 无返回值: startActivity
+ * // _ARouter.java
+ *==============================================*/
+private void startActivity(int requestCode, Context currentContext, Intent intent, Postcard postcard, NavigationCallback callback) {
+    // 1、根据情况选择启动activity的方式
+    if (requestCode >= 0) {  // Need start for result
+        ActivityCompat.startActivityForResult((Activity) currentContext, intent, requestCode, postcard.getOptionsBundle());
+    } else {
+        ActivityCompat.startActivity(currentContext, intent, postcard.getOptionsBundle());
+    }
+    // 2、处理Activity进出的动画效果
+    if ((-1 != postcard.getEnterAnim() && -1 != postcard.getExitAnim()) && currentContext instanceof Activity) {    // Old version.
+        ((Activity) currentContext).overridePendingTransition(postcard.getEnterAnim(), postcard.getExitAnim());
+    }
+    // 3、回调NavigationCallback的onArrival表明，已经跳转到目标页面
+    if (null != callback) { // Navigation over.
+        callback.onArrival(postcard);
+    }
+}
+```
+
+3、监听路由操作的功能是如何实现的?
+> 1. `navigation()`时传入的`NavigationCallback接口`相关的回调方法会在`_ARouter.navigation()`中进行处理。
+```java
+protected Object navigation(final Context context, final Postcard postcard, final int requestCode, final NavigationCallback callback) {
+     try {
+         LogisticsCenter.completion(postcard);
+     } catch (NoRouteFoundException ex) {
+         // 1、路径没有找到.
+        callback.onLost(postcard);
+         return null;
+     }
+     // 2、表明已经找到该Route
+     callback.onFound(postcard);
+
+     if (!postcard.isGreenChannel()) {
+         interceptorService.doInterceptions(postcard, new InterceptorCallback() {
+             @Override
+             public void onInterrupt(Throwable exception) {
+                // 3、中断路由操作。
+                callback.onInterrupt(postcard);
+             }
+         });
+     } else {
+         return _navigation(context, postcard, requestCode, callback);
+     }
+     return null;
+ }
+ private Object _navigation(final Context context, final Postcard postcard, final int requestCode, final NavigationCallback callback) {
+    // xxx
+    startActivity(requestCode, currentContext, intent, postcard, callback);
+    return null;
+}
+private void startActivity(int requestCode, Context currentContext, Intent intent, Postcard postcard, NavigationCallback callback) {
+    // 4、成功跳转到该页面。
+    callback.onArrival(postcard);
+}
+```
+
+4、局部监听路由操作和全局监听路由操作的优先级？
+> 1. 如果存在局部监听路由操作的`NavigationCallback`时，直接处理不会再调用`DegradeService的onLost()方法`。
+> 1. 如果不存在`NavigationCallback`才交给`DegradeService`处理。
+
+5、为什么在路径找不到时DegradeService的onLost()没有被调用？
+> 在`navigation()`时，已经设置了`NavigationCallback`，因此直接交给`NavigationCallback`进行处理。
+
+6、拦截器interceptor中如果有耗时操作会导致ANR吗?
+> 1. 不会
+> 1.` navigation`进行路由时，内部处理`拦截器相关操作`是在`线程池LogisticsCenter.executor`中进行处理的。不会ANR。
+
+7、为什么绿色通道GreenChannel不会导致路由被拦截?
+> 1. `_ARouter.navigation()`中会判断是否是`绿色通道`
+> 1. 非绿色通道才会通过拦截器进行处理。
+
+#### LogisticsCenter.completion(postcard)
+
+8、LogisticsCenter.completion(postcard)源码分析
+> 1.
+```java
+/**==============================================================
+     * // LogisticsCenter.java
+     * 1、补全不完整的Postcard.
+     *========================================================================*/
+    public synchronized static void completion(Postcard postcard) {
+
+        // 2、通过path查询到，路由Map中的RouteMeta-路由元数据。key = postcard.getPath() = /app/HostActivity
+        RouteMeta routeMeta = Warehouse.routes.get(postcard.getPath());
+        if (null == routeMeta) {    // Maybe its does't exist, or didn't load.
+            Class<? extends IRouteGroup> groupMeta = Warehouse.groupsIndex.get(postcard.getGroup());  // Load route meta.
+            if (null == groupMeta) {
+                throw new NoRouteFoundException(TAG + "There is no route match the path [" + postcard.getPath() + "], in group [" + postcard.getGroup() + "]");
+            } else {
+                // Load route and cache it into memory, then delete from metas.
+                try {
+                    if (ARouter.debuggable()) {
+                        logger.debug(TAG, String.format(Locale.getDefault(), "The group [%s] starts loading, trigger by [%s]", postcard.getGroup(), postcard.getPath()));
+                    }
+
+                    IRouteGroup iGroupInstance = groupMeta.getConstructor().newInstance();
+                    iGroupInstance.loadInto(Warehouse.routes);
+                    Warehouse.groupsIndex.remove(postcard.getGroup());
+
+                    if (ARouter.debuggable()) {
+                        logger.debug(TAG, String.format(Locale.getDefault(), "The group [%s] has already been loaded, trigger by [%s]", postcard.getGroup(), postcard.getPath()));
+                    }
+                } catch (Exception e) {
+                    throw new HandlerException(TAG + "Fatal exception when loading group meta. [" + e.getMessage() + "]");
+                }
+
+                completion(postcard);   // Reload
+            }
+        } else {
+            // 3、设置该Postcard所跳转到的目的地。如: class com.feather.imageview.HostActivity
+            postcard.setDestination(routeMeta.getDestination());
+            // 4、设置该Postcard的类型。如: ACTIVITY
+            postcard.setType(routeMeta.getType());
+            // 5、设置该Postcard的优先级。如: -1(默认值)
+            postcard.setPriority(routeMeta.getPriority());
+            // 6、设置该Postcard的额外数据。
+            postcard.setExtra(routeMeta.getExtra());
+
+            // 7、rawUri暂时不知道是干啥的
+            Uri rawUri = postcard.getUri();
+            if (null != rawUri) {   // Try to set params into bundle.
+                Map<String, String> resultMap = TextUtils.splitQueryParameters(rawUri);
+                Map<String, Integer> paramsType = routeMeta.getParamsType();
+
+                if (MapUtils.isNotEmpty(paramsType)) {
+                    // Set value by its type, just for params which annotation by @Param
+                    for (Map.Entry<String, Integer> params : paramsType.entrySet()) {
+                        setValue(postcard,
+                                params.getValue(),
+                                params.getKey(),
+                                resultMap.get(params.getKey()));
+                    }
+
+                    // Save params name which need auto inject.
+                    postcard.getExtras().putStringArray(ARouter.AUTO_INJECT, paramsType.keySet().toArray(new String[]{}));
+                }
+
+                // Save raw uri
+                postcard.withString(ARouter.RAW_URI, rawUri.toString());
+            }
+
+            switch (routeMeta.getType()) {
+                // 8、如果类型是Provider,会通过反射构造Provider对象，调用其init方法，并且存入到Providers Map中
+                case PROVIDER:
+                    // 9、获取Provider的Class对象
+                    Class<? extends IProvider> providerMeta = (Class<? extends IProvider>) routeMeta.getDestination();
+                    // 10、Providers Map中查找对应的对象
+                    IProvider instance = Warehouse.providers.get(providerMeta);
+                    if (null == instance) { // There's no instance of this provider
+                        // 11、没有查找到，构造对象.
+                        IProvider provider = providerMeta.getConstructor().newInstance();
+                        // 12、初始化
+                        provider.init(mContext);
+                        // 13、添加到Map中
+                        Warehouse.providers.put(providerMeta, provider);
+                        instance = provider;
+                    }
+                    // 14、设置Postcard的Provider
+                    postcard.setProvider(instance);
+                    // 15、Provider开通绿色通道。
+                    postcard.greenChannel();
+                    break;
+                // 16、Fragment都开启绿色通道。
+                case FRAGMENT:
+                    postcard.greenChannel();
+                default:
+                    break;
+            }
+        }
+    }
+```
+
+9、为什么Fragment不会触发拦截器?
+> 1. Fragment会设置`绿色通道`
+> 1. 在`_ARouter.navigation()`中通过`LogisticsCenter.completion(postcard)`对`Postcard进行填充时`，发现是`Fragment`会直接调用`postcard.greenChannel(); `进行设置。
+
+# 参考资料
 1. [可能是最详细的ARouter源码分析](https://www.jianshu.com/p/bc4c34c6a06c)
-1. [Java注解处理器](https://race604.com/annotation-processing/)
-1. [路由方案之ARouter源码分析](https://blog.csdn.net/byhook/article/details/79945460)
-1. [什么时候使用CountDownLatch](http://www.importnew.com/15731.html)
+2. [Java注解处理器](https://race604.com/annotation-processing/)
+3. [路由方案之ARouter源码分析](https://blog.csdn.net/byhook/article/details/79945460)
+4. [什么时候使用CountDownLatch](http://www.importnew.com/15731.html)
