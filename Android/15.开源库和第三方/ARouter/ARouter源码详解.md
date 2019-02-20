@@ -1,10 +1,12 @@
+
+
 转载请注明链接：https://blog.csdn.net/feather_wch/article/details/87376462
 
 >详细分析Router的源码。
 
 # ARouter源码详解
 
-版本：2019/2/20-1:38
+版本：2019/2/20-22:55
 
 ---
 
@@ -33,7 +35,9 @@
 5、arouter-api的作用?
 > 1. 提供了实现路由功能所需要的api
 
-## 初始化
+## arouter-api
+
+### 初始化
 
 1、ARouter的初始化
 ```java
@@ -46,7 +50,7 @@ if (isDebugARouter) {
 ARouter.init(BaseApp.this);
 ```
 
-### 开启日志
+#### openLog():开启日志
 
 2、ARouter.openLog()源码分析
 > 1. 设置DefaultLogger的标志位(isShowLog)为true
@@ -110,14 +114,14 @@ static synchronized void openDebug() {
 }
 ```
 
-### \_ARouter
+#### \_ARouter
 
 4、`_ARouter`的作用?
 > 1. ARouter的相关操作，内部都是通过`_ARouter`实现。
 > 1. Arouter是对外暴露api的类，`_ARouter`是真正的实现类
 > 1. 好处: 解耦，可以有选择的去暴露想要给用户使用的方法，并且将其他方法隐藏在内部。比使用`private`的灵活性更强。
 
-### 初始化源码
+#### init():初始化
 
 5、ARouter.init()源码分析
 > 1. 内部通过`_ARouter.init()`转交给`LogisticsCenter`(后勤中心)进行初始化工作。
@@ -411,7 +415,13 @@ public class ARouter$$Root$$home implements IRouteRoot {
 }
 ```
 
-#### Warehouse
+##### IRouteRoot、IInterceptorGroup、IProviderGroup
+
+7、IRouteRoot、IInterceptorGroup、IProviderGroup接口的作用?
+> 1. init()初始化工作时，会扫描所有dex中和ARouter相关的中间类。
+> 1. 只有实现这三种接口的类，才会通过反射实例化，并调用其`loadInto`来加载`Root元素、拦截器、Provider服务`
+
+##### Warehouse
 
 7、Warehouse的源码和作用分析
 > 1. 存储了Providers、Interceptors以及Group相关的RouteMeta(路由元数据)
@@ -522,7 +532,7 @@ public enum RouteType {
 }
 ```
 
-#### ClassUtils.getFileNameByPackageName
+##### getFileNameByPackageName()
 
 6、ClassUtils.getFileNameByPackageName()源码分析
 > 1. 找到app的dex，然后遍历出其中的属于com.alibaba.android.arouter.routes包下的所有类名.
@@ -597,15 +607,15 @@ public static Set<String> getFileNameByPackageName(Context context, final String
 > 1. 遍历所有Dex路径寻找指定包名下所有类的操作工作量过大，从而会导致效率问题。
 > 1. arouter-register就是用来解决这个问题。
 
-### 问题补充
+#### 问题补充
 
 1、为什么会出现错误: There is no route match the path
 > 1. 需要调用`ARouter.openDebug()`方法将标志位`debuggable`设置为`true`。不进入Debug模式不会弹出Toast，只会打印日志。
 > 1. 不同module的一级路径相同，导致moudle中的一级路径失效，因此跳转到第二个module的某个页面时出现该错误。
 
-## Navigation路由
+### Navigation路由
 
-### build
+#### build()
 
 1、ARouter.getInstance().build()源码分析
 > 1. 本质就是构建出内部保存了`path`和`group`的`Postcard`
@@ -678,7 +688,7 @@ public final class Postcard extends RouteMeta {
 }
 ```
 
-### navigation
+#### navigation()
 
 2、ARouter.getInstance().build(path).navigation()源码分析
 > 1. 也就是对`Postcard`的`navigation`进行源码分析
@@ -735,7 +745,7 @@ protected Object navigation(final Context context, final Postcard postcard, fina
         if (null != callback) {
             callback.onLost(postcard);
         } else {
-            // 4、如果没有设置NavigationCallback，会使用全局降级服务进行处理.
+            // 4、没有NavigationCallback，交给全局降级服务进行处理.
             DegradeService degradeService = ARouter.getInstance().navigation(DegradeService.class);
             if (null != degradeService) {
                 // 5、调用降级服务的onLost()进行处理
@@ -921,13 +931,13 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
 
 6、拦截器interceptor中如果有耗时操作会导致ANR吗?
 > 1. 不会
-> 1.` navigation`进行路由时，内部处理`拦截器相关操作`是在`线程池LogisticsCenter.executor`中进行处理的。不会ANR。
+> 1. `navigation`进行路由时，内部处理`拦截器相关操作`是在`线程池LogisticsCenter.executor`中进行处理的。不会ANR。
 
 7、为什么绿色通道GreenChannel不会导致路由被拦截?
 > 1. `_ARouter.navigation()`中会判断是否是`绿色通道`
 > 1. 非绿色通道才会通过拦截器进行处理。
 
-#### LogisticsCenter.completion(postcard)
+##### LogisticsCenter.completion(postcard)
 
 8、LogisticsCenter.completion(postcard)源码分析
 > 1.
@@ -938,29 +948,25 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
      *========================================================================*/
     public synchronized static void completion(Postcard postcard) {
 
-        // 2、通过path查询到，路由Map中的RouteMeta-路由元数据。key = postcard.getPath() = /app/HostActivity
+        // 2、通过path查询，路由Map中的RouteMeta-路由元数据。key = postcard.getPath() = /app/HostActivity
         RouteMeta routeMeta = Warehouse.routes.get(postcard.getPath());
-        if (null == routeMeta) {    // Maybe its does't exist, or didn't load.
-            Class<? extends IRouteGroup> groupMeta = Warehouse.groupsIndex.get(postcard.getGroup());  // Load route meta.
+        if (null == routeMeta) {
+            /**===============================================
+             * 不存在该路由点，可能是没有加载过，加载该group下所有的RouteMeta
+             *===============================================*/
+             // 1. 获取所处group所对应的中间类-如: ARouter$$Group$$arouter
+            Class<? extends IRouteGroup> groupMeta = Warehouse.groupsIndex.get(postcard.getGroup());
+            // 2. group不存在，报错。
             if (null == groupMeta) {
                 throw new NoRouteFoundException(TAG + "There is no route match the path [" + postcard.getPath() + "], in group [" + postcard.getGroup() + "]");
             } else {
-                // Load route and cache it into memory, then delete from metas.
-                try {
-                    if (ARouter.debuggable()) {
-                        logger.debug(TAG, String.format(Locale.getDefault(), "The group [%s] starts loading, trigger by [%s]", postcard.getGroup(), postcard.getPath()));
-                    }
-
-                    IRouteGroup iGroupInstance = groupMeta.getConstructor().newInstance();
-                    iGroupInstance.loadInto(Warehouse.routes);
-                    Warehouse.groupsIndex.remove(postcard.getGroup());
-
-                    if (ARouter.debuggable()) {
-                        logger.debug(TAG, String.format(Locale.getDefault(), "The group [%s] has already been loaded, trigger by [%s]", postcard.getGroup(), postcard.getPath()));
-                    }
-                } catch (Exception e) {
-                    throw new HandlerException(TAG + "Fatal exception when loading group meta. [" + e.getMessage() + "]");
-                }
+                // 3. 实例化Group
+                IRouteGroup iGroupInstance = groupMeta.getConstructor().newInstance();
+                // 4. 加载Group下所有子节点到Routes Map中
+                iGroupInstance.loadInto(Warehouse.routes);
+                // 5. 从GroupIndex分组索引中移除该【一级分组】
+                Warehouse.groupsIndex.remove(postcard.getGroup());
+                // 6. 重新进行填充
 
                 completion(postcard);   // Reload
             }
@@ -969,7 +975,7 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
             postcard.setDestination(routeMeta.getDestination());
             // 4、设置该Postcard的类型。如: ACTIVITY
             postcard.setType(routeMeta.getType());
-            // 5、设置该Postcard的优先级。如: -1(默认值)
+            // 5、设置该Postcard的优先级。如: -1(默认值, 最高优先级。)
             postcard.setPriority(routeMeta.getPriority());
             // 6、设置该Postcard的额外数据。
             postcard.setExtra(routeMeta.getExtra());
@@ -1032,9 +1038,9 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
 > 1. Fragment会设置`绿色通道`
 > 1. 在`_ARouter.navigation()`中通过`LogisticsCenter.completion(postcard)`对`Postcard进行填充时`，发现是`Fragment`会直接调用`postcard.greenChannel(); `进行设置。
 
-## Interceptor拦截器
+### Interceptor拦截器
 
-### InterceptorServiceImpl
+#### InterceptorServiceImpl
 
 1、InterceptorServiceImpl.doInterceptions()进行拦截的源码分析
 > 1. `InterceptorServiceImpl`实现`InterceptorService接口`
@@ -1071,7 +1077,7 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
                 @Override
                 public void run() {
 
-                    // 5、设置interceptorCounter的count = 拦截器数量
+                    // 5、设置interceptorCounter的count = 拦截器数量。每处理一个拦截器，interceptorCounter - 1。
                     CancelableCountDownLatch interceptorCounter = new CancelableCountDownLatch(Warehouse.interceptors.size());
                     try {
                         /**========================================
@@ -1080,7 +1086,7 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
                          *   2. 如果回调了onInterrupt则中断处理，设置Postcard的Tag为对应的Exception信息。
                          *=======================================*/
                         _excute(0, interceptorCounter, postcard);
-                        // 7、等待postcard.getTimeout()秒，本例中，等待300。interceptorCounter默认值为interceptors列表的size。每处理一个拦截器，interceptorCounter - 1.
+                        // 7、阻塞，知道计数归0，或者等待300秒。
                         interceptorCounter.await(postcard.getTimeout(), TimeUnit.SECONDS);
                         /**========================================
                          * 8、interceptorCounter的count > 0，表明没有处理完所有拦截器。
@@ -1170,6 +1176,659 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
     }
 ```
 
+2、拦截器的`process()`方法是在子线程执行还是主线程？
+> 1. 子线程
+
+3、拦截器的`process()`中如何操作UI？
+> 1. 需要切换到Main线程才能进行Dialog等UI操作
+
+### inject数据注入
+
+1、ARouter路由时是如何传递参数的?
+> 1. `@Autowired`的属性会在`ARouter.getInstance().inject(this);`调用时实现自动注入。
+> 1. 原生Activity、Fragment传递数据都是通过`Bundle`实现的。
+> 1. ARouter传递数据也是基于`Bundle`实现，并且自动赋值。
+```java
+// 携带数据
+ARouter.getInstance()
+        .build("/app/HostActivity")
+        .withString("type", "/fragment/one")
+        .navigation();
+```
+> HostActivity: 注入数据
+```java
+@Route(path = "/app/HostActivity")
+public class HostActivity extends AppCompatActivity {
+
+    @Autowired(name = "type")
+    String type;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        // 注入数据
+        ARouter.getInstance().inject(this);
+    }
+}
+```
+
+2、inject(this)源码分析
+```java
+/**============================
+ * 1、注入参数和服务
+ * // ARouter.java
+ *=============================*/
+public void inject(Object thiz) {
+    _ARouter.inject(thiz);
+}
+/**============================
+ * 2、通过AutowiredService注入参数
+ *  @param thiz 路由的目标，例如:HostActivity
+ * // _ARouter.java
+ *=============================*/
+static void inject(Object thiz) {
+    // 1、实例化AutowiredService
+    AutowiredService autowiredService = ((AutowiredService) ARouter.getInstance().build("/arouter/service/autowired").navigation());
+    if (null != autowiredService) {
+        // 2、注入参数
+        autowiredService.autowire(thiz);
+    }
+}
+
+/**============================
+ * 3、AutowiredService的实现类: AutowiredServiceImpl
+ * // AutowiredServiceImpl.java
+ *=============================*/
+@Route(path = "/arouter/service/autowired")
+public class AutowiredServiceImpl implements AutowiredService {
+    private LruCache<String, ISyringe> classCache; // Size = 66
+    private List<String> blackList;
+    /**============================
+     * 1、参数注入
+     *=============================*/
+    @Override
+    public void autowire(Object instance) {
+        // 2、获取到目标的className, 如: HostActivity
+        String className = instance.getClass().getName();
+        try {
+            // 3、不需要自动注入的目标会存到blackList中。
+            if (!blackList.contains(className)) {
+                // 4、缓存中去获取该页面所对应的ISyringe(注射器)实现
+                ISyringe autowiredHelper = classCache.get(className);
+                if (null == autowiredHelper) {
+                    // 5、不存在缓存，创建
+                    autowiredHelper = (ISyringe) Class.forName(instance.getClass().getName() + SUFFIX_AUTOWIRED).getConstructor().newInstance();
+                }
+                // 6、注射器的实现类进行注入
+                autowiredHelper.inject(instance);
+                // 7、缓存
+                classCache.put(className, autowiredHelper);
+            }
+        } catch (Exception ex) {
+            // 8、不需要自动注入的目标，存放到blackList中
+            blackList.add(className);
+        }
+    }
+}
+
+/**==========================================
+ * 4、所有具有@Autowired注解的类，都会通过apt生成ISyringe(注射器)的实现类
+ * // ISyringe.java
+ *=====================================*/
+public interface ISyringe {
+    void inject(Object target);
+}
+
+/**==========================================
+ * 5、HostActivity的注射器实现类。由apt生成。
+ * // HostActivity$$ARouter$$Autowired.java
+ *=====================================*/
+public class HostActivity$$ARouter$$Autowired implements ISyringe {
+    private SerializationService serializationService;
+    @Override
+    public void inject(Object target) {
+        // 1、目标类: HostActivity
+        HostActivity substitute = (HostActivity)target;
+        /**====================================================
+         * 2、赋值, @Autowired注解的属性。
+         *  1. substitute.type 这种表示代表private的属性无法注入。
+         * // 2.“目标类对象.属性”遇到private属性会抛出异常。会导致将该HostActivity存入不需要注入的列表中。
+         * // 3. 对private属性用 @Autowired注解, 会导致同一个类其他非private属性也无法注入.
+         *  4. 使用@Autowired注解private属性，直接会导致编译不过。
+         *=====================================================*/
+        substitute.type = substitute.getIntent().getStringExtra("type");
+        // xxx
+        /**====================================================
+         * 3、如果存在Bundle无法携带的属性。
+         *  1. 会通过SerializationService序列化成json的String传递。
+         *  2. SerializationService没有提供默认实现，需要用户自己实现
+         *=====================================================*/
+        serializationService = ARouter.getInstance().navigation(SerializationService.class);
+        if (null != serializationService) {
+            substitute.obj = serializationService.parseObject(substitute.getArguments().getString("obj"), new com.alibaba.android.arouter.facade.model.TypeWrapper<TestObj>(){}.getType());
+        } else {
+            Log.e("ARouter::", "You want automatic inject the field 'obj' in class 'BlankFragment' , then you should implement 'SerializationService' to support object auto inject!");
+        }
+        if (null == substitute.obj) {
+            Log.e("ARouter::", "The field 'obj' is null, in class '" + BlankFragment.class.getName() + "!");
+        }
+    }
+}
+```
+
+#### SerializationService
+3、需要传递自定义Bean需要实现SerializationService接口
+> 1. 将自定义Bean等数据序列化成Json字符串
+> 1. 注入时再将Json转换为对应的Bean。
+> 1. 自定义实现: JsonServiceImpl
+```java
+@Route(path = "/service/json")
+public class JsonServiceImpl implements SerializationService{
+    Gson mGson = new Gson();
+    // 1、Object转为Json
+    @Override
+    public String object2Json(Object instance) {
+        return mGson.toJson(instance);
+    }
+
+    // 2、Json转为Object
+    @Override
+    public <T> T parseObject(String input, Type clazz) {
+        return mGson.fromJson(input, clazz);
+    }
+
+    // 废弃。
+    @Override
+    public <T> T json2Object(String input, Class<T> clazz) {
+        return mGson.fromJson(input, clazz);
+    }
+
+    @Override
+    public void init(Context context) {
+    }
+}
+```
+
+4、withObject()崩溃报错
+> 必须要实现如上`SerializationService接口的实现类`，如: JsonServiceImpl
+
+
+#### AutowiredServiceImpl
+
+5、AutowiredServiceImpl如何缓存的？LruCache的应用场景？
+> 1. 利用`LruCache`对所有具有@Autowired注解的类所生成ISyringe(注射器)的实现进行缓存。
+> 1. 应用于`AutowiredServiceImpl`(自动注入服务)
+
+#### Autowired
+
+6、@Autowired能否注解private属性?
+> 1. 不可以。
+> 1. 会直接导致编译报错。
+> 1. `特殊情况下`注解`private属性`会导致当前目标，被加入到`不自动注入列表`中，从而导致`非private属性`无法`注入数据`。
+
+7、为什么@Autowired注解的属性没有被注入数据?
+> 1. 没有调用`ARouter.getInstance().inject(this);`
+> 1. 该属性为`private属性`
+> 1. 该属性虽然为`非private属性`，但是用`@Autowired`注解了`private属性`导致该页面被加入到`不自动注入列表`中
+> 1. 跳转到该页面时没有携带对应参数数据。
+
+8、@Autowired对于public、protected、default、private修饰的属性是否可以注入数据?
+> 1. public: 可以
+> 2. protected: 可以。虽然可能navigation的源对象位于其他包，但是注射器实现类`HostActivity$$ARouter$$Autowired`和`Hostctivity`位于同一个包，因此`目标类对象.属性`可以注入数据。
+> 3. default: 可以。同理`protected`
+> 4. private: 编译都失败。
+
+9、ARouter路由传递数据的流程
+> 1. 发起路由请求。通过`LogisticsCenter.completion`自动包装好`Postcard的参数(需要传递的数据)`
+> 1. 将`Postcard的数据`放入`Intent`,并且启动Activity。
+> 1. `inject()`方法中通过编译器产生的中间类-` xxx$$ARouter$$Autowired`进行赋值操作。
+
+10、ARouter处理数据的两种思路
+> 1. Bundle能处理的数据，通过Bundle传输。
+> 2. Bundle不能传递的数据，通过`SerializationService`将对象转为`Json字符串`进行传递，然后反序列化。
+
+## arouter-annotation
+
+### 注解
+
+#### Route
+
+1、Route源码
+```java
+// 1、表明该注解用于：类、接口(注解类型)、枚举
+@Target({ElementType.TYPE})
+// 2、进保留到编译器生成的`class`文件中
+@Retention(RetentionPolicy.CLASS)
+public @interface Route {
+
+    // 1、路径
+    String path();
+    // 2、分组
+    String group() default "";
+    // 3、名字，用于生成javadoc
+    String name() default "";
+     // 4、额外的数据
+    int extras() default Integer.MIN_VALUE;
+     // 5、优先级。-1表示最高优先级，这个优先级暂时没啥用。
+    int priority() default -1;
+}
+```
+
+2、@Target注解是什么？有什么用？
+> 1. 元注解之一，用于注解其他注解。
+> 1. 表明了`Annotation`所修饰的对象范围。
+```java
+@Documented
+// 运行时也会保留
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.ANNOTATION_TYPE)
+public @interface Target {
+    // 表明该注解类型可以用于哪些元素
+    ElementType[] value();
+}
+```
+
+3、@Target可以修饰的元素类型ElementType有哪些(10种)？
+```java
+public enum ElementType {
+    /** Class, interface (including annotation type), or enum declaration */
+    // 1、描述类: 类、接口(包括Annotation)、enum枚举声明
+    TYPE,
+    // 2、描述域：成员变量-包括enmu枚举常量
+    FIELD,
+    // 3、方法
+    METHOD,
+    // 4、参数
+    PARAMETER,
+    // 5、构造器
+    CONSTRUCTOR,
+    // 6、局部变量
+    LOCAL_VARIABLE,
+    // 7、Annotation注解类型
+    ANNOTATION_TYPE,
+    // 8、包
+    PACKAGE,
+    // 9、类型参数声明，1.8开始
+    TYPE_PARAMETER,
+    // 10、 Use of a type，1.8开始
+    TYPE_USE
+}
+```
+
+4、@Retention注解是什么？有什么用？
+> 1. 定义该Annotation被保留的时间长短。
+> 1. RetentionPolicy(保留策略)有三种类型:
+>    1. SOURCE: 仅保留在源码中。
+>    1. CLASS: 保留到class文件
+>    1. RUNTIME: VM的运行时依旧保留。
+> 1. 注释类型声明中不存在 Retention 注释，则默认为`CLASS`
+> Retention:
+```java
+@Documented
+// 1、运行时有效
+@Retention(RetentionPolicy.RUNTIME)
+// 2、注解
+@Target(ElementType.ANNOTATION_TYPE)
+public @interface Retention {
+    // 3、保留策略
+    RetentionPolicy value();
+}
+```
+> RetentionPolicy: 记忆策略
+```java
+public enum RetentionPolicy {
+    // 1、源文件中有效。被编译器丢弃。
+    SOURCE,
+     // 2、class文件中有效。在VM的运行时，被遗弃。这是默认的行为。
+    CLASS,
+     // 3、运行时有效。会在编译器的class文件中和VM的运行时中保留，该类型要深思熟虑。
+    RUNTIME
+}
+```
+
+5、元注解是什么？(meta-annotation)
+> 1. 元注解的作用就是负责注解其他注解。
+> 1. Java5.0定义了4个标准的meta-annotation类型:
+>   1. `@Target`
+>   1. `@Retention`
+>   1. `@Documented`
+>   1. `@Inherited`
+
+#### Autowired
+
+1、Autowired注解的源码分析
+> 1. 该注解用于`需要自动注入的成员变量`
+```java
+// 1、修饰成员变量
+@Target({ElementType.FIELD})
+// 2、保留到class文件中
+@Retention(RetentionPolicy.CLASS)
+public @interface Autowired {
+    // 3、参数或者服务的name
+    String name() default "";
+    /**============================================
+     * 4、required = true时，如果value = null，app会崩溃。
+     *     1. 只检查引用类型。
+     *     2. 不检查原始类型
+     *=============================================*/
+    boolean required() default false;
+    // 5、描述
+    String desc() default "";
+}
+```
+
+2、如何检查说是否注入的某些必要的数据?
+> 1. 如果是引用类型，可以使用`@Autowired(name = "xxx", required = true)`
+> 1. 该参数的值如果为`null`，app会直接崩溃。让开发者在调试阶段就发现问题。
+
+#### Interceptor
+
+1、Interceptor注解源码分析
+```java
+// 1、用于描述class、interface
+@Target({ElementType.TYPE})
+// 2、class文件中有效
+@Retention(RetentionPolicy.CLASS)
+public @interface Interceptor {
+    // 3、拦截器的优先级。ARouter会按顺序从0开始，依次处理拦截器(0、1、2、3、4、....)
+    int priority();
+    // 4、name，用于生成javadoc
+    String name() default "Default";
+}
+```
+
+### enums
+
+#### TypeKind
+
+1、TypeKind是什么？有什么作用?
+> 1-用于表明`参数类型`，便于ARouter调用相应的`withBoolean()/withByte()`去装填入参数。
+> 2-共有`12种类型的参数`
+```java
+public enum TypeKind {
+    // Base type
+    BOOLEAN,
+    BYTE,
+    SHORT,
+    INT,
+    LONG,
+    CHAR,
+    FLOAT,
+    DOUBLE,
+
+    // Other type
+    STRING,
+    SERIALIZABLE,
+    PARCELABLE,
+    OBJECT;
+}
+```
+> 3-会在`中间类ARouter$$Group$$xxx`中去设置参数类型。
+```java
+public class ARouter$$Group$$app implements IRouteGroup {
+    @Override
+    public void loadInto(Map<String, RouteMeta> atlas) {
+        atlas.put("/app/HostActivity",
+                RouteMeta.build(RouteType.ACTIVITY, HostActivity.class, "/app/hostactivity", "app",
+                        /**======================================
+                         * 填入参数类型。
+                         * 这里:
+                         *   11 = OBJECT，student是一个自定义Bean对象
+                         *   8 = STRING, type是一个字符串
+                         *=======================================*/
+                        new HashMap<String, Integer>(){{put("student", 11); put("type", 8); }},
+                        -1, -2147483648));
+    }
+}
+```
+
+2、ARouter根据参数类型，向postcard装填入参数的流程。
+> 1. `LogisticsCenter.completion()`->`LogisticsCenter.setValue()`
+```java
+/**==================================
+ * 1、Postcard的补全
+ * // LogisticsCenter.java
+ * ===============================*/
+public synchronized static void completion(Postcard postcard) {
+
+    RouteMeta routeMeta = Warehouse.routes.get(postcard.getPath());
+    if (null != routeMeta) {
+        // 1、Postcard设置各种参数.
+        postcard.setXXX();
+        // 2、获取到URI
+        Uri rawUri = postcard.getUri();
+        if (null != rawUri) {
+            // 3、从URL中拆分出参数的value
+            Map<String, String> resultMap = TextUtils.splitQueryParameters(rawUri);
+            // 4、参数类型的HashMap
+            Map<String, Integer> paramsType = routeMeta.getParamsType();
+
+            if (MapUtils.isNotEmpty(paramsType)) {
+                // 5、遍历所有的参数。根据参数类型，设置参数到Postcard中。
+                for (Map.Entry<String, Integer> params : paramsType.entrySet()) {
+                    setValue(postcard,
+                            // 6、参数类型
+                            params.getValue(),
+                            // 7、Key值。
+                            params.getKey(),
+                            // 8、该参数对应的Value
+                            resultMap.get(params.getKey()));
+                }
+
+                // 9、存入需要自动注入的参数。此处是所有参数.
+                postcard.getExtras().putStringArray(ARouter.AUTO_INJECT, paramsType.keySet().toArray(new String[]{}));
+            }
+            // 10、存入原始的URI
+            postcard.withString(ARouter.RAW_URI, rawUri.toString());
+        }
+    }
+}
+
+/**==================================
+ * 2、设置URI中解析出来的参数。
+ *   根据参数类型和TypeKind对比，调用相应的方法存入参数Value.
+ * // LogisticsCenter.java
+ *===============================*/
+private static void setValue(Postcard postcard, Integer typeDef, String key, String value) {
+    //
+    if (null != typeDef) {
+        if (typeDef == TypeKind.BOOLEAN.ordinal()) {
+            postcard.withBoolean(key, Boolean.parseBoolean(value));
+        } else if (typeDef == TypeKind.BYTE.ordinal()) {
+            postcard.withByte(key, Byte.valueOf(value));
+        } else if (typeDef == TypeKind.SHORT.ordinal()) {
+            postcard.withShort(key, Short.valueOf(value));
+        } else if (typeDef == TypeKind.INT.ordinal()) {
+            postcard.withInt(key, Integer.valueOf(value));
+        } else if (typeDef == TypeKind.LONG.ordinal()) {
+            postcard.withLong(key, Long.valueOf(value));
+        } else if (typeDef == TypeKind.FLOAT.ordinal()) {
+            postcard.withFloat(key, Float.valueOf(value));
+        } else if (typeDef == TypeKind.DOUBLE.ordinal()) {
+            postcard.withDouble(key, Double.valueOf(value));
+        } else if (typeDef == TypeKind.STRING.ordinal()) {
+            postcard.withString(key, value);
+        } else if (typeDef == TypeKind.PARCELABLE.ordinal()) {
+            // TODO : How to description parcelable value with string?
+        } else if (typeDef == TypeKind.OBJECT.ordinal()) {
+            postcard.withString(key, value);
+        } else {    // Compatible compiler sdk 1.0.3, in that version, the string type = 18
+            postcard.withString(key, value);
+        }
+    } else {
+        postcard.withString(key, value);
+    }
+}
+```
+
+## 实例分析
+
+### 单Module app
+
+1、实例分析init初始化流程()
+> 1-ARouter会生成8个中间类：3个ARouter级(`ARouter$$Root$$arouterapi、ARouter$$Providers$$arouterapi、ARouter$$Group$$arouter`)和5个app级(`ARouter$$Root$$app、ARouter$$Interceptors$$app、ARouter$$Providers$$app、ARouter$$Group$$app、 ARouter$$Group$$degrade`)
+> 2-加载ARouter级的Root和Providers。1、将`ARouter$$Group$$arouter`存入`groupsIndex` 2、将AutowiredServiceImpl和InterceptorServiceImpl存入`providersIndex`
+```java
+
+// 0 = "com.alibaba.android.arouter.routes.ARouter$$Root$$arouterapi"
+public class ARouter$$Root$$arouterapi implements IRouteRoot {
+    public void loadInto(Map<String, Class<? extends IRouteGroup>> routes) {
+        // Warehouse.groupsIndex【将ARouter$$Group$$arouter加入到group索引map中】
+        routes.put("arouter", arouter.class);
+    }
+}
+
+// 1 = "com.alibaba.android.arouter.routes.ARouter$$Providers$$arouterapi"
+public class ARouter$$Providers$$arouterapi implements IProviderGroup {
+
+    public void loadInto(Map<String, RouteMeta> providers) {
+        // Warehouse.providersIndex-AutowiredServiceImpl添加到Providers Map中
+        providers.put("com.alibaba.android.arouter.facade.service.AutowiredService", RouteMeta.build(RouteType.PROVIDER, AutowiredServiceImpl.class, "/arouter/service/autowired", "arouter", (Map)null, -1, -2147483648));
+        // Warehouse.providersIndex-InterceptorServiceImpl添加到Providers Map中
+        providers.put("com.alibaba.android.arouter.facade.service.InterceptorService", RouteMeta.build(RouteType.PROVIDER, InterceptorServiceImpl.class, "/arouter/service/interceptor", "arouter", (Map)null, -1, -2147483648));
+    }
+}
+
+// 2 = "com.alibaba.android.arouter.routes.ARouter$$Group$$arouter"
+public class ARouter$$Group$$arouter implements IRouteGroup {
+
+    public void loadInto(Map<String, RouteMeta> atlas) {
+        // Warehouse.routes 【AutowiredServiceImpl加载到Route列表中】
+        atlas.put("/arouter/service/autowired", RouteMeta.build(RouteType.PROVIDER, AutowiredServiceImpl.class, "/arouter/service/autowired", "arouter", (Map)null, -1, -2147483648));
+        // Warehouse.routes 【InterceptorServiceImpl加载到Route列表中】
+        atlas.put("/arouter/service/interceptor", RouteMeta.build(RouteType.PROVIDER, InterceptorServiceImpl.class, "/arouter/service/interceptor", "arouter", (Map)null, -1, -2147483648));
+    }
+}
+
+```
+```
+Warehouse.groupsIndex: size = 1
+ 0 = "arouter" -> "class com.alibaba.android.arouter.routes.ARouter$$Group$$arouter"
+
+Warehouse.providersIndex: size = 2
+0 = {HashMap$Node@10926} "com.alibaba.android.arouter.facade.service.AutowiredService" -> "RouteMeta{type=PROVIDER, rawType=null, destination=class com.alibaba.android.arouter.core.AutowiredServiceImpl, path='/arouter/service/autowired', group='arouter', priority=-1, extra=-2147483648, paramsType=null, name='null'}"
+1 = {HashMap$Node@10927} "com.alibaba.android.arouter.facade.service.InterceptorService" -> "RouteMeta{type=PROVIDER, rawType=null, destination=class com.alibaba.android.arouter.core.InterceptorServiceImpl, path='/arouter/service/interceptor', group='arouter', priority=-1, extra=-2147483648, paramsType=null, name='null'}"
+```
+> 3-加载app级别的Route: 1、将`ARouter$$Root$$app`和`ARouter$$Group$$degrade`存入`Warehouse.groupsIndex` 2、将`DegradeServiceImpl`存入`Warehouse.providersIndex` 3、将`MainInterceptor`存入`Warehouse.interceptorsIndex`
+```java
+
+// 0 = "com.alibaba.android.arouter.routes.ARouter$$Root$$app"
+public class ARouter$$Root$$app implements IRouteRoot {
+  @Override
+  public void loadInto(Map<String, Class<? extends IRouteGroup>> routes) {
+    // Warehouse.groupsIndex【group的索引，需要进一步加载Group中的内容】 - 存入Group app, 内部加载分组app中的Route
+    routes.put("app", ARouter$$Group$$app.class);
+    // Warehouse.groupsIndex【group的索引，需要进一步加载Group中的内容】 - 存入Group degrade
+    routes.put("degrade", ARouter$$Group$$degrade.class);
+  }
+}
+
+// 1 = "com.alibaba.android.arouter.routes.ARouter$$Interceptors$$app"
+public class ARouter$$Interceptors$$app implements IInterceptorGroup {
+  @Override
+  public void loadInto(Map<Integer, Class<? extends IInterceptor>> interceptors) {
+    // Warehouse.interceptorsIndex【拦截器的索引，需要进一步加载Interceptor中的内容】
+    interceptors.put(1, MainInterceptor.class);
+  }
+}
+
+// 2 = "com.alibaba.android.arouter.routes.ARouter$$Providers$$app"
+public class ARouter$$Providers$$app implements IProviderGroup {
+  @Override
+  public void loadInto(Map<String, RouteMeta> providers) {
+    // Warehouse.providersIndex【Providers服务的索引，需要进一步加载Provider中的内容】
+    providers.put("com.alibaba.android.arouter.facade.service.DegradeService", RouteMeta.build(RouteType.PROVIDER, DegradeServiceImpl.class, "/degrade/Service", "degrade", null, -1, -2147483648));
+  }
+}
+
+// 3 = "com.alibaba.android.arouter.routes.ARouter$$Group$$app"
+public class ARouter$$Group$$app implements IRouteGroup {
+  @Override
+  public void loadInto(Map<String, RouteMeta> atlas) {
+    // Warehouse.routes【存放具体的RouteMeta路由元数据】 - MainActivity的路由元数据
+    atlas.put("/app/MainActivity", RouteMeta.build(RouteType.ACTIVITY, MainActivity.class, "/app/mainactivity", "app", null, -1, -2147483648));
+    // Warehouse.routes【存放具体的RouteMeta路由元数据】 - MainFragment的路由元数据
+    atlas.put("/app/MainFragment", RouteMeta.build(RouteType.FRAGMENT, MainFragment.class, "/app/mainfragment", "app", null, -1, -2147483648));
+  }
+}
+
+// 4 = "com.alibaba.android.arouter.routes.ARouter$$Group$$degrade"
+public class ARouter$$Group$$degrade implements IRouteGroup {
+  @Override
+  public void loadInto(Map<String, RouteMeta> atlas) {
+    //  Warehouse.routes【存放具体的RouteMeta路由元数据】 - 存入全局降级策略Service(一种Provider)
+    atlas.put("/degrade/Service", RouteMeta.build(RouteType.PROVIDER, DegradeServiceImpl.class, "/degrade/service", "degrade", null, -1, -2147483648));
+  }
+}
+
+```
+> 4-`afterInit()`会加载`/arouter/service/interceptor`也就是`InterceptorServiceImpl`
+```java
+    static void afterInit() {
+        interceptorService = (InterceptorService) ARouter.getInstance().build("/arouter/service/interceptor").navigation();
+    }
+```
+> 5-`build("/arouter/service/interceptor")`中会先加载`PathReplaceService`
+```java
+    protected Postcard build(String path) {
+        PathReplaceService pService = ARouter.getInstance().navigation(PathReplaceService.class);
+        path = pService.forString(path);
+        return build(path, extractGroup(path));
+    }
+```
+> 6-加载`PathReplaceService`的`navigation(service)`
+```java
+/**=====================================================
+     * 加载Service
+     * // _ARouter.java
+     * ====================================================*/
+    protected <T> T navigation(Class<? extends T> service) {
+        // 1. 用Service的Name构造对应的Postcard
+        Postcard postcard = LogisticsCenter.buildProvider(service.getName());
+        // 2. 可能是老版本，用Service的SimpleName构建
+        if (null == postcard) {
+            postcard = LogisticsCenter.buildProvider(service.getSimpleName());
+        }
+        // 3、不存在目标Service返回Null
+        if (null == postcard) {
+            return null;
+        }
+        // 4、存在目标Serivce，补全Postcard
+        LogisticsCenter.completion(postcard);
+        // 5、返回该Service(Provider)
+        return (T) postcard.getProvider();
+    }
+
+    /**===========================================================
+     * 2、构造Service(Provider)
+     * 1. 查找到Warehouse.providersIndex中ServiceName对应的RouteMeta
+     * 2. 用RouteMeta的path和group构造Postcard
+     * // LogisticsCenter.java
+     * ====================================================*/
+    public static Postcard buildProvider(String serviceName) {
+        // 1. 查找到Warehouse.providersIndex中ServiceName对应的RouteMeta
+        RouteMeta meta = Warehouse.providersIndex.get(serviceName);
+        if (null == meta) {
+            return null;
+        } else {
+            // 2. 用RouteMeta的path和group构造Postcard
+            return new Postcard(meta.getPath(), meta.getGroup());
+        }
+    }
+```
+> 7-构造出`/arouter/service/interceptor`也就是`InterceptorServiceImpl`对应的Postcard后正式开始navigation加载
+> 8-`navigation`中`LogisticsCenter.completion()`因为`Warehouse.routes`中找不到`InterceptorServiceImpl`，因此会去加载`group = arouter`下面的所有节点，调用`ARouter$$Group$$arouter.loadInto()`加载`AutowiredServiceImpl`和`InterceptorServiceImpl`
+> 9-`ARouter$$Group$$arouter`从`Warehouse.groupsIndex`中移除
+> 10-构造出`InterceptorServiceImpl对象`并加入到`Warehouse.providers`中
+
+2、实例分析navigation路由到Fragment的流程。
+> 1. `ARouter.getInstance().build(“/app/MainFragment”).navigation();`会先加载`group = app`下面所有的Fragment、Activity
+> 1. 实例化`MainFragment`并且返回。
+
+3、实例分析navigation路由到Activity的流程。
+> 1. `ARouter.getInstance().build(“/app/MainActivity”).navigation();`会先加载`group = app`下面所有的Fragment、Activity
+> 1. 如果出错没找到，会调用`ARouter$$Group$$degrade.loadInto()`加载`DegradeServiceImpl`到providers中。并进行降级处理。
+> 1. 如果没有出错，会通过`InterceptorServiceImpl`处理拦截器。
+> 1. 最终实例化`Activity`并且携带参数跳转到目标页面。
 
 # 参考资料
 1. [可能是最详细的ARouter源码分析](https://www.jianshu.com/p/bc4c34c6a06c)
@@ -1177,3 +1836,4 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
 3. [路由方案之ARouter源码分析](https://blog.csdn.net/byhook/article/details/79945460)
 4. [什么时候使用CountDownLatch](http://www.importnew.com/15731.html)
 1. [CountDownLatch理解一：与join的区别](https://blog.csdn.net/zhutulang/article/details/48504487)
+1. [annotation(@Retention@Target)详解](https://www.cnblogs.com/gmq-sh/p/4798194.html)
