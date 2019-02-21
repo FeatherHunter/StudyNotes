@@ -1,0 +1,99 @@
+* {
+    margin: 0;
+    padding: 0;
+    text-decoration: none;
+}
+
+body {
+    padding: 20px;
+}
+
+.main {
+    width: 500px;
+    height: 350px;
+    overflow: hidden;
+    margin: 0 auto;
+    position: relative;
+}
+
+.main1 {
+    width: 2500px;
+    height: 350px;
+    position: absolute;
+    z-index: 1;
+}
+
+.main1 img {
+    float: left;
+}
+
+/*5个圆点*/
+.point {
+    width: 150px;
+    height: 10px;
+    position: absolute;
+    left: 200px;
+    bottom: 20px;
+    z-index: 2;
+}
+
+.point span {
+    width: 10px;
+    height: 10px;
+    float: left;
+    margin: 0 5px;
+    border: 1px solid #fff;
+    background: #333;
+    border-radius: 5px;
+}
+
+/*第一个span*/
+.point .on {
+    background: orangered;
+}
+
+/*上下页切换图标*/
+.arrow {
+    cursor: pointer;
+    display: none; /*不显示*/
+    line-height: 31px;
+    text-align: center;
+    font-size: 36px;
+    font-weight: bold;
+    width: 40px;
+    height: 32px;
+    position: absolute;
+    z-index: 2;
+    top: 160px;
+    background-color: RGBA(0 0 0 0.3);
+    color: #fff;
+}
+
+/*鼠标移入切换图标上*/
+.arrow:hover {
+    background-color: RGBA(0 0 0 0.7);
+}
+
+/*鼠标移入整个div*/
+.main:hover .arrow {
+    display: block; /*显示*/
+}
+
+.bx-prev {
+    left: 20px;
+    background-image: url("/JQuery/img/controls.png");
+
+}
+
+.bx-next {
+    right: 20px;
+    background-image: url("/JQuery/img/controls.png");
+    background-position-x: 58px;
+}
+
+.test {
+    width: 1000px;
+    height: 100px;
+    border: 1px solid red;
+}
+
