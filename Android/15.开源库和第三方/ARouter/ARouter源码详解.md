@@ -1,12 +1,10 @@
-
-
 转载请注明链接：https://blog.csdn.net/feather_wch/article/details/87376462
 
 >详细分析Router的源码。
 
 # ARouter源码详解
 
-版本：2019/2/20-22:55
+版本：2019/2/21-17:55
 
 ---
 
@@ -482,55 +480,10 @@ public interface IInterceptor extends IProvider {
 
 ##### RouteMeta、RouteType
 
-9、RouteMeta分析
-> RouteMeta是一个数据bean，封装了被注解类的一些信息
-```java
-public class RouteMeta {
-    /**=========================================
-     * 1、路由类型。是一个枚举，表示被注解类的路由类型。例如: PROVIDER
-     *   1. Activity
-     *   2. Service // 目前不支持
-     *   3. Provider
-     *   4. Content Provider // 目前不支持
-     *   5. Broastcast // 目前不支持
-     *   6. Method
-     *   7. Fragment
-     *   8. UNKNOWN
-     *========================================*/
-    private RouteType type;
-    private Element rawType;        // Raw type of route
-    private Class<?> destination;   // Destination. 例如: class com.alibaba.android.arouter.core.AutowiredServiceImpl; class com.alibaba.android.arouter.core.InterceptorServiceImpl;
-    private String path;            // Path of route. 例如: /arouter/service/autowired; /arouter/service/interceptor
-    private String group;           // Group of route. 例如: arouter
-    private int priority = -1;      // The smaller the number, the higher the priority
-    private int extra;              // Extra data
-    private String name;
-    private Map<String, Autowired> injectConfig;  // Cache inject config.
-    /**=========================================
-     * 2、属性类型。包含了所有注解了Autowired的属性的信息。
-     *   key为属性名，value为属性类型，ARouter将可被intent传递的数据类型定义了对应的int类型：
-     *   BOOLEAN,BYTE,SHORT,INT,LONG,CHAR,FLOAT,DOUBLE,STRING,PARCELABLE,OBJECT分别对应0，1，2，3...
-     *========================================*/
-    private Map<String, Integer> paramsType;  // Param type
-}
-
-/**=========================================
- * 1、路由类型。枚举，表示被注解类的路由类型。
- *========================================*/
-public enum RouteType {
-    ACTIVITY(0, "android.app.Activity"),
-    SERVICE(1, "android.app.Service"),
-    PROVIDER(2, "com.alibaba.android.arouter.facade.template.IProvider"),
-    CONTENT_PROVIDER(-1, "android.app.ContentProvider"),
-    BOARDCAST(-1, ""),
-    METHOD(-1, ""),
-    FRAGMENT(-1, "android.app.Fragment"),
-    UNKNOWN(-1, "Unknown route type");
-
-    int id;
-    String className;
-}
-```
+9、RouteMeta和RouteType的作用?
+> 1. RouteMeta是一个数据bean，封装了被注解类的一些信息
+> 1. RouteType是路由类型，该枚举表明是Provider、Activity、Fragment等类型。
+> 1. 详情见: `arouter-annotation->model->RouteMeta`和`arouter-annotation->enums->RouteType`
 
 ##### getFileNameByPackageName()
 
@@ -1660,6 +1613,1080 @@ private static void setValue(Postcard postcard, Integer typeDef, String key, Str
 }
 ```
 
+#### RouteType
+
+2、RouteType的作用
+> 1. 路由类型
+```java
+
+/**=========================================
+ * 1、路由类型。枚举，表示被注解类的路由类型。
+ *========================================*/
+public enum RouteType {
+    ACTIVITY(0, "android.app.Activity"),
+    SERVICE(1, "android.app.Service"),
+    PROVIDER(2, "com.alibaba.android.arouter.facade.template.IProvider"),
+    CONTENT_PROVIDER(-1, "android.app.ContentProvider"),
+    BOARDCAST(-1, ""),
+    METHOD(-1, ""),
+    FRAGMENT(-1, "android.app.Fragment"),
+    UNKNOWN(-1, "Unknown route type");
+
+    int id;
+    String className;
+}
+```
+
+### model
+
+#### RouteMeta
+
+1、RouteMeta是什么?
+> 1. RouteMeta是一个数据bean，封装了被注解类的一些信息
+> 1. 所有需要跳转的页面(Activity、Fragment)都会封装成`RouteMeta`存放到`Warehouse.routes`中
+> 1. 所有的Provider的索引都会封装成`RouteMeta`存放到`Warehouse.providersIndex`中，后续实际加载`provider`时会从索引中提取出关键信息，`实例化`provider并且存入`Warehouse`的`Map<Class, IProvider> providers`中。
+```java
+public class RouteMeta {
+    /**=========================================
+     * 1、路由类型。是一个枚举，表示被注解类的路由类型。例如: PROVIDER
+     *   1. Activity
+     *   2. Service // 目前不支持
+     *   3. Provider
+     *   4. Content Provider // 目前不支持
+     *   5. Broastcast // 目前不支持
+     *   6. Method
+     *   7. Fragment
+     *   8. UNKNOWN
+     *========================================*/
+    private RouteType type;
+    private Element rawType;        // Raw type of route
+    /**========================================
+     *  2、路由的目标。
+     *   如: HostActivity.class、MainFragment.class、MyInterceptor.cass、
+     *=======================================*/
+    private Class<?> destination;   // Destination. 例如: class com.alibaba.android.arouter.core.AutowiredServiceImpl; class com.alibaba.android.arouter.core.InterceptorServiceImpl;
+    /**========================================
+     *  3、路由的路径。
+     *   如: /app/MainActivity
+     *=======================================*/
+    private String path;            // Path of route. 例如: /arouter/service/autowired; /arouter/service/interceptor
+    /**========================================
+     *  4、路由的分组(一级路径)。
+     *   如: app、arouter
+     *=======================================*/
+    private String group;           // Group of route. 例如: arouter
+    /**=========================================
+     *  5、属性类型。包含了所有注解了Autowired的属性的信息。
+     *   key为属性名，value为属性类型，ARouter将可被intent传递的数据类型定义了对应的int类型：
+     *   BOOLEAN,BYTE,SHORT,INT,LONG,CHAR,FLOAT,DOUBLE,STRING,PARCELABLE,OBJECT分别对应0，1，2，3...
+     *========================================*/
+    private Map<String, Integer> paramsType;  // Param type
+    /**========================================
+     *  6、优先级。-1默认为最高。
+     *   1. 该属性目前没啥用。
+     *   2. 拦截器才需要优先级。并且放在Warehouse的
+     *      Map<Integer, Class<? extends IInterceptor>> interceptorsIndex中。
+     *      也不是RouteMeta属性的。
+     *=======================================*/
+    private int priority = -1;      // The smaller the number, the higher the priority
+    /**========================================
+     *  7、name
+     *=======================================*/
+    private String name;
+    /**========================================
+     *  8、额外数据
+     *=======================================*/
+    private int extra;              // Extra data
+    /**========================================
+     *  9、注解配置，目前不知道有什么用。
+     *=======================================*/
+    private Map<String, Autowired> injectConfig;  // Cache inject config.
+}
+```
+
+## arouter-compiler
+
+
+1、arouter-compiler的作用和使用?
+> 1. 作用是在编译期间，过滤第一个模块中定义的几个注解(Route，Autowired，Interceptor)，然后生成编译期间的中间代码.
+> 1. `build.gradle`中引入
+```xml
+    annotationProcessor 'com.alibaba:arouter-compiler:1.2.0'
+```
+
+### AbstractProcessor简介
+
+2、AbstractProcessor的作用?
+> 1. 通过AbstractProcessor以`Java编译时生成代码的方式`实现`注解处理器`。
+> 1. 抽象类AbstractProcessor以及接口Processor都是位于`包javax.annotation.processing`中。
+> 1. 该抽象类有四个主要方法:
+```java
+public abstract class AbstractProcessor implements Processor {
+    protected ProcessingEnvironment processingEnv;
+    private boolean initialized = false;
+
+    /**===========================================================================
+     * 1、初始化。用于初始化操作，利用参数提供的ProcessingEnvironment，可能以获取一些有用的工具类。
+     * ===========================================================================*/
+    public synchronized void init(ProcessingEnvironment var1) {
+        if(this.initialized) {
+            throw new IllegalStateException("Cannot call init more than once.");
+        } else {
+            Objects.requireNonNull(var1, "Tool provided null ProcessingEnvironment");
+            this.processingEnv = var1;
+            this.initialized = true;
+        }
+    }
+    /**===========================================================================
+     * 2、注解处理器的核心方法，处理具体的注解。
+     * ===========================================================================*/
+    public abstract boolean process(Set<? extends TypeElement> var1, RoundEnvironment var2);
+
+    /**===========================================================================
+     * 3、返回此注释 Processor 支持的最新的源版本。
+     *      1. 可以通过注解指定: @SupportedSourceVersion(SourceVersion.RELEASE_7)
+     * ===========================================================================*/
+    public SourceVersion getSupportedSourceVersion() {
+        // xxx
+    }
+    /**===========================================================================
+     * 4、返回此 Processor 支持的注释类型的名称。
+     *      1. 可能是"name."形式的名称，表示所有以"name."开头的规范名称的注释类型集合。
+     *      2. 不应该声明"*", 除非实际处理了所有文件。如此声明可能导致性能下降。
+     *      3. 可以通过注解指定: @SupportedAnnotationTypes()
+     * ===========================================================================*/
+    public Set<String> getSupportedAnnotationTypes() {
+        // xxx
+    }
+    /**===========================================================================
+     * 5、可以通过注解指定: @SupportedOptions()
+     * ===========================================================================*/
+    public Set<String> getSupportedOptions() {
+        SupportedOptions var1 = (SupportedOptions)this.getClass().getAnnotation(SupportedOptions.class);
+        return var1 == null?Collections.emptySet():arrayToSet(var1.value());
+    }
+    public Iterable<? extends Completion> getCompletions(xxx){xxx}
+    protected synchronized boolean isInitialized() {return this.initialized;}
+    private static Set<String> arrayToSet(String[] var0) {xxx}
+}
+```
+
+3、ProcessingEnvironment的作用
+> 提供有用的工具类。
+```java
+public interface ProcessingEnvironment {
+
+        /**
+         * 返回用来在元素上进行操作的某些实用工具方法的实现。<br>
+         *
+         * Elements是一个工具类，可以处理相关Element（包括ExecutableElement, PackageElement, TypeElement, TypeParameterElement, VariableElement）
+         */
+        Elements getElementUtils();
+
+        /**
+         * 返回用来报告错误、警报和其他通知的 Messager。
+         */
+        Messager getMessager();
+
+        /**
+         *  用来创建新源、类或辅助文件的 Filer。
+         */
+        Filer getFiler();
+
+        /**
+         *  返回用来在类型上进行操作的某些实用工具方法的实现。
+         */
+        Types getTypeUtils();
+
+        // 返回任何生成的源和类文件应该符合的源版本。
+        SourceVersion getSourceVersion();
+
+        // 返回当前语言环境；如果没有有效的语言环境，则返回 null。
+        Locale getLocale();
+
+        // 返回传递给注释处理工具的特定于 processor 的选项
+        Map<String, String> getOptions();
+    }
+```
+
+### RouteProcessor
+
+2、RouteProcessor的作用
+> 1. 在编译期间获取Route注解的类，生成中间类文件。
+> 1. 生成唯一的Root文件: `ARouter$$Root$$ + ModuleName`
+> 1. 生成唯一的Provider文件: `ARouter$$Providers + ModuleName`
+> 1. 生成各个分组对应的Group文件:
+>      1. `ARouter$$Group$$ + GroupA`
+>      1. `ARouter$$Group$$ + GroupB`
+>      1. `ARouter$$Group$$ + GroupC`
+
+3、RouteProcessor源码解析
+> 1. 生成`Root中间类、Group中间类、Provider中间类`文件
+> 1. 分别构造这三种文件的`loadInto()`
+```java
+@AutoService(Processor.class)
+// 1、支持的选项: "AROUTER_MODULE_NAME"和"AROUTER_GENERATE_DOC"
+//        javaCompileOptions {
+//                annotationProcessorOptions {
+//                includeCompileClasspath = true
+//                arguments = [AROUTER_MODULE_NAME: project.getName()]
+//               }
+//        }
+@SupportedOptions({KEY_MODULE_NAME, KEY_GENERATE_DOC_NAME})
+// 2、支持的最新的源版本：1.7
+@SupportedSourceVersion(SourceVersion.RELEASE_7)
+// 3、支持的注解类型的名称: "com.alibaba.android.arouter.facade.annotation.Route"和"com.alibaba.android.arouter.facade.annotation.Autowired"
+@SupportedAnnotationTypes({ANNOTATION_TYPE_ROUTE, ANNOTATION_TYPE_AUTOWIRED})
+public class RouteProcessor extends AbstractProcessor {
+    private Map<String, Set<RouteMeta>> groupMap = new HashMap<>(); // ModuleName and routeMeta.
+    private Map<String, String> rootMap = new TreeMap<>();  // Map of root metas, used for generate class file in order.
+    // xxx省略xxx
+
+    /**=============================================================
+     * 1、初始化“注解处理器”，通过ProcessingEnvironment提供的相应工具类。
+     *    1. 获取并处理用户配置的 module name
+     *    2. 生成用户配置的 doc文件
+     *====================================================================*/
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+
+        // 0、工具初始化
+        mFiler = processingEnv.getFiler();                  // Generate class.
+        types = processingEnv.getTypeUtils();            // Get type utils.
+        elements = processingEnv.getElementUtils();      // Get class meta.
+        iProvider = elements.getTypeElement(Consts.IPROVIDER).asType();
+        typeUtils = new TypeUtils(types, elements);
+        logger = new Logger(processingEnv.getMessager());   // Package the log utils.
+
+        // 1、获取到用户配置的Module Name。
+        Map<String, String> options = processingEnv.getOptions();
+        if (MapUtils.isNotEmpty(options)) {
+            moduleName = options.get(KEY_MODULE_NAME);
+            generateDoc = VALUE_ENABLE.equals(options.get(KEY_GENERATE_DOC_NAME));
+        }
+
+        // 2、处理用户配置的module name
+        if (StringUtils.isNotEmpty(moduleName)) {
+            moduleName = moduleName.replaceAll("[^0-9a-zA-Z_]+", "");
+        }
+
+        // 3、生成doc文件
+        if (generateDoc) {
+            docWriter = mFiler.createResource(
+                        StandardLocation.SOURCE_OUTPUT,
+                        PACKAGE_OF_GENERATE_DOCS,
+                        "arouter-map-of-" + moduleName + ".json"
+                        ).openWriter();
+        }
+    }
+
+    /**=============================================================
+     * 2、处理注解。会获取到环境变量中过滤的元素集合，最终生成编译期间的中间类。
+     *      命名规则: 工程名+$$+Group+$$+模块名
+     *====================================================================*/
+    public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        if (CollectionUtils.isNotEmpty(annotations)) {
+            Set<? extends Element> routeElements = roundEnv.getElementsAnnotatedWith(Route.class);
+            // 1. 解析路由元素
+            this.parseRoutes(routeElements);
+            return true;
+        }
+        return false;
+    }
+
+
+    /**=============================================================
+     * 3、解析路由元素。
+     *====================================================================*/
+    private void parseRoutes(Set<? extends Element> routeElements) throws IOException {
+        if (CollectionUtils.isNotEmpty(routeElements)) {
+            // 1、找到所有用@Route注解的目标
+            logger.info(">>> Found routes, size is " + routeElements.size() + " <<<");
+
+            rootMap.clear();
+
+            TypeMirror type_Activity = elements.getTypeElement(ACTIVITY).asType();
+            TypeMirror type_Service = elements.getTypeElement(SERVICE).asType();
+            TypeMirror fragmentTm = elements.getTypeElement(FRAGMENT).asType();
+            TypeMirror fragmentTmV4 = elements.getTypeElement(Consts.FRAGMENT_V4).asType();
+            // Interface of ARouter
+            TypeElement type_IRouteGroup = elements.getTypeElement("xxx.IRouteGroup");
+            TypeElement type_IProviderGroup = elements.getTypeElement("xxx..IProviderGroup");
+            ClassName routeMetaCn = ClassName.get(RouteMeta.class);
+            ClassName routeTypeCn = ClassName.get(RouteType.class);
+
+            /**=============================================================
+             * 2、构造Root元素中, loadInto的入参
+             *     // ARouter$$Root$$... loadInto()方法入参:
+             *     Map<String, Class<? extends IRouteGroup>> routes
+             *====================================================================*/
+            ParameterizedTypeName inputMapTypeOfRoot = ParameterizedTypeName.get(
+                    ClassName.get(Map.class),
+                    ClassName.get(String.class),
+                    ParameterizedTypeName.get(
+                            ClassName.get(Class.class),
+                            WildcardTypeName.subtypeOf(ClassName.get(type_IRouteGroup))
+                    )
+            );
+
+            /**=============================================================
+             * 3、构造Group和Providers中, loadInto的入参
+             *     // ARouter$$Group$$... loadInto()方法入参:
+             *        1. Map<String, RouteMeta> atlas
+             *     // ARouter$$Providers$$... loadInto()方法入参:
+             *        2. Map<String, RouteMeta> providers
+             *====================================================================*/
+            ParameterizedTypeName inputMapTypeOfGroup = ParameterizedTypeName.get(
+                    ClassName.get(Map.class),
+                    ClassName.get(String.class),
+                    ClassName.get(RouteMeta.class)
+            );
+
+            /**=============================================
+             * 4、构造入参名称
+             *     1. Root元素: "routes"
+             *     2. Group: "atlas"
+             *     3. Providers: "providers"
+             *==============================================*/
+            ParameterSpec rootParamSpec = ParameterSpec.builder(inputMapTypeOfRoot, "routes").build();
+            ParameterSpec groupParamSpec = ParameterSpec.builder(inputMapTypeOfGroup, "atlas").build();
+            ParameterSpec providerParamSpec = ParameterSpec.builder(inputMapTypeOfGroup, "providers").build();  // Ps. its param type same as groupParamSpec!
+
+
+            //  Follow a sequence, find out metas of group first, generate java file, then statistics them as root.
+            for (Element element : routeElements) {
+                TypeMirror tm = element.asType();
+                Route route = element.getAnnotation(Route.class);
+                RouteMeta routeMeta;
+
+                /**=============================================
+                 * 5、目标是Activity。处理所有Autowire注解的字段的参数类型。
+                 *==============================================*/
+                if (types.isSubtype(tm, type_Activity)) {                 // Activity
+                    logger.info(">>> Found activity route: " + tm.toString() + " <<<");
+
+                    // 1. 获取到所有@Autowired注解的字段
+                    Map<String, Integer> paramsType = new HashMap<>();
+                    Map<String, Autowired> injectConfig = new HashMap<>();
+                    // 2. 遍历这些字段，处理数据类型，存入到RouteMeta的paramsType中。
+                    for (Element field : element.getEnclosedElements()) {
+                        if (field.getKind().isField() && field.getAnnotation(Autowired.class) != null && !types.isSubtype(field.asType(), iProvider)) {
+                            // It must be field, then it has annotation, but it not be provider.
+                            Autowired paramConfig = field.getAnnotation(Autowired.class);
+                            String injectName = StringUtils.isEmpty(paramConfig.name()) ? field.getSimpleName().toString() : paramConfig.name();
+                            paramsType.put(injectName, typeUtils.typeExchange(field));
+                            injectConfig.put(injectName, paramConfig);
+                        }
+                    }
+                    // 3. 构建RouteMeta
+                    routeMeta = new RouteMeta(route, element, RouteType.ACTIVITY, paramsType);
+                    // 4. 存入Map<String, Autowired> injectConfig
+                    routeMeta.setInjectConfig(injectConfig);
+                }
+                /**=============================================
+                 * 6、目标是Provider, 构建对应的RouteMeta
+                 *==============================================*/
+                else if (types.isSubtype(tm, iProvider)) {         // IProvider
+                    logger.info(">>> Found provider route: " + tm.toString() + " <<<");
+                    routeMeta = new RouteMeta(route, element, RouteType.PROVIDER, null);
+                }
+                /**=============================================
+                 * 7、目标是Service, 构建对应的RouteMeta
+                 *==============================================*/
+                else if (types.isSubtype(tm, type_Service)) {           // Service
+                    logger.info(">>> Found service route: " + tm.toString() + " <<<");
+                    routeMeta = new RouteMeta(route, element, RouteType.parse(SERVICE), null);
+                }
+                /**=============================================
+                 * 8、目标是Fragment, 构建对应的RouteMeta
+                 *==============================================*/
+                else if (types.isSubtype(tm, fragmentTm) || types.isSubtype(tm, fragmentTmV4)) {
+                    logger.info(">>> Found fragment route: " + tm.toString() + " <<<");
+                    routeMeta = new RouteMeta(route, element, RouteType.parse(FRAGMENT), null);
+                }
+
+                /**=============================================
+                 * 9、对RouteMeta进行分类.
+                 *==============================================*/
+                categories(routeMeta);
+            }
+
+            /**=============================================
+             * 10、Root的方法loadInto()的构造器
+             *==============================================*/
+            MethodSpec.Builder loadIntoMethodOfRootBuilder = MethodSpec.methodBuilder(METHOD_LOAD_INTO)
+                    .addAnnotation(Override.class)
+                    .addModifiers(PUBLIC)
+                    .addParameter(rootParamSpec);
+
+            /**=============================================
+             * 11、Provider的方法loadInto()的构造器
+             *==============================================*/
+            MethodSpec.Builder loadIntoMethodOfProviderBuilder = MethodSpec.methodBuilder(METHOD_LOAD_INTO)
+                    .addAnnotation(Override.class)
+                    .addModifiers(PUBLIC)
+                    .addParameter(providerParamSpec);
+
+            Map<String, List<RouteDoc>> docSource = new HashMap<>();
+
+            // Start generate java source, structure is divided into upper and lower levels, used for demand initialization.
+            /**=============================================
+             * 12、根据group分组, 对相同group的进行统一处理。
+             *   group = app
+             *   group = home
+             *   ...各种分组...
+             *
+             *   1. 构造出
+             *==============================================*/
+            for (Map.Entry<String, Set<RouteMeta>> entry : groupMap.entrySet()) {
+                String groupName = entry.getKey();
+
+                /**=============================================
+                 * 13、Group的方法loadInto()的构造器
+                 *==============================================*/
+                MethodSpec.Builder loadIntoMethodOfGroupBuilder = MethodSpec.methodBuilder(METHOD_LOAD_INTO)
+                        .addAnnotation(Override.class)
+                        .addModifiers(PUBLIC)
+                        .addParameter(groupParamSpec);
+
+                List<RouteDoc> routeDocList = new ArrayList<>();
+
+                /**=============================================
+                 * 14、遍历同一个group的所有RouteMeta构造方法体
+                 *==============================================*/
+                Set<RouteMeta> groupData = entry.getValue();
+                for (RouteMeta routeMeta : groupData) {
+                    RouteDoc routeDoc = extractDocInfo(routeMeta);
+
+                    ClassName className = ClassName.get((TypeElement) routeMeta.getRawType());
+
+                    switch (routeMeta.getType()) {
+                        /**=============================================
+                         * 15、Provider构造loadInto()方法的构造器，中添加"添加provider的语句":
+                         *   1. providers.put("xxx", RouteMeta.build(xxx, JsonServiceImpl.class, xxx));
+                         *==============================================*/
+                        case PROVIDER:  // Need cache provider's super class
+                            List<? extends TypeMirror> interfaces = ((TypeElement) routeMeta.getRawType()).getInterfaces();
+                            for (TypeMirror tm : interfaces) {
+                                routeDoc.addPrototype(tm.toString());
+
+
+                                if (types.isSameType(tm, iProvider)) {   // Its implements iProvider interface himself.
+                                    String className = (routeMeta.getRawType()).toString();
+                                } else if (types.isSubtype(tm, iProvider)) {
+                                    String className = tm.toString();
+                                }
+
+                                loadIntoMethodOfProviderBuilder.addStatement(
+                                            "providers.put($S, $T.build($T." + routeMeta.getType() + ", $T.class, $S, $S, null, " + routeMeta.getPriority() + ", " + routeMeta.getExtra() + "))",
+                                            className,
+                                            routeMetaCn,
+                                            routeTypeCn,
+                                            className,
+                                            routeMeta.getPath(),
+                                            routeMeta.getGroup());
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+
+                    /**=============================================
+                     * 16、构造paramsType(参数类型)的Map Body
+                     *==============================================*/
+                    StringBuilder mapBodyBuilder = new StringBuilder();
+                    Map<String, Integer> paramsType = routeMeta.getParamsType();
+                    Map<String, Autowired> injectConfigs = routeMeta.getInjectConfig();
+                    if (MapUtils.isNotEmpty(paramsType)) {
+                        List<RouteDoc.Param> paramList = new ArrayList<>();
+
+                        for (Map.Entry<String, Integer> types : paramsType.entrySet()) {
+                            mapBodyBuilder.append("put(\"").append(types.getKey()).append("\", ").append(types.getValue()).append("); ");
+
+                            RouteDoc.Param param = new RouteDoc.Param();
+                            Autowired injectConfig = injectConfigs.get(types.getKey());
+                            param.setKey(types.getKey());
+                            param.setType(TypeKind.values()[types.getValue()].name().toLowerCase());
+                            param.setDescription(injectConfig.desc());
+                            param.setRequired(injectConfig.required());
+
+                            paramList.add(param);
+                        }
+
+                        routeDoc.setParams(paramList);
+                    }
+                    String mapBody = mapBodyBuilder.toString();
+
+                    /**==============================================
+                     * 17、Group构造loadInto()方法的构造器, 中添加语句:
+                     *   1. atlas.put("/app/HostActivity", RouteMeta.build(xxx, HostActivity.class, "/app/hostactivity", xxx));
+                     *   2. atlas.put("/app/MainActivity", RouteMeta.build(xxx, MainActivity.class, "/app/hostactivity", xxx));
+                     *==============================================*/
+                    loadIntoMethodOfGroupBuilder.addStatement(
+                            "atlas.put($S, $T.build($T." + routeMeta.getType() + ", $T.class, $S, $S, " + (StringUtils.isEmpty(mapBody) ? null : ("new java.util.HashMap<String, Integer>(){{" + mapBodyBuilder.toString() + "}}")) + ", " + routeMeta.getPriority() + ", " + routeMeta.getExtra() + "))",
+                            routeMeta.getPath(),
+                            routeMetaCn,
+                            routeTypeCn,
+                            className,
+                            routeMeta.getPath().toLowerCase(),
+                            routeMeta.getGroup().toLowerCase());
+
+                    routeDoc.setClassName(className.toString());
+                    routeDocList.add(routeDoc);
+                }
+
+                /**==============================================
+                 * 18、生成Group文件
+                 *   1. group = app: ARouter$$Group$$app
+                 *   2. group = fragment: ARouter$$Group$$fragment
+                 *==============================================*/
+                String groupFileName = NAME_OF_GROUP + groupName;
+                JavaFile.builder(PACKAGE_OF_GENERATE_FILE,
+                        TypeSpec.classBuilder(groupFileName)
+                                .addJavadoc(WARNING_TIPS)
+                                .addSuperinterface(ClassName.get(type_IRouteGroup))
+                                .addModifiers(PUBLIC)
+                                .addMethod(loadIntoMethodOfGroupBuilder.build())
+                                .build()
+                ).build().writeTo(mFiler);
+
+                logger.info(">>> Generated group: " + groupName + "<<<");
+                rootMap.put(groupName, groupFileName);
+                docSource.put(groupName, routeDocList);
+            }
+
+            // Output route doc
+            if (generateDoc) {
+                docWriter.append(JSON.toJSONString(docSource, SerializerFeature.PrettyFormat));
+                docWriter.flush();
+                docWriter.close();
+            }
+
+            /**==============================================
+             * 19、生成Provider中间类文件
+             *   例如: 1. ARouter$$Providers$$app
+             *==============================================*/
+            String providerMapFileName = NAME_OF_PROVIDER + SEPARATOR + moduleName;
+            JavaFile.builder(PACKAGE_OF_GENERATE_FILE,
+                    TypeSpec.classBuilder(providerMapFileName)
+                            .addJavadoc(WARNING_TIPS)
+                            .addSuperinterface(ClassName.get(type_IProviderGroup))
+                            .addModifiers(PUBLIC)
+                            .addMethod(loadIntoMethodOfProviderBuilder.build())
+                            .build()
+            ).build().writeTo(mFiler);
+
+            logger.info(">>> Generated provider map, name is " + providerMapFileName + " <<<");
+
+
+
+            /**==============================================
+             * 20、Root构造器中, 添加语句(将Group中间类添加到routes中)
+             *   例如: 1. routes.put("app", ARouter$$Group$$app.class);
+             *         2. routes.put("fragment", ARouter$$Group$$fragment.class);
+             *         3. routes.put("service", ARouter$$Group$$service.class);
+             *==============================================*/
+            if (MapUtils.isNotEmpty(rootMap)) {
+                // Generate root meta by group name, it must be generated before root, then I can find out the class of group.
+                for (Map.Entry<String, String> entry : rootMap.entrySet()) {
+                    loadIntoMethodOfRootBuilder.addStatement("routes.put($S, $T.class)", entry.getKey(), ClassName.get(PACKAGE_OF_GENERATE_FILE, entry.getValue()));
+                }
+            }
+            // Write root meta into disk.
+            String rootFileName = NAME_OF_ROOT + SEPARATOR + moduleName;
+            JavaFile.builder(PACKAGE_OF_GENERATE_FILE,
+                    TypeSpec.classBuilder(rootFileName)
+                            .addJavadoc(WARNING_TIPS)
+                            .addSuperinterface(ClassName.get(elements.getTypeElement(ITROUTE_ROOT)))
+                            .addModifiers(PUBLIC)
+                            .addMethod(loadIntoMethodOfRootBuilder.build())
+                            .build()
+            ).build().writeTo(mFiler);
+
+            logger.info(">>> Generated root, name is " + rootFileName + " <<<");
+        }
+    }
+
+
+    /**=============================================================
+     * 4、对RouteMeta进行排序。 相同group的RouteMeta放到同一个set中，并且将该set存入groupMap中
+     *====================================================================*/
+    private void categories(RouteMeta routeMete) {
+        if (routeVerify(routeMete)) {
+            logger.info(">>> Start categories, group = " + routeMete.getGroup() + ", path = " + routeMete.getPath() + " <<<");
+            Set<RouteMeta> routeMetas = groupMap.get(routeMete.getGroup());
+            if (CollectionUtils.isEmpty(routeMetas)) {
+                Set<RouteMeta> routeMetaSet = new TreeSet<>(new Comparator<RouteMeta>() {
+                    @Override
+                    public int compare(RouteMeta r1, RouteMeta r2) {
+                        try {
+                            return r1.getPath().compareTo(r2.getPath());
+                        } catch (NullPointerException npe) {
+                            logger.error(npe.getMessage());
+                            return 0;
+                        }
+                    }
+                });
+                routeMetaSet.add(routeMete);
+                groupMap.put(routeMete.getGroup(), routeMetaSet);
+            } else {
+                routeMetas.add(routeMete);
+            }
+        } else {
+            logger.warning(">>> Route meta verify error, group is " + routeMete.getGroup() + " <<<");
+        }
+    }
+
+    /**==================================
+     * 5、验证RouteMeta的合法性
+     *===================================*/
+    private boolean routeVerify(RouteMeta meta) {
+        // xxx
+
+        return true;
+    }
+
+    /**==================================
+     * 6、RouteMeta中提取出doc所需要的信息
+     *===================================*/
+    private RouteDoc extractDocInfo(RouteMeta routeMeta) {
+        RouteDoc routeDoc = new RouteDoc();
+        routeDoc.setGroup(routeMeta.getGroup());
+        routeDoc.setPath(routeMeta.getPath());
+        routeDoc.setDescription(routeMeta.getName());
+        routeDoc.setType(routeMeta.getType().name().toLowerCase());
+        routeDoc.setMark(routeMeta.getExtra());
+
+        return routeDoc;
+    }
+}
+```
+
+4、RouteProcessor能处理哪些功能的中间类?
+> 1. 所有`@Route`注解的目标。
+>     1. Activity、Frgment
+>     1. Provider
+
+### InterceptorProcessor
+
+1、InterceptorProcessor的作用
+> 1. 生成`拦截器`相关的中间类:
+```java
+public class ARouter$$Interceptors$$app implements IInterceptorGroup {
+  @Override
+  public void loadInto(Map<Integer, Class<? extends IInterceptor>> interceptors) {
+    interceptors.put(8, MyInterceptor.class);
+  }
+}
+```
+
+2、InterceptorProcessor的源码(未解析)
+```java
+@AutoService(Processor.class)
+@SupportedOptions(KEY_MODULE_NAME)
+@SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedAnnotationTypes(ANNOTATION_TYPE_INTECEPTOR)
+public class InterceptorProcessor extends AbstractProcessor {
+    private Map<Integer, Element> interceptors = new TreeMap<>();
+    private Filer mFiler;       // File util, write class file into disk.
+    private Logger logger;
+    private Elements elementUtil;
+    private String moduleName = null;   // Module name, maybe its 'app' or others
+    private TypeMirror iInterceptor = null;
+
+    // 初始化
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+
+        mFiler = processingEnv.getFiler();                  // Generate class.
+        elementUtil = processingEnv.getElementUtils();      // Get class meta.
+        logger = new Logger(processingEnv.getMessager());   // Package the log utils.
+
+        // Attempt to get user configuration [moduleName]
+        Map<String, String> options = processingEnv.getOptions();
+        if (MapUtils.isNotEmpty(options)) {
+            moduleName = options.get(KEY_MODULE_NAME);
+        }
+
+        if (StringUtils.isNotEmpty(moduleName)) {
+            moduleName = moduleName.replaceAll("[^0-9a-zA-Z_]+", "");
+            logger.info("The user has configuration the module name, it was [" + moduleName + "]");
+        } else {
+            logger.error(NO_MODULE_NAME_TIPS);
+            throw new RuntimeException("ARouter::Compiler >>> No module name, for more information, look at gradle log.");
+        }
+
+        iInterceptor = elementUtil.getTypeElement(Consts.IINTERCEPTOR).asType();
+
+        logger.info(">>> InterceptorProcessor init. <<<");
+    }
+
+    /**
+     * 生成中间类文件
+     */
+    @Override
+    public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        if (CollectionUtils.isNotEmpty(annotations)) {
+            Set<? extends Element> elements = roundEnv.getElementsAnnotatedWith(Interceptor.class);
+            try {
+                parseInterceptors(elements);
+            } catch (Exception e) {
+                logger.error(e);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * 生成拦截器中间类文件
+     */
+    private void parseInterceptors(Set<? extends Element> elements) throws IOException {
+        if (CollectionUtils.isNotEmpty(elements)) {
+            logger.info(">>> Found interceptors, size is " + elements.size() + " <<<");
+
+            // Verify and cache, sort incidentally.
+            for (Element element : elements) {
+                if (verify(element)) {  // Check the interceptor meta
+                    logger.info("A interceptor verify over, its " + element.asType());
+                    Interceptor interceptor = element.getAnnotation(Interceptor.class);
+
+                    Element lastInterceptor = interceptors.get(interceptor.priority());
+                    if (null != lastInterceptor) { // Added, throw exceptions
+                        throw new IllegalArgumentException(
+                                String.format(Locale.getDefault(), "More than one interceptors use same priority [%d], They are [%s] and [%s].",
+                                        interceptor.priority(),
+                                        lastInterceptor.getSimpleName(),
+                                        element.getSimpleName())
+                        );
+                    }
+
+                    interceptors.put(interceptor.priority(), element);
+                } else {
+                    logger.error("A interceptor verify failed, its " + element.asType());
+                }
+            }
+
+            // Interface of ARouter.
+            TypeElement type_ITollgate = elementUtil.getTypeElement(IINTERCEPTOR);
+            TypeElement type_ITollgateGroup = elementUtil.getTypeElement(IINTERCEPTOR_GROUP);
+
+            /**
+             *  Build input type, format as :
+             *
+             *  ```Map<Integer, Class<? extends ITollgate>>```
+             */
+            ParameterizedTypeName inputMapTypeOfTollgate = ParameterizedTypeName.get(
+                    ClassName.get(Map.class),
+                    ClassName.get(Integer.class),
+                    ParameterizedTypeName.get(
+                            ClassName.get(Class.class),
+                            WildcardTypeName.subtypeOf(ClassName.get(type_ITollgate))
+                    )
+            );
+
+            // Build input param name.
+            ParameterSpec tollgateParamSpec = ParameterSpec.builder(inputMapTypeOfTollgate, "interceptors").build();
+
+            // Build method : 'loadInto'
+            MethodSpec.Builder loadIntoMethodOfTollgateBuilder = MethodSpec.methodBuilder(METHOD_LOAD_INTO)
+                    .addAnnotation(Override.class)
+                    .addModifiers(PUBLIC)
+                    .addParameter(tollgateParamSpec);
+
+            // Generate
+            if (null != interceptors && interceptors.size() > 0) {
+                // Build method body
+                for (Map.Entry<Integer, Element> entry : interceptors.entrySet()) {
+                    loadIntoMethodOfTollgateBuilder.addStatement("interceptors.put(" + entry.getKey() + ", $T.class)", ClassName.get((TypeElement) entry.getValue()));
+                }
+            }
+
+            // Write to disk(Write file even interceptors is empty.)
+            JavaFile.builder(PACKAGE_OF_GENERATE_FILE,
+                    TypeSpec.classBuilder(NAME_OF_INTERCEPTOR + SEPARATOR + moduleName)
+                            .addModifiers(PUBLIC)
+                            .addJavadoc(WARNING_TIPS)
+                            .addMethod(loadIntoMethodOfTollgateBuilder.build())
+                            .addSuperinterface(ClassName.get(type_ITollgateGroup))
+                            .build()
+            ).build().writeTo(mFiler);
+
+            logger.info(">>> Interceptor group write over. <<<");
+        }
+    }
+
+    /**
+     * 验证拦截器数据的合法性
+     */
+    private boolean verify(Element element) {
+        Interceptor interceptor = element.getAnnotation(Interceptor.class);
+        // It must be implement the interface IInterceptor and marked with annotation Interceptor.
+        return null != interceptor && ((TypeElement) element).getInterfaces().contains(iInterceptor);
+    }
+}
+```
+
+### AutowiredProcessor
+
+1、AutowiredProcessor的作用
+> 1. 用于生成使用`@Autowired`注解过的页面的自动注入辅助类。例如`HostActivity$$ARouter$$Autowired.java`
+```java
+/**==========================================
+ * 5、HostActivity的注射器实现类。由apt生成。
+ * // HostActivity$$ARouter$$Autowired.java
+ *=====================================*/
+public class HostActivity$$ARouter$$Autowired implements ISyringe {
+    private SerializationService serializationService;
+    @Override
+    public void inject(Object target) {
+        HostActivity substitute = (HostActivity)target;
+        substitute.type =
+        // 注入数据
+        substitute.getIntent().getStringExtra("type");
+        // xxx
+    }
+}
+```
+
+2、AutowiredProcessor源码(未解析)
+```java
+@AutoService(Processor.class)
+@SupportedOptions(KEY_MODULE_NAME)
+@SupportedSourceVersion(SourceVersion.RELEASE_7)
+@SupportedAnnotationTypes({ANNOTATION_TYPE_AUTOWIRED})
+public class AutowiredProcessor extends AbstractProcessor {
+    private Filer mFiler;       // File util, write class file into disk.
+    private Logger logger;
+    private Types types;
+    private TypeUtils typeUtils;
+    private Elements elements;
+    private Map<TypeElement, List<Element>> parentAndChild = new HashMap<>();   // Contain field need autowired and his super class.
+    private static final ClassName ARouterClass = ClassName.get("com.alibaba.android.arouter.launcher", "ARouter");
+    private static final ClassName AndroidLog = ClassName.get("android.util", "Log");
+
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnvironment) {
+        super.init(processingEnvironment);
+
+        mFiler = processingEnv.getFiler();                  // Generate class.
+        types = processingEnv.getTypeUtils();            // Get type utils.
+        elements = processingEnv.getElementUtils();      // Get class meta.
+
+        typeUtils = new TypeUtils(types, elements);
+
+        logger = new Logger(processingEnv.getMessager());   // Package the log utils.
+
+        logger.info(">>> AutowiredProcessor init. <<<");
+    }
+
+    @Override
+    public boolean process(Set<? extends TypeElement> set, RoundEnvironment roundEnvironment) {
+        if (CollectionUtils.isNotEmpty(set)) {
+            try {
+                logger.info(">>> Found autowired field, start... <<<");
+                categories(roundEnvironment.getElementsAnnotatedWith(Autowired.class));
+                generateHelper();
+
+            } catch (Exception e) {
+                logger.error(e);
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    private void generateHelper() throws IOException, IllegalAccessException {
+        TypeElement type_ISyringe = elements.getTypeElement(ISYRINGE);
+        TypeElement type_JsonService = elements.getTypeElement(JSON_SERVICE);
+        TypeMirror iProvider = elements.getTypeElement(Consts.IPROVIDER).asType();
+        TypeMirror activityTm = elements.getTypeElement(Consts.ACTIVITY).asType();
+        TypeMirror fragmentTm = elements.getTypeElement(Consts.FRAGMENT).asType();
+        TypeMirror fragmentTmV4 = elements.getTypeElement(Consts.FRAGMENT_V4).asType();
+
+        // Build input param name.
+        ParameterSpec objectParamSpec = ParameterSpec.builder(TypeName.OBJECT, "target").build();
+
+        if (MapUtils.isNotEmpty(parentAndChild)) {
+            for (Map.Entry<TypeElement, List<Element>> entry : parentAndChild.entrySet()) {
+                // Build method : 'inject'
+                MethodSpec.Builder injectMethodBuilder = MethodSpec.methodBuilder(METHOD_INJECT)
+                        .addAnnotation(Override.class)
+                        .addModifiers(PUBLIC)
+                        .addParameter(objectParamSpec);
+
+                TypeElement parent = entry.getKey();
+                List<Element> childs = entry.getValue();
+
+                String qualifiedName = parent.getQualifiedName().toString();
+                String packageName = qualifiedName.substring(0, qualifiedName.lastIndexOf("."));
+                String fileName = parent.getSimpleName() + NAME_OF_AUTOWIRED;
+
+                logger.info(">>> Start process " + childs.size() + " field in " + parent.getSimpleName() + " ... <<<");
+
+                TypeSpec.Builder helper = TypeSpec.classBuilder(fileName)
+                        .addJavadoc(WARNING_TIPS)
+                        .addSuperinterface(ClassName.get(type_ISyringe))
+                        .addModifiers(PUBLIC);
+
+                FieldSpec jsonServiceField = FieldSpec.builder(TypeName.get(type_JsonService.asType()), "serializationService", Modifier.PRIVATE).build();
+                helper.addField(jsonServiceField);
+
+                injectMethodBuilder.addStatement("serializationService = $T.getInstance().navigation($T.class)", ARouterClass, ClassName.get(type_JsonService));
+                injectMethodBuilder.addStatement("$T substitute = ($T)target", ClassName.get(parent), ClassName.get(parent));
+
+                // Generate method body, start inject.
+                for (Element element : childs) {
+                    Autowired fieldConfig = element.getAnnotation(Autowired.class);
+                    String fieldName = element.getSimpleName().toString();
+                    if (types.isSubtype(element.asType(), iProvider)) {  // It's provider
+                        if ("".equals(fieldConfig.name())) {    // User has not set service path, then use byType.
+
+                            // Getter
+                            injectMethodBuilder.addStatement(
+                                    "substitute." + fieldName + " = $T.getInstance().navigation($T.class)",
+                                    ARouterClass,
+                                    ClassName.get(element.asType())
+                            );
+                        } else {    // use byName
+                            // Getter
+                            injectMethodBuilder.addStatement(
+                                    "substitute." + fieldName + " = ($T)$T.getInstance().build($S).navigation()",
+                                    ClassName.get(element.asType()),
+                                    ARouterClass,
+                                    fieldConfig.name()
+                            );
+                        }
+
+                        // Validater
+                        if (fieldConfig.required()) {
+                            injectMethodBuilder.beginControlFlow("if (substitute." + fieldName + " == null)");
+                            injectMethodBuilder.addStatement(
+                                    "throw new RuntimeException(\"The field '" + fieldName + "' is null, in class '\" + $T.class.getName() + \"!\")", ClassName.get(parent));
+                            injectMethodBuilder.endControlFlow();
+                        }
+                    } else {    // It's normal intent value
+                        String originalValue = "substitute." + fieldName;
+                        String statement = "substitute." + fieldName + " = " + buildCastCode(element) + "substitute.";
+                        boolean isActivity = false;
+                        if (types.isSubtype(parent.asType(), activityTm)) {  // Activity, then use getIntent()
+                            isActivity = true;
+                            statement += "getIntent().";
+                        } else if (types.isSubtype(parent.asType(), fragmentTm) || types.isSubtype(parent.asType(), fragmentTmV4)) {   // Fragment, then use getArguments()
+                            statement += "getArguments().";
+                        } else {
+                            throw new IllegalAccessException("The field [" + fieldName + "] need autowired from intent, its parent must be activity or fragment!");
+                        }
+
+                        statement = buildStatement(originalValue, statement, typeUtils.typeExchange(element), isActivity);
+                        if (statement.startsWith("serializationService.")) {   // Not mortals
+                            injectMethodBuilder.beginControlFlow("if (null != serializationService)");
+                            injectMethodBuilder.addStatement(
+                                    "substitute." + fieldName + " = " + statement,
+                                    (StringUtils.isEmpty(fieldConfig.name()) ? fieldName : fieldConfig.name()),
+                                    ClassName.get(element.asType())
+                            );
+                            injectMethodBuilder.nextControlFlow("else");
+                            injectMethodBuilder.addStatement(
+                                    "$T.e(\"" + Consts.TAG + "\", \"You want automatic inject the field '" + fieldName + "' in class '$T' , then you should implement 'SerializationService' to support object auto inject!\")", AndroidLog, ClassName.get(parent));
+                            injectMethodBuilder.endControlFlow();
+                        } else {
+                            injectMethodBuilder.addStatement(statement, StringUtils.isEmpty(fieldConfig.name()) ? fieldName : fieldConfig.name());
+                        }
+
+                        // Validator
+                        if (fieldConfig.required() && !element.asType().getKind().isPrimitive()) {  // Primitive wont be check.
+                            injectMethodBuilder.beginControlFlow("if (null == substitute." + fieldName + ")");
+                            injectMethodBuilder.addStatement(
+                                    "$T.e(\"" + Consts.TAG + "\", \"The field '" + fieldName + "' is null, in class '\" + $T.class.getName() + \"!\")", AndroidLog, ClassName.get(parent));
+                            injectMethodBuilder.endControlFlow();
+                        }
+                    }
+                }
+
+                helper.addMethod(injectMethodBuilder.build());
+
+                // Generate autowire helper
+                JavaFile.builder(packageName, helper.build()).build().writeTo(mFiler);
+
+                logger.info(">>> " + parent.getSimpleName() + " has been processed, " + fileName + " has been generated. <<<");
+            }
+
+            logger.info(">>> Autowired processor stop. <<<");
+        }
+    }
+
+    private String buildCastCode(Element element) {
+        if (typeUtils.typeExchange(element) == TypeKind.SERIALIZABLE.ordinal()) {
+            return CodeBlock.builder().add("($T) ", ClassName.get(element.asType())).build().toString();
+        }
+        return "";
+    }
+
+    private String buildStatement(String originalValue, String statement, int type, boolean isActivity) {
+        if (type == TypeKind.BOOLEAN.ordinal()) {
+            statement += (isActivity ? ("getBooleanExtra($S, " + originalValue + ")") : ("getBoolean($S)"));
+        } else if (type == TypeKind.BYTE.ordinal()) {
+            statement += (isActivity ? ("getByteExtra($S, " + originalValue + ")") : ("getByte($S)"));
+        } else if (type == TypeKind.SHORT.ordinal()) {
+            statement += (isActivity ? ("getShortExtra($S, " + originalValue + ")") : ("getShort($S)"));
+        } else if (type == TypeKind.INT.ordinal()) {
+            statement += (isActivity ? ("getIntExtra($S, " + originalValue + ")") : ("getInt($S)"));
+        } else if (type == TypeKind.LONG.ordinal()) {
+            statement += (isActivity ? ("getLongExtra($S, " + originalValue + ")") : ("getLong($S)"));
+        }else if(type == TypeKind.CHAR.ordinal()){
+            statement += (isActivity ? ("getCharExtra($S, " + originalValue + ")") : ("getChar($S)"));
+        } else if (type == TypeKind.FLOAT.ordinal()) {
+            statement += (isActivity ? ("getFloatExtra($S, " + originalValue + ")") : ("getFloat($S)"));
+        } else if (type == TypeKind.DOUBLE.ordinal()) {
+            statement += (isActivity ? ("getDoubleExtra($S, " + originalValue + ")") : ("getDouble($S)"));
+        } else if (type == TypeKind.STRING.ordinal()) {
+            statement += (isActivity ? ("getStringExtra($S)") : ("getString($S)"));
+        } else if (type == TypeKind.SERIALIZABLE.ordinal()) {
+            statement += (isActivity ? ("getSerializableExtra($S)") : ("getSerializable($S)"));
+        } else if (type == TypeKind.PARCELABLE.ordinal()) {
+            statement += (isActivity ? ("getParcelableExtra($S)") : ("getParcelable($S)"));
+        } else if (type == TypeKind.OBJECT.ordinal()) {
+            statement = "serializationService.parseObject(substitute." + (isActivity ? "getIntent()." : "getArguments().") + (isActivity ? "getStringExtra($S)" : "getString($S)") + ", new com.alibaba.android.arouter.facade.model.TypeWrapper<$T>(){}.getType())";
+        }
+
+        return statement;
+    }
+
+    /**
+     * Categories field, find his papa.
+     *
+     * @param elements Field need autowired
+     */
+    private void categories(Set<? extends Element> elements) throws IllegalAccessException {
+        if (CollectionUtils.isNotEmpty(elements)) {
+            for (Element element : elements) {
+                TypeElement enclosingElement = (TypeElement) element.getEnclosingElement();
+
+                if (element.getModifiers().contains(Modifier.PRIVATE)) {
+                    throw new IllegalAccessException("The inject fields CAN NOT BE 'private'!!! please check field ["
+                            + element.getSimpleName() + "] in class [" + enclosingElement.getQualifiedName() + "]");
+                }
+
+                if (parentAndChild.containsKey(enclosingElement)) { // Has categries
+                    parentAndChild.get(enclosingElement).add(element);
+                } else {
+                    List<Element> childs = new ArrayList<>();
+                    childs.add(element);
+                    parentAndChild.put(enclosingElement, childs);
+                }
+            }
+
+            logger.info("categories finished.");
+        }
+    }
+}
+```
+
+
 ## 实例分析
 
 ### 单Module app
@@ -1837,3 +2864,7 @@ public class ARouter$$Group$$degrade implements IRouteGroup {
 4. [什么时候使用CountDownLatch](http://www.importnew.com/15731.html)
 1. [CountDownLatch理解一：与join的区别](https://blog.csdn.net/zhutulang/article/details/48504487)
 1. [annotation(@Retention@Target)详解](https://www.cnblogs.com/gmq-sh/p/4798194.html)
+1. [Android编译时注解APT实战（AbstractProcessor）](https://www.jianshu.com/p/07ef8ba80562)
+1. [Java AbstractProcessor实现自定义ButterKnife](https://blog.csdn.net/kaifa1321/article/details/79683246)
+1. [JDK在线文档](http://tool.oschina.net/apidocs/apidoc?api=jdk-zh)
+1. [Annotation实战【自定义AbstractProcessor】](https://www.cnblogs.com/avenwu/p/4173899.html)
