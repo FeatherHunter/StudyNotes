@@ -48,9 +48,12 @@ if (isDebugARouter) {
 ARouter.init(BaseApp.this);
 ```
 
-#### openLog():开启日志
+#### 开启日志: openLog()、openDebug()
 
-2、ARouter.openLog()源码分析
+2、日志初始化流程图
+![日志的初始化](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/android/arouter/ARouter_log_init.png?raw=true)
+
+3、ARouter.openLog()源码分析
 > 1. 设置DefaultLogger的标志位(isShowLog)为true
 > 2. 后续打印的日志，在isShowLog=true时，调用`Log的相关方法`打印出日志。
 ```java
@@ -90,7 +93,7 @@ public void info(String tag, String message) {
 }
 ```
 
-3、ARouter.openDebug()源码分析
+4、ARouter.openDebug()源码分析
 ```java
 /**===================
  * // ARouter.java
@@ -114,14 +117,14 @@ static synchronized void openDebug() {
 
 #### \_ARouter
 
-4、`_ARouter`的作用?
+5、`_ARouter`的作用?
 > 1. ARouter的相关操作，内部都是通过`_ARouter`实现。
 > 1. Arouter是对外暴露api的类，`_ARouter`是真正的实现类
 > 1. 好处: 解耦，可以有选择的去暴露想要给用户使用的方法，并且将其他方法隐藏在内部。比使用`private`的灵活性更强。
 
 #### init():初始化
 
-5、ARouter.init()源码分析
+6、ARouter.init()源码分析
 > 1. 内部通过`_ARouter.init()`转交给`LogisticsCenter`(后勤中心)进行初始化工作。
 > 1. `LogisticsCenter.init()`需要得到ARouter框架生成的所有中间类的类名集合。如果有本地缓存直接读取，没有缓存会找到app的所有Dex路径，然后遍历出其中的属于com.alibaba.android.arouter.routes包下的所有类名，将这些ARouter框架生成的中间类打包成集合返回。
 > 1. 获取到ARouter生成的所有中间类类名集合后，会遍历该集合并且对其中的Root、Interceptors拦截器、Providors服务进行初始化，并且加入到Map中。
@@ -393,6 +396,8 @@ public class InterceptorServiceImpl implements InterceptorService {
     private static void checkInterceptorsInitStatus() {...}
 }
 ```
+
+7、ARouter.init()流程图
 
 6、为什么不同module使用了相同的group名导致出现错误`There is no route match the path`?
 > 1. 不同的Module都会生成不同的`IRouteGroup实现(如: ARouter$$Group$$fragment.class)`
