@@ -682,8 +682,7 @@ public static Set<String> getFileNameByPackageName(Context context, final String
 #### 流程图
 
 1、ARouter.getInstance().build(xxx).navigation()流程图
-```
-```
+![navigation()流程图](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/android/arouter/ARouter_navigation.jpg?raw=true)
 
 #### build()
 
@@ -1224,6 +1223,7 @@ public Postcard withTransition(int enterAnim, int exitAnim) {
 #### 流程图
 
 1、InterceptorServiceImpl.doInterceptions()流程图
+![doInterceptions流程图](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/android/arouter/ARouter_interceptor.jpg?raw=true)
 
 #### InterceptorServiceImpl
 
