@@ -17,7 +17,7 @@ body {
 }
 
 .main1 {
-    width: 2500px;            //5张图片的宽度
+    width: 3500px;                /*7张图片的宽度*/
     height: 350px;
     position: absolute;
     z-index: 1;
@@ -96,3 +96,4 @@ body {
     height: 100px;
     border: 1px solid red;
 }
+
