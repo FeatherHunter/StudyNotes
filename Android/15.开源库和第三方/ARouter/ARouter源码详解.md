@@ -1,15 +1,16 @@
+
+
 转载请注明链接：https://blog.csdn.net/feather_wch/article/details/87376462
 
 >详细分析Router的源码。
 
 # ARouter源码详解
 
-版本：2019/2/21-17:55
+版本：2019/2/22-16:02
 
 ---
 
 [toc]
-
 1、ARouter源码的四个组成部分
 > 1. arouter-register
 > 1. arouter-annotation
@@ -35,7 +36,106 @@
 
 ## arouter-api
 
-### 初始化
+### 源码工程目录(1题)
+
+1、com.alibaba:arouter-api-1.4.0工程目录
+> 1. 大致描述arouter-api源工程中各个部分的作用。适合所有源码大致都看过后再看。
+```
+
+/**========================
+ * 1、ARouter
+ *========================*/
+-launcher
+ -ARouter.java // 提供ARouter的各项功能
+ -_ARouter.java // ARouter.java内部类, 实际实现ARouter功能, 隐藏不想对外开放的方法。
+
+/**========================
+ * 2、核心
+ *========================*/
+-core
+ -LogisticsCenter.java // 物流中心。填充路由需要的必要信息。
+ -Warehouse.java // 仓库。存放Group、Providers、Interceptors。
+ -AutowiredServiceImpl.java // 数据自动注入的管理器。
+ -InterceptorServiceImpl.java // 拦截器的管理器。
+
+/**========================
+ * 3、定义所有接口。
+ *========================*/
+-facade
+ -Postcard.java // 唯一class。明信片, 路由到目标需要借助该Postcard中存储的必要信息。
+
+ // 3.1、模板
+ -template
+  -IInterceptor.java // 拦截器必须实现该类。
+  -IInterceptorGroup.java // 用于注册拦截器，初始化时，实现该接口的类会被调用loadInto来注册同一Group下的所有拦截器。
+  -IProvider.java // 服务必须实现该类。
+  -IProviderGroup.java // 用于注册Providers，初始化时，实现该接口的类会被调用loadInto来注册同一Group下的所有Providers。
+  -IRouteGroup.java // 用于加载Route节点。路由时，通过该接口的实现类，来加载同一Group下的所有Route。
+  -IRouteRoot.java // 根元素。初始化时，用于注册所有Group类-实现IRouteGroup接口的类。
+  -ISyringe.java // 注射器接口。所有使用@Autowired注解的页面，都会生成对应的注射器实现类，用于实现自动注入。
+  -ILogger.java // 日志。
+
+ // 3.2、接口
+ -callback
+  -InterceptorCallback.java // 拦截器的处理接口。onContinue()和onInterrupt()
+  -NavigationCallback.java // 局部监控路由过程的接口。
+  -NavCallback.java // 该类用于方便使用NavigationCallback接口的功能。
+
+ // 3.3、服务
+ -service
+  -AutowiredService.java // 自动注入服务接口。
+  -DegradeService.java // 全局降级策略服务接口。
+  -InterceptorService.java // 拦截器管理服务接口。
+  -PathReplaceService.java // 路径动态替换服务接口。
+  -SerializationService.java // 注入Bundle不支持的数据的序列化/反序列化接口。
+  -ClassLoaderService.java // 用于InstantRun和 move Dex文件
+
+/**========================
+ * 4、ARouter系统级中间类
+ *========================*/
+-routes
+ // 1、arouter根元素,初始化阶段,注册ARouter$$Group$$arouter到Warehouse.groupsIndex
+ -ARouter$$Root$$arouterapi.java
+ // 2、arouter拦截器,初始化阶段,注册AutowiredServiceImpl和InterceptorServiceImpl到Warehouse.providersIndex
+ -ARouter$$Providers$$arouterapi.java
+ // 3、实际加载AutowiredServiceImpl和InterceptorServiceImpl(第一次使用时)
+ -ARouter$$Group$$arouter.java
+
+/**========================
+ * 5、线程相关
+ *========================*/
+-thread
+ -DefaultPoolExecutor.java    // 默认线程池。
+ -DefaultThreadFactory.java   // 线程池工厂。
+ -CancelableCountDownLatch.java // 可取消的CountDownLatch。用于拦截器管理类InterceptorServiceImpl处理all拦截器。
+
+/**========================
+ * 6、工具类
+ *========================*/
+-utils
+ -ClassUtils.java // 扫描包下面所有"com.alibaba.android.arouter.routes"开头的类名，也就是ARouter生成的中间类。
+ -Consts.java     // ARouter相关常量。如: "ARouter"、"com.alibaba.android.arouter.routes"、"Root"、"Interceptors"、"Providers"
+ -DefaultLogger.java // 日志工具
+ -MapUtils.java
+ -PackageUtils.java
+ -TextUtils.java
+
+/**========================
+ * 7、ARouter相关的自定义异常
+ *========================*/
+-exception
+ -HandlerException.java // 主流程的处理出现异常
+ -InitException.java // 初始化异常
+ -NoRouteFoundException.java // 没有找到目标Route
+
+/**========================
+ * 8、base
+ *========================*/
+-base
+ -UniqueKeyTreeMap.java // key唯一的TreeMap,用于存储拦截器的Warehouse.interceptorsIndex, 保证key(优先级)唯一。
+```
+
+### 开启日志(4题)
 
 1、ARouter的初始化
 ```java
@@ -48,10 +148,12 @@ if (isDebugARouter) {
 ARouter.init(BaseApp.this);
 ```
 
-#### 开启日志: openLog()、openDebug()
+#### 流程图
 
 2、日志初始化流程图
 ![日志的初始化](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/android/arouter/ARouter_log_init.png?raw=true)
+
+#### openLog()
 
 3、ARouter.openLog()源码分析
 > 1. 设置DefaultLogger的标志位(isShowLog)为true
@@ -93,6 +195,13 @@ public void info(String tag, String message) {
 }
 ```
 
+4、`_ARouter`的作用?
+> 1. ARouter的相关操作，内部都是通过`_ARouter`实现。
+> 1. Arouter是对外暴露api的类，`_ARouter`是真正的实现类
+> 1. 好处: 解耦，可以有选择的去暴露想要给用户使用的方法，并且将其他方法隐藏在内部。比使用`private`的灵活性更强。
+
+#### openDebug()
+
 4、ARouter.openDebug()源码分析
 ```java
 /**===================
@@ -115,16 +224,16 @@ static synchronized void openDebug() {
 }
 ```
 
-#### \_ARouter
+### 初始化(10题)
 
-5、`_ARouter`的作用?
-> 1. ARouter的相关操作，内部都是通过`_ARouter`实现。
-> 1. Arouter是对外暴露api的类，`_ARouter`是真正的实现类
-> 1. 好处: 解耦，可以有选择的去暴露想要给用户使用的方法，并且将其他方法隐藏在内部。比使用`private`的灵活性更强。
+#### 流程图
 
-#### init():初始化
+1、ARouter.init()流程图
 
-6、ARouter.init()源码分析
+#### init()
+
+
+2、ARouter.init()源码分析
 > 1. 内部通过`_ARouter.init()`转交给`LogisticsCenter`(后勤中心)进行初始化工作。
 > 1. `LogisticsCenter.init()`需要得到ARouter框架生成的所有中间类的类名集合。如果有本地缓存直接读取，没有缓存会找到app的所有Dex路径，然后遍历出其中的属于com.alibaba.android.arouter.routes包下的所有类名，将这些ARouter框架生成的中间类打包成集合返回。
 > 1. 获取到ARouter生成的所有中间类类名集合后，会遍历该集合并且对其中的Root、Interceptors拦截器、Providors服务进行初始化，并且加入到Map中。
@@ -397,9 +506,7 @@ public class InterceptorServiceImpl implements InterceptorService {
 }
 ```
 
-7、ARouter.init()流程图
-
-6、为什么不同module使用了相同的group名导致出现错误`There is no route match the path`?
+3、为什么不同module使用了相同的group名导致出现错误`There is no route match the path`?
 > 1. 不同的Module都会生成不同的`IRouteGroup实现(如: ARouter$$Group$$fragment.class)`
 > 1. 在加载`Root元素`的时候，会先后执行两次`put(xxx)`方法，但是因为key相同，因此前一个会被覆盖，导致前一个定义的路由无法找到。
 > 1. 官方建议不同Module的group名不能相同。
@@ -418,15 +525,9 @@ public class ARouter$$Root$$home implements IRouteRoot {
 }
 ```
 
-##### IRouteRoot、IInterceptorGroup、IProviderGroup
+#### Warehouse
 
-7、IRouteRoot、IInterceptorGroup、IProviderGroup接口的作用?
-> 1. init()初始化工作时，会扫描所有dex中和ARouter相关的中间类。
-> 1. 只有实现这三种接口的类，才会通过反射实例化，并调用其`loadInto`来加载`Root元素、拦截器、Provider服务`
-
-##### Warehouse
-
-7、Warehouse的源码和作用分析
+4、Warehouse的源码和作用分析
 > 1. 存储了Providers、Interceptors以及Group相关的RouteMeta(路由元数据)
 ```java
 class Warehouse {
@@ -453,9 +554,17 @@ class Warehouse {
 }
 ```
 
+#### 接口
+
+##### IRouteRoot、IInterceptorGroup、IProviderGroup
+
+5、IRouteRoot、IInterceptorGroup、IProviderGroup接口的作用?
+> 1. init()初始化工作时，会扫描所有dex中和ARouter相关的中间类。
+> 1. 只有实现这三种接口的类，才会通过反射实例化，并调用其`loadInto`来加载`Root元素、拦截器、Provider服务`
+
 ##### IRouteGroup、IProvider、IInterceptor
 
-8、IRouteGroup、IProvider、IInterceptor接口的作用?
+6、IRouteGroup、IProvider、IInterceptor接口的作用?
 ```java
 /**==========================================================
  * 1、路由分组(Group)需要实现IRouteGroup接口。
@@ -485,14 +594,16 @@ public interface IInterceptor extends IProvider {
 
 ##### RouteMeta、RouteType
 
-9、RouteMeta和RouteType的作用?
+7、RouteMeta和RouteType的作用?
 > 1. RouteMeta是一个数据bean，封装了被注解类的一些信息
 > 1. RouteType是路由类型，该枚举表明是Provider、Activity、Fragment等类型。
 > 1. 详情见: `arouter-annotation->model->RouteMeta`和`arouter-annotation->enums->RouteType`
 
+#### ClassUtils
+
 ##### getFileNameByPackageName()
 
-6、ClassUtils.getFileNameByPackageName()源码分析
+8、ClassUtils.getFileNameByPackageName()源码分析
 > 1. 找到app的dex，然后遍历出其中的属于com.alibaba.android.arouter.routes包下的所有类名.
 > 1. 这些类都是编译期间生成的中间类。()
 ```java
@@ -557,25 +668,25 @@ public static Set<String> getFileNameByPackageName(Context context, final String
 8 = "com.alibaba.android.arouter.routes.ARouter$$Providers$$app"
 ```
 
-7、CountDownLatch的作用?
+9、CountDownLatch的作用?
 >1. CountDownLatch这个类能够使一个线程等待其他线程完成各自的工作后再执行。
 >1. `getFileNameByPackageName`需要等所有的Dex路径都扫描好后，才返回类名的集合。
 
-8、ClassUtils.getFileNameByPackageName()的效率问题和改进方法
+10、ClassUtils.getFileNameByPackageName()的效率问题和改进方法
 > 1. 遍历所有Dex路径寻找指定包名下所有类的操作工作量过大，从而会导致效率问题。
 > 1. arouter-register就是用来解决这个问题。
 
-#### 问题补充
+### Navigation路由(12题)
 
-1、为什么会出现错误: There is no route match the path
-> 1. 需要调用`ARouter.openDebug()`方法将标志位`debuggable`设置为`true`。不进入Debug模式不会弹出Toast，只会打印日志。
-> 1. 不同module的一级路径相同，导致moudle中的一级路径失效，因此跳转到第二个module的某个页面时出现该错误。
+#### 流程图
 
-### Navigation路由
+1、ARouter.getInstance().build(xxx).navigation()流程图
+```
+```
 
 #### build()
 
-1、ARouter.getInstance().build()源码分析
+2、ARouter.getInstance().build()源码分析
 > 1. 本质就是构建出内部保存了`path`和`group`的`Postcard`
 > 1. 会先通过官方预留的`PathReplaceService`对`path`进行`动态处理`
 > 1. 需要注意在`PathReplaceService`处理path前进行判断处理，避免`build(path, group)和build(path)`对路径进行了重复的两次动态处理。
@@ -648,7 +759,7 @@ public final class Postcard extends RouteMeta {
 
 #### navigation()
 
-2、ARouter.getInstance().build(path).navigation()源码分析
+3、ARouter.getInstance().build(path).navigation()源码分析
 > 1. 也就是对`Postcard`的`navigation`进行源码分析
 ```java
 /**==============================================
@@ -842,7 +953,7 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
 }
 ```
 
-3、监听路由操作的功能是如何实现的?
+4、监听路由操作的功能是如何实现的?
 > 1. `navigation()`时传入的`NavigationCallback接口`相关的回调方法会在`_ARouter.navigation()`中进行处理。
 ```java
 protected Object navigation(final Context context, final Postcard postcard, final int requestCode, final NavigationCallback callback) {
@@ -880,24 +991,24 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
 }
 ```
 
-4、局部监听路由操作和全局监听路由操作的优先级？
+5、局部监听路由操作和全局监听路由操作的优先级？
 > 1. 如果存在局部监听路由操作的`NavigationCallback`时，直接处理不会再调用`DegradeService的onLost()方法`。
 > 1. 如果不存在`NavigationCallback`才交给`DegradeService`处理。
 
-5、为什么在路径找不到时DegradeService的onLost()没有被调用？
+6、为什么在路径找不到时DegradeService的onLost()没有被调用？
 > 在`navigation()`时，已经设置了`NavigationCallback`，因此直接交给`NavigationCallback`进行处理。
 
-6、拦截器interceptor中如果有耗时操作会导致ANR吗?
+7、拦截器interceptor中如果有耗时操作会导致ANR吗?
 > 1. 不会
 > 1. `navigation`进行路由时，内部处理`拦截器相关操作`是在`线程池LogisticsCenter.executor`中进行处理的。不会ANR。
 
-7、为什么绿色通道GreenChannel不会导致路由被拦截?
+8、为什么绿色通道GreenChannel不会导致路由被拦截?
 > 1. `_ARouter.navigation()`中会判断是否是`绿色通道`
 > 1. 非绿色通道才会通过拦截器进行处理。
 
 ##### LogisticsCenter.completion(postcard)
 
-8、LogisticsCenter.completion(postcard)源码分析
+9、LogisticsCenter.completion(postcard)源码分析
 > 1.
 ```java
 /**==============================================================
@@ -992,15 +1103,130 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
     }
 ```
 
-9、为什么Fragment不会触发拦截器?
+10、为什么Fragment不会触发拦截器?
 > 1. Fragment会设置`绿色通道`
 > 1. 在`_ARouter.navigation()`中通过`LogisticsCenter.completion(postcard)`对`Postcard进行填充时`，发现是`Fragment`会直接调用`postcard.greenChannel(); `进行设置。
 
-### Interceptor拦截器
+
+#### Postcard
+
+11、Postcard是什么?有什么用?
+> 1. ARouter.build()方法就是构造出一个`Postcard(明信片)`，包含了所有路由到目标所需要的必要信息。
+> 1. `Postcard`继承自`RouteMeta`
+> 1. `build()`中仅仅是构造出具有`path和group`的`Postcard`
+> 1. `navigation()->LogisticsCenter.completion()`补全出包含路由所必要的信息的`Postcard`(该过程中还会去尝试加载同一个group下的所有元素)
+
+12、Postcard所包含的必要信息(除了携带的参数)?
+> 总结: 1.URI 2.路由超时时间 3.绿色通道 4.intent的flags标志 5.intent的action 6.动画相关的OptionsCompat、入场动画、出场动画
+> 1-携带的URI
+```java
+// uri
+private Uri uri;
+// 设置uri
+public Postcard setUri(Uri uri) {
+    this.uri = uri;
+    return this;
+}
+```
+> 2-设置navigation路由的超时时间(单位：秒)
+```java
+// Navigation的超时时间(300s)
+private int timeout = 300;
+// 设置timeout
+public Postcard setTimeout(int timeout) {
+    this.timeout = timeout;
+    return this;
+}
+```
+> 3-设置Intent的Flags标志(Intent)
+```java
+// Intent的Flags标志(启动模式)
+private int flags = -1;         // Flags of route
+// 设置启动模式
+public Postcard withFlags(@FlagInt int flag) {
+    this.flags = flag;
+    return this;
+}
+// 预设的Intent的Flag选项
+@IntDef({
+        Intent.FLAG_ACTIVITY_SINGLE_TOP,
+        Intent.FLAG_ACTIVITY_NEW_TASK,
+        Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+        Intent.FLAG_DEBUG_LOG_RESOLUTION,
+        Intent.FLAG_FROM_BACKGROUND,
+        Intent.FLAG_ACTIVITY_BROUGHT_TO_FRONT,
+        Intent.FLAG_ACTIVITY_CLEAR_TASK,
+        Intent.FLAG_ACTIVITY_CLEAR_TOP,
+        Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS,
+        Intent.FLAG_ACTIVITY_FORWARD_RESULT,
+        Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY,
+        Intent.FLAG_ACTIVITY_MULTIPLE_TASK,
+        Intent.FLAG_ACTIVITY_NO_ANIMATION,
+        Intent.FLAG_ACTIVITY_NO_USER_ACTION,
+        Intent.FLAG_ACTIVITY_PREVIOUS_IS_TOP,
+        Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED,
+        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT,
+        Intent.FLAG_ACTIVITY_TASK_ON_HOME,
+        Intent.FLAG_RECEIVER_REGISTERED_ONLY
+})
+@Retention(RetentionPolicy.SOURCE)
+public @interface FlagInt {
+}
+```
+> 4-设置Intent的Action
+```java
+//增加设置intent的action
+private String action;
+public String getAction(){
+    return action;
+}
+public Postcard withAction(String action){
+    this.action=action;
+    return this;
+}
+```
+> 5-开启绿色通道
+```java
+// 是否开启绿色通道
+private boolean greenChannel;
+// 开启绿色通道，不允许手动关闭(Fragment默认是绿色通道)
+public Postcard greenChannel() {
+    this.greenChannel = true;
+    return this;
+}
+```
+> 6-设置动画(入场动画、出场动画等)
+```java
+// Animation
+private Bundle optionsCompat;    // The transition animation of activity
+private int enterAnim = -1;
+private int exitAnim = -1;
+// 设置动画1:
+@RequiresApi(16)
+public Postcard withOptionsCompat(ActivityOptionsCompat compat) {
+    if (null != compat) {
+        this.optionsCompat = compat.toBundle();
+    }
+    return this;
+}
+// 设置动画2: 设置常规动画
+public Postcard withTransition(int enterAnim, int exitAnim) {
+    this.enterAnim = enterAnim;
+    this.exitAnim = exitAnim;
+    return this;
+}
+```
+
+
+### Interceptor拦截器(4题)
+
+#### 流程图
+
+1、InterceptorServiceImpl.doInterceptions()流程图
 
 #### InterceptorServiceImpl
 
-1、InterceptorServiceImpl.doInterceptions()进行拦截的源码分析
+2、InterceptorServiceImpl.doInterceptions()进行拦截的源码分析
 > 1. `InterceptorServiceImpl`实现`InterceptorService接口`
 > 1. `_ARouter`的navigation方法中如果当前的Postcard没有开启绿色通道，会调用`interceptorService.doInterceptions`进行拦截器处理。
 ```java
@@ -1134,15 +1360,135 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
     }
 ```
 
-2、拦截器的`process()`方法是在子线程执行还是主线程？
+3、拦截器的`process()`方法是在子线程执行还是主线程？
 > 1. 子线程
 
-3、拦截器的`process()`中如何操作UI？
+4、拦截器的`process()`中如何操作UI？
 > 1. 需要切换到Main线程才能进行Dialog等UI操作
 
-### inject数据注入
+### inject数据注入(15题)
 
-1、ARouter路由时是如何传递参数的?
+#### 流程图
+
+1、withXXX()参数传入的流程图
+
+2、inject()的流程图
+
+#### withXXX()参数传入
+
+3、ARouter的参数传入方式分为两类
+> 1. 第一种: 借助传统的`Bundle`进行数据传递。如: withString(key, "String")
+> 1. 第二种: `Bundle`无法传递的数据，借助`SerializationService`进行序列化，将生成的`JSON String`通过Bundle进行传递。如: withObject(key, Object)
+> 1. 本质两种方法都是通过`Bundle`进行传递
+
+4、Postcard内部的Bundle是如何传递给目标页面的呢?
+> 1. 如果是`Activity`: 通过Intent的`intent.putExtras(bundle)`传递
+```java
+private Object _navigation(Context context, Postcard postcard, xxx) {
+    // xxx
+    switch (postcard.getType()) {
+        case ACTIVITY:
+            // 存到intent中
+            intent.putExtras(postcard.getExtras());
+    }
+    // xxx
+}
+```
+> 2. 如果是`Frgament`: 通过`Fragment`的`setArguments(bundle)`传递。
+```java
+private Object _navigation(Context context, Postcard postcard, xxx) {
+    switch (postcard.getType()) {
+        case FRAGMENT:
+            Class fragmentMeta = postcard.getDestination();
+            Object instance = fragmentMeta.getConstructor().newInstance();
+            if (instance instanceof Fragment) {
+                // setArguments()传入Bundle
+                ((Fragment) instance).setArguments(postcard.getExtras());
+            } else if (instance instanceof android.support.v4.app.Fragment) {
+                // setArguments()传入Bundle
+                ((android.support.v4.app.Fragment) instance).setArguments(postcard.getExtras());
+            }
+            return instance;
+    }
+    // xxx
+}
+```
+
+##### Postcard
+
+5、Postcard Bundle相关源码分析
+> 1. 内部单纯的保存了一个`Bundle`
+> 1. 支持所有Bundle能传递的数据。
+> 1. 借助SerializationService将任何Object都能存入到Bundle中
+```java
+public final class Postcard extends RouteMeta {
+
+    /**=======================================
+     *  1、内部的Bundle
+     *=======================================*/
+    private Bundle mBundle;
+    // 1. 该方法会直接覆盖原有的Bundle，而不是增加！
+    public Postcard with(Bundle bundle) {
+        if (null != bundle) {
+            mBundle = bundle;
+        }
+        return this;
+    }
+    // 2. 获取到Bundle
+    public Bundle getExtras() {
+        return mBundle;
+    }
+
+    /**=======================================
+     *  2、支持所有Bundle能传递的数据。
+     *    1、 也支持在Bundle中以key-value形式存入Bundle
+     *=======================================*/
+    public Postcard withBundle(@Nullable String key, @Nullable Bundle value) {
+        mBundle.putBundle(key, value);
+        return this;
+    }
+    public Postcard withString(@Nullable String key, @Nullable String value) {
+        mBundle.putString(key, value);
+        return this;
+    }
+    public Postcard withBoolean(@Nullable String key, boolean value) {}
+    public Postcard withShort(@Nullable String key, short value) {}
+    public Postcard withInt(@Nullable String key, int value) {}
+    public Postcard withLong(@Nullable String key, long value) {}
+    public Postcard withDouble(@Nullable String key, double value) {}
+    public Postcard withByte(@Nullable String key, byte value) {}
+    public Postcard withChar(@Nullable String key, char value) {}
+    public Postcard withFloat(@Nullable String key, float value) {}
+    public Postcard withCharSequence(@Nullable String key, @Nullable CharSequence value) {}
+    public Postcard withParcelable(@Nullable String key, @Nullable Parcelable value){}
+    public Postcard withParcelableArray(@Nullable String key, @Nullable Parcelable[] value){}
+    public Postcard withParcelableArrayList(@Nullable String key, @Nullable ArrayList<? extends Parcelable> value){}
+    public Postcard withSparseParcelableArray(@Nullable String key, @Nullable SparseArray<? extends Parcelable> value) {}
+    public Postcard withIntegerArrayList(@Nullable String key, @Nullable ArrayList<Integer> value) {}
+    public Postcard withStringArrayList(@Nullable String key, @Nullable ArrayList<String> value) {}
+    public Postcard withCharSequenceArrayList(@Nullable String key, @Nullable ArrayList<CharSequence> value) {}
+    public Postcard withSerializable(@Nullable String key, @Nullable Serializable value) {}
+    public Postcard withByteArray(@Nullable String key, @Nullable byte[] value) {}
+    public Postcard withShortArray(@Nullable String key, @Nullable short[] value) {}
+    public Postcard withCharArray(@Nullable String key, @Nullable char[] value) {}
+    public Postcard withFloatArray(@Nullable String key, @Nullable float[] value) {}
+    public Postcard withCharSequenceArray(@Nullable String key, @Nullable CharSequence[] value) {}
+
+    /**=======================================
+     *  3、借助SerializationService将任何Object都能存入到Bundle中
+     *=======================================*/
+    public Postcard withObject(@Nullable String key, @Nullable Object value) {
+        serializationService = ARouter.getInstance().navigation(SerializationService.class);
+        mBundle.putString(key, serializationService.object2Json(value));
+        return this;
+    }
+}
+```
+
+
+#### inject()
+
+6、ARouter路由时是如何传递参数的?
 > 1. `@Autowired`的属性会在`ARouter.getInstance().inject(this);`调用时实现自动注入。
 > 1. 原生Activity、Fragment传递数据都是通过`Bundle`实现的。
 > 1. ARouter传递数据也是基于`Bundle`实现，并且自动赋值。
@@ -1169,7 +1515,7 @@ public class HostActivity extends AppCompatActivity {
 }
 ```
 
-2、inject(this)源码分析
+7、inject(this)源码分析
 ```java
 /**============================
  * 1、注入参数和服务
@@ -1273,8 +1619,8 @@ public class HostActivity$$ARouter$$Autowired implements ISyringe {
 }
 ```
 
-#### SerializationService
-3、需要传递自定义Bean需要实现SerializationService接口
+##### SerializationService
+8、需要传递自定义Bean需要实现SerializationService接口
 > 1. 将自定义Bean等数据序列化成Json字符串
 > 1. 注入时再将Json转换为对应的Bean。
 > 1. 自定义实现: JsonServiceImpl
@@ -1306,45 +1652,42 @@ public class JsonServiceImpl implements SerializationService{
 }
 ```
 
-4、withObject()崩溃报错
+9、withObject()崩溃报错
 > 必须要实现如上`SerializationService接口的实现类`，如: JsonServiceImpl
 
-
-#### AutowiredServiceImpl
-
-5、AutowiredServiceImpl如何缓存的？LruCache的应用场景？
-> 1. 利用`LruCache`对所有具有@Autowired注解的类所生成ISyringe(注射器)的实现进行缓存。
-> 1. 应用于`AutowiredServiceImpl`(自动注入服务)
-
-#### Autowired
-
-6、@Autowired能否注解private属性?
+10、@Autowired能否注解private属性?
 > 1. 不可以。
 > 1. 会直接导致编译报错。
 > 1. `特殊情况下`注解`private属性`会导致当前目标，被加入到`不自动注入列表`中，从而导致`非private属性`无法`注入数据`。
 
-7、为什么@Autowired注解的属性没有被注入数据?
+11、为什么@Autowired注解的属性没有被注入数据?
 > 1. 没有调用`ARouter.getInstance().inject(this);`
 > 1. 该属性为`private属性`
 > 1. 该属性虽然为`非private属性`，但是用`@Autowired`注解了`private属性`导致该页面被加入到`不自动注入列表`中
 > 1. 跳转到该页面时没有携带对应参数数据。
 
-8、@Autowired对于public、protected、default、private修饰的属性是否可以注入数据?
+12、@Autowired对于public、protected、default、private修饰的属性是否可以注入数据?
 > 1. public: 可以
 > 2. protected: 可以。虽然可能navigation的源对象位于其他包，但是注射器实现类`HostActivity$$ARouter$$Autowired`和`Hostctivity`位于同一个包，因此`目标类对象.属性`可以注入数据。
 > 3. default: 可以。同理`protected`
 > 4. private: 编译都失败。
 
-9、ARouter路由传递数据的流程
+13、ARouter路由传递数据的流程
 > 1. 发起路由请求。通过`LogisticsCenter.completion`自动包装好`Postcard的参数(需要传递的数据)`
 > 1. 将`Postcard的数据`放入`Intent`,并且启动Activity。
 > 1. `inject()`方法中通过编译器产生的中间类-` xxx$$ARouter$$Autowired`进行赋值操作。
 
-10、ARouter处理数据的两种思路
+14、ARouter处理数据的两种思路
 > 1. Bundle能处理的数据，通过Bundle传输。
 > 2. Bundle不能传递的数据，通过`SerializationService`将对象转为`Json字符串`进行传递，然后反序列化。
 
-## arouter-annotation
+##### AutowiredServiceImpl
+
+15、AutowiredServiceImpl如何缓存的？LruCache的应用场景？
+> 1. 利用`LruCache`对所有具有@Autowired注解的类所生成ISyringe(注射器)的实现进行缓存。
+> 1. 应用于`AutowiredServiceImpl`(自动注入服务)
+
+## arouter-annotation(12题)
 
 ### 注解
 
@@ -1453,7 +1796,7 @@ public enum RetentionPolicy {
 
 #### Autowired
 
-1、Autowired注解的源码分析
+6、Autowired注解的源码分析
 > 1. 该注解用于`需要自动注入的成员变量`
 ```java
 // 1、修饰成员变量
@@ -1474,13 +1817,13 @@ public @interface Autowired {
 }
 ```
 
-2、如何检查说是否注入的某些必要的数据?
+7、如何检查说是否注入的某些必要的数据?
 > 1. 如果是引用类型，可以使用`@Autowired(name = "xxx", required = true)`
 > 1. 该参数的值如果为`null`，app会直接崩溃。让开发者在调试阶段就发现问题。
 
 #### Interceptor
 
-1、Interceptor注解源码分析
+8、Interceptor注解源码分析
 ```java
 // 1、用于描述class、interface
 @Target({ElementType.TYPE})
@@ -1498,7 +1841,7 @@ public @interface Interceptor {
 
 #### TypeKind
 
-1、TypeKind是什么？有什么作用?
+9、TypeKind是什么？有什么作用?
 > 1-用于表明`参数类型`，便于ARouter调用相应的`withBoolean()/withByte()`去装填入参数。
 > 2-共有`12种类型的参数`
 ```java
@@ -1539,7 +1882,7 @@ public class ARouter$$Group$$app implements IRouteGroup {
 }
 ```
 
-2、ARouter根据参数类型，向postcard装填入参数的流程。
+10、ARouter根据参数类型，向postcard装填入参数的流程。
 > 1. `LogisticsCenter.completion()`->`LogisticsCenter.setValue()`
 ```java
 /**==================================
@@ -1620,7 +1963,7 @@ private static void setValue(Postcard postcard, Integer typeDef, String key, Str
 
 #### RouteType
 
-2、RouteType的作用
+11、RouteType的作用
 > 1. 路由类型
 ```java
 
@@ -1646,7 +1989,7 @@ public enum RouteType {
 
 #### RouteMeta
 
-1、RouteMeta是什么?
+12、RouteMeta是什么?
 > 1. RouteMeta是一个数据bean，封装了被注解类的一些信息
 > 1. 所有需要跳转的页面(Activity、Fragment)都会封装成`RouteMeta`存放到`Warehouse.routes`中
 > 1. 所有的Provider的索引都会封装成`RouteMeta`存放到`Warehouse.providersIndex`中，后续实际加载`provider`时会从索引中提取出关键信息，`实例化`provider并且存入`Warehouse`的`Map<Class, IProvider> providers`中。
@@ -1709,7 +2052,7 @@ public class RouteMeta {
 }
 ```
 
-## arouter-compiler
+## arouter-compiler(10题)
 
 
 1、arouter-compiler的作用和使用?
@@ -1816,7 +2159,7 @@ public interface ProcessingEnvironment {
 
 ### RouteProcessor
 
-2、RouteProcessor的作用
+4、RouteProcessor的作用
 > 1. 在编译期间获取Route注解的类，生成中间类文件。
 > 1. 生成唯一的Root文件: `ARouter$$Root$$ + ModuleName`
 > 1. 生成唯一的Provider文件: `ARouter$$Providers + ModuleName`
@@ -1825,7 +2168,7 @@ public interface ProcessingEnvironment {
 >      1. `ARouter$$Group$$ + GroupB`
 >      1. `ARouter$$Group$$ + GroupC`
 
-3、RouteProcessor源码解析
+5、RouteProcessor源码解析
 > 1. 生成`Root中间类、Group中间类、Provider中间类`文件
 > 1. 分别构造这三种文件的`loadInto()`
 ```java
@@ -2267,14 +2610,14 @@ public class RouteProcessor extends AbstractProcessor {
 }
 ```
 
-4、RouteProcessor能处理哪些功能的中间类?
+6、RouteProcessor能处理哪些功能的中间类?
 > 1. 所有`@Route`注解的目标。
 >     1. Activity、Frgment
 >     1. Provider
 
 ### InterceptorProcessor
 
-1、InterceptorProcessor的作用
+7、InterceptorProcessor的作用
 > 1. 生成`拦截器`相关的中间类:
 ```java
 public class ARouter$$Interceptors$$app implements IInterceptorGroup {
@@ -2285,7 +2628,7 @@ public class ARouter$$Interceptors$$app implements IInterceptorGroup {
 }
 ```
 
-2、InterceptorProcessor的源码(未解析)
+8、InterceptorProcessor的源码(未解析)
 ```java
 @AutoService(Processor.class)
 @SupportedOptions(KEY_MODULE_NAME)
@@ -2436,7 +2779,7 @@ public class InterceptorProcessor extends AbstractProcessor {
 
 ### AutowiredProcessor
 
-1、AutowiredProcessor的作用
+9、AutowiredProcessor的作用
 > 1. 用于生成使用`@Autowired`注解过的页面的自动注入辅助类。例如`HostActivity$$ARouter$$Autowired.java`
 ```java
 /**==========================================
@@ -2456,7 +2799,7 @@ public class HostActivity$$ARouter$$Autowired implements ISyringe {
 }
 ```
 
-2、AutowiredProcessor源码(未解析)
+10、AutowiredProcessor源码(未解析)
 ```java
 @AutoService(Processor.class)
 @SupportedOptions(KEY_MODULE_NAME)
@@ -2861,6 +3204,12 @@ public class ARouter$$Group$$degrade implements IRouteGroup {
 > 1. 如果出错没找到，会调用`ARouter$$Group$$degrade.loadInto()`加载`DegradeServiceImpl`到providers中。并进行降级处理。
 > 1. 如果没有出错，会通过`InterceptorServiceImpl`处理拦截器。
 > 1. 最终实例化`Activity`并且携带参数跳转到目标页面。
+
+# 问题补充
+
+1、为什么会出现错误: There is no route match the path
+> 1. 需要调用`ARouter.openDebug()`方法将标志位`debuggable`设置为`true`。不进入Debug模式不会弹出Toast，只会打印日志。
+> 1. 不同module的一级路径相同，导致moudle中的一级路径失效，因此跳转到第二个module的某个页面时出现该错误。
 
 # 参考资料
 1. [可能是最详细的ARouter源码分析](https://www.jianshu.com/p/bc4c34c6a06c)
