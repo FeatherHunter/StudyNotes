@@ -229,6 +229,7 @@ static synchronized void openDebug() {
 #### 流程图
 
 1、ARouter.init()流程图
+![ARouter.init()流程图](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/android/arouter/ARouter_init.jpg?raw=true)
 
 #### init()
 
