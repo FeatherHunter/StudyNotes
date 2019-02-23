@@ -2,11 +2,16 @@
 
 转载请注明链接：https://blog.csdn.net/feather_wch/article/details/87376462
 
->详细分析Router的源码。
+>详细分析ARouter的源码。
+>
+> ARouter原理是比较简单的，就两方面内容: 初始化init()和路由navigation()。而这两者的本质就是围绕注册、加载所进行的。
+> 1. 初始化：本质是为了注册Group、拦截器和Provider。注册就是将ARouter生成的中间类的className放置到索引列表中。便于以后通过反射进行实例化。
+> 1. 路由：就是加载出目标后，根据对面是Activity、Fragment还是Provider进行相应的处理。过程中涉及到加载、路径动态替换、局部监听路由操作、全局降级策略、数据自动注入。
+>       1. 加载：从上面注册的索引列表中获取到ClassName，判断类型。对于Provider和拦截器，就是直接构造出对象，执行其init()进行初始化，并加入到对应列表中。对于Group，实例化后调用loadInto()，将该组下面的Activity、Fragment、Provider进行注册。
 
 # ARouter源码详解
 
-版本：2019/2/22-16:02
+版本：2019/2/23-14:50
 
 ---
 
@@ -677,12 +682,13 @@ public static Set<String> getFileNameByPackageName(Context context, final String
 > 1. 遍历所有Dex路径寻找指定包名下所有类的操作工作量过大，从而会导致效率问题。
 > 1. arouter-register就是用来解决这个问题。
 
-### Navigation路由(12题)
+### Navigation路由(19题)
 
 #### 流程图
 
 1、ARouter.getInstance().build(xxx).navigation()流程图
 ![navigation()流程图](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/android/arouter/ARouter_navigation.jpg?raw=true)
+
 
 #### build()
 
@@ -690,6 +696,17 @@ public static Set<String> getFileNameByPackageName(Context context, final String
 > 1. 本质就是构建出内部保存了`path`和`group`的`Postcard`
 > 1. 会先通过官方预留的`PathReplaceService`对`path`进行`动态处理`
 > 1. 需要注意在`PathReplaceService`处理path前进行判断处理，避免`build(path, group)和build(path)`对路径进行了重复的两次动态处理。
+> 1. Provider、Activity、Fragment区别:
+
+|区别|Activity|Fragment|Provider|
+|---|---|---|---|
+|PathReplaceService(路径动态变化)   |√   |√   |√   |
+|NavigationCallback(局部监控)   |√   |√   |√   |
+|DegradeService(全局降级服务)   |√   |√   |√   |
+|绿色通道   |√   |×  |×   |
+|InterceptorService(拦截器)   |√   |×  |×   |
+|数据传递   |intent.putExtras   | setArguments  | 无  |
+|路由结果   |跳转到Activity   |获取Fragment   |获取Provider   |
 ```java
 /**==============================================
  * 1、构建加载的路径。例如: path = /app/HostActivity
@@ -759,6 +776,7 @@ public final class Postcard extends RouteMeta {
 
 #### navigation()
 
+##### 路由分析(Activity、Fragment、Provider)
 3、ARouter.getInstance().build(path).navigation()源码分析
 > 1. 也就是对`Postcard`的`navigation`进行源码分析
 ```java
@@ -953,7 +971,79 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
 }
 ```
 
-4、监听路由操作的功能是如何实现的?
+###### Provider
+
+4、加载Provider的两种方法
+> 1. ARouter.getInstance().build(`服务的path`).navigation()
+> 1. ARouter.getInstance().navigation(`Provider.class`)
+
+5、ARouter.getInstance().navigation(Provider.class): 加载服务的源码流程
+> 1. 该加载方式没有Build的流程。
+```java
+    /**=================================
+     * 1、转交_ARouter加载Provider
+     * // ARouter.java
+     * ================================*/
+    public <T> T navigation(Class<? extends T> service) {
+        return _ARouter.getInstance().navigation(service);
+    }
+    /**=================================
+     * 2、加载Provider。
+     *    1. 没有注册过，返回null
+     *    2. 注册过，进行加载，返回Provider
+     * // _ARouter.java
+     * ================================*/
+    protected <T> T navigation(Class<? extends T> service) {
+        // 1、构造Provider相关的RouteMeta，存入group和path，
+        Postcard postcard = LogisticsCenter.buildProvider(service.getName());
+        // 2、老版本适配
+        if (null == postcard) {
+            postcard = LogisticsCenter.buildProvider(service.getSimpleName());
+        }
+        // 3、没有找到，表明没有注册过，直接返回。Provider是init初始化阶段一定会注册的。
+        if (null == postcard) {
+            return null;
+        }
+        // 4、对于Provider，直接加载。实例化，并且调用init方法。
+        LogisticsCenter.completion(postcard);
+        // 5、返回Provider
+        return (T) postcard.getProvider();
+    }
+```
+
+6、 为什么初始化时已经对所有Provider进行注册，还会生成该Provider相关的Group中间类?
+> 0-自定义拦截器:
+```java
+@Route(path = "/degrade/Service")
+public class DegradeServiceImpl implements DegradeService {}
+```
+> 1-Provider中间类: `ARouter$$Providers$$app.java`
+```java
+public class ARouter$$Providers$$app implements IProviderGroup {
+
+  // Warehouse.providersIndex
+  public void loadInto(Map<String, RouteMeta> providers) {
+    providers.put("com.alibaba.android.arouter.facade.service.DegradeService", RouteMeta.build(RouteType.PROVIDER, DegradeServiceImpl.class, "/degrade/Service", "degrade", null, -1, -2147483648));
+  }
+}
+```
+> 2-自定义Provider相关的Group中间类: `ARouter$$Group$$degrade.java`
+```java
+public class ARouter$$Group$$degrade implements IRouteGroup {
+
+  // Warehouse.routes
+  public void loadInto(Map<String, RouteMeta> atlas) {
+    atlas.put("/degrade/Service", RouteMeta.build(RouteType.PROVIDER, DegradeServiceImpl.class, "/degrade/service", "degrade", null, -1, -2147483648));
+  }
+}
+```
+> 3-init初始化时，通过`ARouter$$Providers$$app`加入到providers的索引列表中。
+> 4-通过`"/degrade/Service"`路由到目标Provider时，用不到这个索引信息，会直接通过`ARouter$$Group$$degrade`将`自定义Provider`注册到`Warehouse.routes列表中`。然后构造出Provider并加入到`Warehouse.providers`中。
+> 5-结论: `ARouter$$Providers$$app`是用于系统需要使用`全局降级服务`时来寻找到`DegradeService`的。而`ARouter$$Group$$degrade`是用户级需要Provider时所用到的。
+
+##### 监听路由操作/全局降级服务
+
+7、监听路由操作的功能是如何实现的?
 > 1. `navigation()`时传入的`NavigationCallback接口`相关的回调方法会在`_ARouter.navigation()`中进行处理。
 ```java
 protected Object navigation(final Context context, final Postcard postcard, final int requestCode, final NavigationCallback callback) {
@@ -991,24 +1081,42 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
 }
 ```
 
-5、局部监听路由操作和全局监听路由操作的优先级？
+8、如果DegradeService有多个实现类，系统是如何处理的？
+> 1. path = "xxx"，进行字符串比较，较小的在前，较大的在后。
+> 1. 因为是Map.put，因此较大是最终存储的。
+> 1. 绝对不要有多个实现类！
+
+9、局部监听路由操作和全局监听路由操作的优先级？
 > 1. 如果存在局部监听路由操作的`NavigationCallback`时，直接处理不会再调用`DegradeService的onLost()方法`。
 > 1. 如果不存在`NavigationCallback`才交给`DegradeService`处理。
 
-6、为什么在路径找不到时DegradeService的onLost()没有被调用？
+10、为什么在路径找不到时DegradeService的onLost()没有被调用？
 > 在`navigation()`时，已经设置了`NavigationCallback`，因此直接交给`NavigationCallback`进行处理。
 
-7、拦截器interceptor中如果有耗时操作会导致ANR吗?
+##### 拦截器ANR
+
+11、拦截器interceptor中如果有耗时操作会导致ANR吗?
 > 1. 不会
 > 1. `navigation`进行路由时，内部处理`拦截器相关操作`是在`线程池LogisticsCenter.executor`中进行处理的。不会ANR。
 
-8、为什么绿色通道GreenChannel不会导致路由被拦截?
+##### 绿色通道
+
+12、为什么绿色通道GreenChannel不会导致路由被拦截?
 > 1. `_ARouter.navigation()`中会判断是否是`绿色通道`
 > 1. 非绿色通道才会通过拦截器进行处理。
 
-##### LogisticsCenter.completion(postcard)
+13、为什么Fragment不会触发拦截器?
+> 1. Fragment会设置`绿色通道`
+> 1. 在`_ARouter.navigation()`中通过`LogisticsCenter.completion(postcard)`对`Postcard进行填充时`，发现是`Fragment`会直接调用`postcard.greenChannel(); `进行设置。
 
-9、LogisticsCenter.completion(postcard)源码分析
+#### LogisticsCenter
+
+14、LogisticsCenter的作用?
+> 1. 物流中心，能补全Postcard，并且注册一级Group下所有二级元素。
+
+##### completion(postcard)
+
+15、LogisticsCenter.completion(postcard)源码分析
 > 1.
 ```java
 /**==============================================================
@@ -1103,20 +1211,33 @@ private void startActivity(int requestCode, Context currentContext, Intent inten
     }
 ```
 
-10、为什么Fragment不会触发拦截器?
-> 1. Fragment会设置`绿色通道`
-> 1. 在`_ARouter.navigation()`中通过`LogisticsCenter.completion(postcard)`对`Postcard进行填充时`，发现是`Fragment`会直接调用`postcard.greenChannel(); `进行设置。
+##### buildProvider()
+
+16、buildProvider()源码分析
+```java
+    // _ARouter.java - 构造Provider的RouteMeta
+    public static Postcard buildProvider(String serviceName) {
+        // 1、索引Map中查找(ARouter初始化时会注册所有Provider)
+        RouteMeta meta = Warehouse.providersIndex.get(serviceName);
+        if (null == meta) {
+            return null;
+        } else {
+            // 2、构造Postcard
+            return new Postcard(meta.getPath(), meta.getGroup());
+        }
+    }
+```
 
 
 #### Postcard
 
-11、Postcard是什么?有什么用?
+17、Postcard是什么?有什么用?
 > 1. ARouter.build()方法就是构造出一个`Postcard(明信片)`，包含了所有路由到目标所需要的必要信息。
 > 1. `Postcard`继承自`RouteMeta`
 > 1. `build()`中仅仅是构造出具有`path和group`的`Postcard`
 > 1. `navigation()->LogisticsCenter.completion()`补全出包含路由所必要的信息的`Postcard`(该过程中还会去尝试加载同一个group下的所有元素)
 
-12、Postcard所包含的必要信息(除了携带的参数)?
+18、Postcard所包含的必要信息(除了携带的参数)?
 > 总结: 1.URI 2.路由超时时间 3.绿色通道 4.intent的flags标志 5.intent的action 6.动画相关的OptionsCompat、入场动画、出场动画
 > 1-携带的URI
 ```java
@@ -1372,8 +1493,8 @@ public Postcard withTransition(int enterAnim, int exitAnim) {
 #### 流程图
 
 1、withXXX()参数传入的流程图
-
 2、inject()的流程图
+![inject数据注入](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/android/arouter/ARouter_inject.jpg?raw=true)
 
 #### withXXX()参数传入
 
