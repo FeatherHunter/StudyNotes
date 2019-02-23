@@ -15,6 +15,10 @@
 
 ---
 
+![思维导图](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/android/arouter/ARouter%E6%BA%90%E7%A0%81%E8%AF%A6%E8%A7%A3-%E6%80%9D%E7%BB%B4%E5%AF%BC%E5%9B%BE.png?raw=true)
+
+---
+
 [toc]
 1、ARouter源码的四个组成部分
 > 1. arouter-register
@@ -3327,13 +3331,13 @@ public class ARouter$$Group$$degrade implements IRouteGroup {
 > 1. 如果没有出错，会通过`InterceptorServiceImpl`处理拦截器。
 > 1. 最终实例化`Activity`并且携带参数跳转到目标页面。
 
-# 问题补充
+## 问题补充
 
 1、为什么会出现错误: There is no route match the path
 > 1. 需要调用`ARouter.openDebug()`方法将标志位`debuggable`设置为`true`。不进入Debug模式不会弹出Toast，只会打印日志。
 > 1. 不同module的一级路径相同，导致moudle中的一级路径失效，因此跳转到第二个module的某个页面时出现该错误。
 
-# 参考资料
+## 参考资料
 1. [可能是最详细的ARouter源码分析](https://www.jianshu.com/p/bc4c34c6a06c)
 2. [Java注解处理器](https://race604.com/annotation-processing/)
 3. [路由方案之ARouter源码分析](https://blog.csdn.net/byhook/article/details/79945460)
