@@ -1,8 +1,8 @@
-转载请注明链接:
+转载请注明链接:https://blog.csdn.net/feather_wch/article/details/87903926
 
 # Android 热修复框架: Sophix基本使用
 
-版本号:2019/2/23
+版本号:2019/2/24-15:38
 
 ---
 
