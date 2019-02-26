@@ -91,3 +91,49 @@ legend {
 > 2. 精灵图在制作的时候宽度一定要大于最大的那张图片宽度；
 > 3. 图片与图片之间要有空隙；
 > 4. 在精灵图制作完成之后，一定要将精灵图的下方留出足够的位置，用来方便进行扩展；
+
+5、IconFont
+> 1.定义：指用字体文件代替图片文件，来展示图标，特殊字体等元素；
+> 2.优点:
+> 1. 加载文件体积小；
+> 2. 可以直接通过css的font-size，和color修改它的大小和颜色，对于需要做多个尺寸的图标，是个很好的方法；
+> 3. 支持一些css3对文字的效果，如：阴影、旋转、透明度。
+> 4. 兼容低版本浏览器；
+```
+```
+> 3.缺点：
+> 1. 矢量图只能是纯色的；
+> 2. 制作门槛高，耗时长，维护成本很高。
+
+6、生成IconFont字体文件
+> 1.设计矢量图，然后通过工具直接转换为相应的字体；
+> 2.使用第三方IconFont在线服务（阿里巴巴IconFont平台），直接上传设计的图标矢量图生成字体文件；
+
+7、使用IconFont字体文件
+> 1.font-face字体声明：不同的浏览器调用不同的字体文件；
+```
+@font-face {font-family: "iconfont";
+  src: url('iconfont.eot'); /* IE9*/
+  src: url('iconfont.eot?#iefix') format('embedded-opentype'), /* IE6-IE8 */
+  url('iconfont.woff') format('woff'), /* chrome, firefox */
+  url('iconfont.ttf') format('truetype'), /* chrome, firefox, opera, Safari, Android, iOS 4.2+*/
+  url('iconfont.svg#iconfont') format('svg'); /* iOS 4.1- */
+}
+```
+> 2.定义IconFont样式
+```
+.iconfont {
+   font-family:"iconfont" !important;
+   font-size:16px;
+}
+```
+> 3.挑选图标对应的字体编码，应用于页面中
+```
+<i class="icon iconfont">&#xe60e;</i>
+```
+
+8、IconFont存在的问题(实践)
+> 1.字体图标在一些浏览器下会遇到被加粗的问题，设置-webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;解决。
+> 2.跨域访问不到字体，由于怕字体版权得不到保护，默认跨域的字体文件是访问不到的，一般通过服务器设置 Access-Control-Allow-Origin指定自己需要的网站和设置同域来解决这个问题。
+> 3.不要包含没有使用的@font-face，IE将不分他是否使用，统统加载下来。万恶的IE。
+> 4.@font-face声明之前，如果有script标签的话，直到字体文件完成下载之前，IE将都不会渲染任何东西。
