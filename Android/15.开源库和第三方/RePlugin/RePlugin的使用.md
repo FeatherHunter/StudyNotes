@@ -2,7 +2,7 @@
 
 # RePlugin的使用
 
-版本号:2019-03-03(21:00)
+版本号:2019-03-03(23:44)
 
 ---
 
@@ -172,7 +172,12 @@ public class MainApplication extends Application {
 }
 ```
 
-## **安装插件(41题)**
+#### java.lang.ExceptionInInitializerError
+
+6、报错`java.lang.ExceptionInInitializerError`
+> 需要换成非继承的形式
+
+## **安装插件(46题)**
 
 1、无论是内置，还是外置插件，不是所有的APK都能作为 RePlugin 的插件并安装进来的。
 > 1. 必须要严格按照[《插件接入指南》](https://github.com/Qihoo360/RePlugin/wiki/%E6%8F%92%E4%BB%B6%E6%8E%A5%E5%85%A5%E6%8C%87%E5%8D%97)中所述完成接入，其编译出的APK才能成为插件，且这个APK同时也可以被安装到设备中。
@@ -457,6 +462,33 @@ repluginHostConfig {
 > 位于“主程序路径/app_p_a/p.l”中。
 
 41、内置插件：内置插件的JSON文件只存放于主程序“assets/plugins-builtin.json”文件下。每次会从那里获取信息。
+
+### 插件命名
+
+42、RePlugin的插件可以有两种名字，分别是：插件包名、插件别名。
+> 1. 插件包名：顾名思义，就是插件的PackageName
+> 1. 插件别名：为了“精简包名”而设计的别名
+
+#### 插件包名
+43、插件包名可以任意起名，不受限制。
+> 若APK既作为单品，又作为插件，则建议分成两个包名，且Provider的Authority也建议改名，这样可针对不同的场景（插件还是单品）来做不同的处理。
+
+#### 插件别名
+44、插件别名如何使用
+> 要声明插件别名，需要在插件的`AndroidManifest.xml`中声明以下`Meta-data`：
+```xml
+     <meta-data
+            android:name="com.qihoo360.plugin.name"
+            android:value="[你的插件别名]" />
+```
+
+
+45、针对内置插件而言, 可以不填写插件别名
+> 1. 若不填写插件别名，则会将内置插件的“文件名”作为其插件名
+> 1. 其优先级为：Meta-data声明的 > 文件名
+
+46、针对外置插件而言，必须要指明插件别名
+> 1. 若不填写插件别名，则只能允许使用“插件包名”
 
 ## **打开插件的Activity(31题)**
 
