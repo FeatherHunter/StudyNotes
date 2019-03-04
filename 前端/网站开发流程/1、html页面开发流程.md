@@ -137,3 +137,5 @@ legend {
 > 2.跨域访问不到字体，由于怕字体版权得不到保护，默认跨域的字体文件是访问不到的，一般通过服务器设置 Access-Control-Allow-Origin指定自己需要的网站和设置同域来解决这个问题。
 > 3.不要包含没有使用的@font-face，IE将不分他是否使用，统统加载下来。万恶的IE。
 > 4.@font-face声明之前，如果有script标签的话，直到字体文件完成下载之前，IE将都不会渲染任何东西。
+
+IconFont三种使用方式，推荐第二种：https://blog.csdn.net/qq_39176732/article/details/81390423
