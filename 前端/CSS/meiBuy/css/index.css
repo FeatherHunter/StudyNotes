@@ -1,0 +1,529 @@
+@charset "UTF-8";
+html {
+    font: 12px '宋体';
+}
+
+a {
+    color: #333;
+}
+
+.top {
+    height: 26px;
+    background-color: #f7f7f7f7;
+    border-bottom: 1px solid #d8d8d8;
+}
+
+.top-page {
+    width: 970px;
+    height: inherit;
+    margin: 0 auto;
+}
+
+.top-page-l {
+    line-height: 26px;
+}
+
+.top-page-r ul li {
+    float: left;
+    padding-right: 10px;
+    line-height: 26px;
+}
+
+.top-page-r ul li a i {
+    display: inline-block;
+    height: 0;
+    width: 0;
+    /*制作倒三角*/
+    border: 3px dashed transparent;
+    border-top: solid #333333;
+    margin-left: 3px;
+}
+
+.logo {
+    width: 970px;
+    height: 90px;
+    margin: 0 auto;
+}
+
+.logo-l {
+    width: 135px;
+    height: 45px;
+    margin: 20px 0 0 20px;
+}
+
+.logo-l a {
+    display: inline-block;
+    width: 100%;
+    height: 100%;
+    background: url("../img/logo.png") no-repeat;
+    /*首行缩进*/
+    text-indent: -1000em;
+}
+
+.logo-r {
+    width: 530px;
+    height: 42px;
+    border: 1px solid #c9c9c9;
+    margin-top: 29px;
+}
+
+.logo-r-content {
+    margin: 5px 5px 5px 4px;
+}
+
+.logo-r-search {
+    width: 418px;
+    height: 28px;
+    border: 1px solid #c9c9c9;
+    color: #999;
+}
+
+.logo-r-btn {
+    width: 99px;
+    height: 30px;
+    color: white;
+    background-color: #2f70d0;
+}
+
+.nav {
+    width: 970px;
+    height: 25px;
+    margin: 0 auto;
+    border-bottom: 2px solid #0266a3;
+}
+
+.nav ul li {
+    float: left;
+    padding: 0 15px 0 15px;
+    line-height: 25px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.nav ul li a {
+    color: #0266a3;
+}
+
+.nav ul li:hover {
+    background-color: #0266a3;
+}
+
+.nav ul li:hover a {
+    color: white;
+}
+
+.banner {
+    width: 970px;
+    height: 210px;
+    /*margin-top:14px;*/
+    /*margin:0 auto;*/
+    margin: 14px auto 0;
+}
+
+.sub-nav {
+    width: 200px;
+    height: inherit;
+    background-color: gray;
+    margin-right: 11px;
+}
+
+.sub-nav h2 {
+    height: 30px;
+    font-size: 14px;
+    line-height: 30px;
+    color: white;
+    background-color: #0266a3;
+    font-weight: bold;
+    padding-left: 20px;
+}
+
+.sub-nav ul {
+    height: 180px;
+    background-color: #ebf0f6;
+}
+
+.sub-nav li {
+    font-size: 15px;
+    padding-top: 11px;
+    padding-left: 9px;
+}
+
+.sub-nav i {
+    font-size: 13px;
+}
+
+.sub-nav li a {
+    padding-left: 15px;
+}
+
+.ad {
+    width: 520px;
+    height: inherit;
+    background-color: gray;
+}
+
+.message {
+    width: 230px;
+    height: inherit;
+}
+
+.message-top {
+    height: 95px;
+    border: 1px solid #ddd;
+    background-color: #f7faf7;
+}
+
+.message-top .fw {
+    font-weight: bold;
+    padding: 8px 0 0 18px;
+}
+
+.message-top i {
+    margin: 20px 10px 0 10px;
+    display: inline-block;
+    height: 40px;
+    width: 40px;
+    background: url("../img/pic.png");
+}
+
+.message-top .cheap {
+    width: 166px;
+    margin-top: 20px;
+    line-height: 20px;
+}
+
+.message-top a {
+    font-weight: bold;
+}
+
+.message-bottom {
+    margin-top: 21px;
+    height: 92px;
+    background-color: #f7f7f7;
+}
+
+.message-bottom .find-message {
+    text-align: center;
+    color: gray;
+    font-size: 14px;
+    padding-top: 11px;
+}
+
+.message-bottom .phone {
+    text-align: center;
+    color: #3f9ce0;
+    margin-top: 10px;
+}
+
+.message-bottom .phone i {
+    display: inline-block;
+    height: 14px;
+    width: 14px;
+    background: url("../img/pic.png") -41px 0;
+}
+
+.message-bottom input {
+    width: 81px;
+    height: 23px;
+    background: url("../img/pic.png") -41px -22px;
+    border: 1px solid #3f9ce0;
+    margin-top: 14px;
+    margin-left: 76px;
+    color: #3f9ce0;
+    box-shadow: 2px 2px 4px #888888;
+}
+
+.material {
+    width: 950px;
+    height: 34px;
+    line-height: 34px;
+    border-top: 2px solid #c3d7e4;
+    margin: 14px auto 0;
+    background-color: #ecf1f7;
+    font-weight: bold;
+    padding-left: 20px;
+}
+
+.product {
+    position: relative;
+    width: 970px;
+    height: 345px;
+    margin: 12px auto 0;
+}
+
+.product-l {
+    /*width: 712px;*/
+    width: 706px;
+    height: 345px;
+    border: 1px solid #d8d8d8;
+    padding-left: 26px;
+}
+
+.product-l-item {
+    width: 350px;
+    height: 146px;
+    margin: 17px 0 0 0;
+}
+
+.product-l-item-img {
+    height: 143px;
+    width: 99px;
+}
+
+.product-l-item-img div {
+    height: 95px;
+    width: 94px;
+    border: 1px solid #cacaca;
+    /*水平竖直居中*/
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.product-l-item-img img {
+    max-width: 93px;
+    max-height: 90px;
+}
+
+.product-l-item-img a {
+    display: inline-block;
+    height: 22px;
+    width: 60px;
+    line-height: 22px;
+    background-color: #2f70d0;
+    color: white;
+    text-align: center;
+    margin: 16px 0 0 18px;
+}
+
+.product-l .line {
+    position: absolute;
+    top: 172px;
+    left: 8px;
+    height: 1px;
+    width: 720px;
+    background-color: rgb(215, 215, 216);
+}
+
+.product-l-item-info {
+    height: 143px;
+    width: 250px;
+}
+
+.product-l-item-info-title {
+    height: 30px;
+    line-height: 30px;
+    padding-left: 10px;
+}
+
+.product-l-item-info-detail {
+    width: 9em;
+    height: 30px;
+    margin-left: 15px;
+    color: #863e01;
+    font-size: 11px;
+}
+
+.product-l-item-info-price {
+    font-size: 16px;
+    color: red;
+    margin: 20px 0 0 10px;
+}
+
+.product-l-item-info-sales {
+    height: 20px;
+    line-height: 20px;
+    margin: 20px 0 0 10px;
+}
+
+.product-l-item-info-sales span {
+    color: red;
+}
+
+.product-r {
+    width: 228px;
+    height: inherit;
+    border: 1px solid #d8d8d8;
+}
+
+.product-r h2 {
+    font-size: 14px;
+    height: 30px;
+    line-height: 30px;
+    padding-left: 10px;
+    border-bottom: 1px solid #d8d8d8;
+    /*background-color: #ecf1f7;*/
+}
+
+.product-r ul {
+    height: 310px;
+    margin-top: 10px;
+}
+
+.product-r ul li {
+    height: 25px;
+    line-height: 25px;
+}
+
+.product-r ul li i {
+    display: inline-block;
+    height: 5px;
+    width: 5px;
+    background-color: #d8d8d8;
+    border-radius: 50%;
+    margin: 0 10px 0 10px;
+    position: relative;
+    top: -2px;
+}
+
+.child-safe {
+    height: 227px;
+    width: 970px;
+    margin: 15px auto 0;
+}
+
+.child-safe-l {
+    width: 732px;
+    height: inherit;
+}
+
+.child-safe-l-title {
+    height: 25px;
+
+}
+
+.child-safe-l-title span {
+    display: inline-block;
+    height: 25px;
+    width: 75px;
+    line-height: 25px;
+    background-color: #1296db;
+    text-align: center;
+    font-size: 14px;
+}
+
+.child-safe-l-title a {
+    display: inline-block;
+    height: 20px;
+    width: 80px;
+    line-height: 20px;
+    color: #1296db;
+    font-weight: bold;
+}
+
+.child-safe-l-title a i {
+    display: inline-block;
+    height: 15px;
+    width: 15px;
+    background: url("../img/pic.png") -56px 0;
+    position: relative;
+    top: 3px;
+    left: 6px;
+}
+
+.child-safe-l-info {
+    height: 200px;
+    width: 732px;
+    border: 1px solid #d8d8d8;
+    border-top: 2px solid #0266a3;
+}
+
+.child-safe-l-info-item {
+    box-sizing: border-box;
+    border: 3px solid #fff;
+    width: 25%;
+    height: inherit;
+
+}
+
+.child-safe-l-info-item div {
+    height: 62%;
+    /*水平竖直居中*/
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+}
+
+.child-safe-l-info-item img {
+    max-height: 96%;
+    max-width: 90%;
+}
+
+.child-safe-l-info-item-title {
+    height: 30px;
+    width: 150px;
+    text-align: center;
+    margin-left: 12px;
+}
+
+.child-safe-l-info-item-tip {
+    margin: 8px 0 0 32px;
+    color: #A1A1A2;
+}
+
+.child-safe-r {
+    width: 228px;
+    height: 227px;
+    /*border: 1px solid #d8d8d8;*/
+}
+
+.child-safe-r div {
+    height: 100px;
+    border: 1px solid #d8d8d8;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.child-safe-r div img {
+    max-height: 96%;
+    max-width: 90%;
+    min-width: 218px;
+}
+
+.friend {
+    width: 970px;
+    height: 80px;
+    margin: 20px auto 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /*border: 1px solid #d8d8d8;*/
+    border-bottom: 2px solid #0266a3;
+    color: #A1A1A2;
+}
+
+.friend ul {
+    width: 700px;
+}
+
+.friend li {
+    float: left;
+    padding: 5px 5px 5px 5px;
+
+}
+
+.friend li a {
+    color: #A1A1A2;
+}
+
+.about {
+    width: 970px;
+    height: 112px;
+    margin: 15px auto 0;
+    font-family: Arial;
+}
+
+.about-me {
+    height: 75px;
+    line-height: 24px;
+    text-align: center;
+    padding: 20px 0;
+
+}
+
+.about-me a {
+    padding: 0 5px;
+}
