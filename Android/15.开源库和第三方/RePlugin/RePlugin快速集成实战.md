@@ -1,4 +1,4 @@
-转载请注明链接:
+转载请注明链接: https://blog.csdn.net/feather_wch/article/details/88266603
 
 > 快速集成RePlugin以简单实例，讲解内置插件、外置插件、等众多用法。
 

@@ -1,14 +1,14 @@
+
+
 转载请注明链接: https://blog.csdn.net/feather_wch/article/details/88199536
 
 # RxJava 2.x使用详解
 
-版本号:2019-03-06(0:52)
+版本号:2019-03-06(20:00)
 
 ---
 
-[TOC]
-
-
+[toc]
 ## 基本概念
 
 1、什么是响应式编程？
@@ -67,7 +67,9 @@ Observable.just(1, 2, 3, 4)
 });
 ```
 
-## Consumer
+## Observer
+
+### Consumer
 
 1、简化的订阅方式
 ```java
@@ -79,6 +81,30 @@ Observable.just("hello").subscribe(new Consumer<String>()
 
     }
 });
+```
+
+### SingleObserver
+
+2、SingleObserver的作用
+> 1、SingleObserver只会调用`onError()`和`onSuccess()`
+```java
+Single.just(new Random().nextInt())
+      .subscribe(new SingleObserver<Integer>() {
+            @Override
+            public void onSubscribe(@NonNull Disposable d) {
+
+            }
+
+            @Override
+            public void onSuccess(@NonNull Integer integer) {
+                // 成功接收到
+            }
+
+            @Override
+            public void onError(@NonNull Throwable e) {
+                // 出现异常
+            }
+      });
 ```
 
 ## 线程调度
@@ -689,6 +715,41 @@ Observable.just(new Student("wang"), new Student("chen"), new Student("hao"))
 });
 ```
 
+#### debounce
+
+1、debounce的作用和使用方法
+> 1. 去除掉发送频率过快的数据
+> 1. 下例中移除掉发送间隔时间，低于500ms的数据。
+```java
+// 1、间隔发送数据
+Observable.create(new ObservableOnSubscribe<Integer>() {
+    @Override
+    public void subscribe(@NonNull ObservableEmitter<Integer> emitter) throws Exception {
+        // send events with simulated time wait
+        emitter.onNext(1); // skip
+        Thread.sleep(400);
+        emitter.onNext(2); // deliver
+        Thread.sleep(505);
+        emitter.onNext(3); // skip
+        Thread.sleep(100);
+        emitter.onNext(4); // deliver
+        Thread.sleep(605);
+        emitter.onNext(5); // deliver
+        Thread.sleep(510);
+        emitter.onComplete();
+    }
+    // 2. 去除掉发送间隔时间 <= 500ms都剔除掉，只发送了 2、4、5
+}).debounce(500, TimeUnit.MILLISECONDS)
+        .subscribeOn(Schedulers.io())
+        .observeOn(AndroidSchedulers.mainThread())
+        .subscribe(new Consumer<Integer>() {
+            @Override
+            public void accept(@NonNull Integer integer) throws Exception {
+                    // 接收到数据
+            }
+        });
+```
+
 ### 定时器
 
 #### interval
@@ -744,6 +805,114 @@ Observable.timer(2, TimeUnit.SECONDS)
 ```
 
 
+### defer
+
+1、defer的作用
+> 1. 每次`Subscribe订阅时`会创建一个新`被观察者Observable`
+```java
+// 1、def
+Observable<Integer> observable = Observable.defer(new Callable<ObservableSource<? extends Integer>>()
+{
+    @Override
+    public ObservableSource<? extends Integer> call() throws Exception
+    {
+        // 2、每订阅一次，创建一个被观察者
+        return Observable.just(1, 2, 3);
+    }
+});
+
+// 订阅一次
+observable.subscribe(xxx);
+// 订阅一次
+observable.subscribe(xxx);
+```
+
+### last
+
+1、last是取出可观察到的最后一个值
+```java
+Observable.just(1, 2, 3)
+          .last(4)
+          .subscribe(new Consumer<Integer>() {
+                    @Override
+                    public void accept(@NonNull Integer integer) throws Exception {
+                        mRxOperatorsText.append("last : " + integer + "\n");
+                        Log.e(TAG, "last : " + integer + "\n");
+                    }
+          });
+```
+
+### merge
+
+2、merge的作用？
+> 1. 能将多个`Observable`结合起来
+> 1. `merge`和`concat`区别在于:
+>      * 不需要等待`Observable 1`事件全部发送完成，就可以发送`发射器2的事件`
+
+3、merge的使用
+```java
+Observable.merge(Observable.just(1, 2), Observable.just(3, 4, 5))
+                .subscribe(xxx);
+                // 接收到1、2、3、4、5
+```
+
+
+### reduce
+
+
+1、reduce的作用
+> 1. 被观察者发出的每一个item都调用function进行处理，然后得到一个最终值，并且发射出去。
+> 1. 例如1、2、3、4、5，funvtion是相加，结果=1+2+3+4+5
+```java
+Observable.just(1, 2, 3)
+.reduce(new BiFunction<Integer, Integer, Integer>() {
+          // 1、两个item相加
+          public Integer apply(@NonNull Integer integer, @NonNull Integer integer2) throws Exception {
+              return integer + integer2;
+          }
+}).subscribe(new Consumer<Integer>() {
+           @Override
+           public void accept(@NonNull Integer integer) throws Exception {
+               // 输出结果 = 6
+           }
+});
+```
+
+### scan
+
+1、scan的作用？和reduce的区别？
+> 1. 功能和reduce类似
+> 1. 区别在于`每一个步骤的结果都会发射出去`
+```java
+Observable.just(1, 2, 3)
+.scan(new BiFunction<Integer, Integer, Integer>() {
+      @Override
+      public Integer apply(@NonNull Integer integer, @NonNull Integer integer2) throws Exception {
+            return integer + integer2;
+}})
+.subscribe(xxx);
+```
+
+### window
+
+1、window的作用
+> 1. 和Buffer类似，但是是发送出`每组item的Observable`，`每个Observable会依次发出这组数据中的数据`
+```java
+Observable.just(1, 2, 3)
+.window(3, TimeUnit.SECONDS)
+.subscribe(new Consumer<Observable<Integer>>() {
+        @Override
+        public void accept(@NonNull Observable<Integer> observable) throws Exception {
+                // 1、接收到一组Item的Observable
+                observable.subscribe(new Consumer<Integer>() {
+                      @Override
+                      public void accept(@NonNull Integer aLong) throws Exception {
+                              // 2、依次接收到一组数据中的每个数据
+                      }
+                });
+      }
+});
+```
 
 ## Function
 
@@ -754,3 +923,4 @@ Observable.timer(2, TimeUnit.SECONDS)
 ## 参考资料
 
 1. [操作符-官方文档](http://reactivex.io/documentation/operators.html)
+1. [RxJava 2.x 入门教程（五）](https://www.jianshu.com/p/81fac37430dd)
