@@ -4,11 +4,11 @@
 
 # RxJava 2.x使用详解
 
-版本号:2019-03-06(20:00)
+版本号:2019-03-07(20:00)
 
 ---
 
-[toc]
+@[toc]
 ## 基本概念
 
 1、什么是响应式编程？
@@ -326,6 +326,21 @@ subject.subscribe(new Observer<String>(){...});
 
 subject.onNext("3");
 subject.onNext("4");
+```
+
+### 数据的转发
+
+1、Subject还可以进行数据的转发，作为中间桥梁，将A的数据转发给C
+```java
+// A
+Observable<String> observable = Observable.fromArray("123","456","789");
+// B
+ReplaySubject<String> replaySubject = ReplaySubject.create();
+
+// A发数据给B
+observable.subscribe(replaySubject);
+// B转发数据给A
+replaySubject.subscribe(new SubjectObserver<>("C"));
 ```
 
 ## 操作符
@@ -850,12 +865,17 @@ Observable.just(1, 2, 3)
 >      * 不需要等待`Observable 1`事件全部发送完成，就可以发送`发射器2的事件`
 
 3、merge的使用
+> 接收类型相同的数据
 ```java
 Observable.merge(Observable.just(1, 2), Observable.just(3, 4, 5))
                 .subscribe(xxx);
                 // 接收到1、2、3、4、5
 ```
 
+#### 接收类型不同的数据
+
+4、如果merge的数据是不同的类型怎么办?
+> 1. 用一个包装类进行包装，然后获取到之后通过`instanceof`进行判断
 
 ### reduce
 
@@ -924,3 +944,4 @@ Observable.just(1, 2, 3)
 
 1. [操作符-官方文档](http://reactivex.io/documentation/operators.html)
 1. [RxJava 2.x 入门教程（五）](https://www.jianshu.com/p/81fac37430dd)
+1. [RxJava实战技巧大全](https://www.jianshu.com/p/14f55d3368ed)
