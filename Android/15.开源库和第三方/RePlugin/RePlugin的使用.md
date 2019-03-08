@@ -2,13 +2,13 @@
 
 # RePlugin的使用
 
-版本号:2019-03-03(23:44)
+版本号:2019-03-07(21:44)
 
 ---
 
 [TOC]
 
-## **接入RePlugin(7题)**
+## **接入RePlugin(9题)**
 
 ### 1-添加Gradle依赖
 
@@ -174,10 +174,33 @@ public class MainApplication extends Application {
 
 #### java.lang.ExceptionInInitializerError
 
-6、报错`java.lang.ExceptionInInitializerError`
+8、报错`java.lang.ExceptionInInitializerError`
 > 需要换成非继承的形式
 
+### 4-插件App接入
+
+9、在build.gradle中进行配置
+> 1-根目录-build.gradle中接入
+```xml
+buildscript {
+    dependencies {
+        classpath 'com.qihoo360.replugin:replugin-plugin-gradle:2.2.4'
+        ...
+    }
+}
+```
+> 2-app的build.gradle中配置
+```xml
+apply plugin: 'replugin-plugin-gradle'
+
+dependencies {
+    compile 'com.qihoo360.replugin:replugin-plugin-lib:2.2.4'
+    ...
+}
+```
+
 ## **安装插件(46题)**
+
 
 1、无论是内置，还是外置插件，不是所有的APK都能作为 RePlugin 的插件并安装进来的。
 > 1. 必须要严格按照[《插件接入指南》](https://github.com/Qihoo360/RePlugin/wiki/%E6%8F%92%E4%BB%B6%E6%8E%A5%E5%85%A5%E6%8C%87%E5%8D%97)中所述完成接入，其编译出的APK才能成为插件，且这个APK同时也可以被安装到设备中。

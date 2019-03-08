@@ -104,6 +104,10 @@ public class BaseApplication extends RePluginApplication{
     </application>
 ```
 
+## 内置插件
+
+### build.gradle配置
+
 
 ## 问题汇总
 
