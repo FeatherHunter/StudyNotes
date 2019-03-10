@@ -1046,7 +1046,7 @@ graph TD;
 
 18、如何让远程服务端调用客户端的ServiceConnection中的方法？
 >1. 无法直接让远程服务端使用
->2. 需要借助Binder才能让远程服务端毁掉自己的方法
+>2. 需要借助Binder才能让远程服务端回调自己的方法
 >3. ServiceDispatcher的内部类InnerConnection就起到了Binder的作用
 >4. ServiceDispatcher起到连接ServiceConnection和InnerConnection的作用
 
