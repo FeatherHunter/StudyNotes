@@ -2,7 +2,7 @@
 
 # RePlugin的使用
 
-版本号:2019-03-07(21:44)
+版本号:2019-03-10(16:44)
 
 ---
 
@@ -199,7 +199,7 @@ dependencies {
 }
 ```
 
-## **安装插件(46题)**
+## **安装插件(50题)**
 
 
 1、无论是内置，还是外置插件，不是所有的APK都能作为 RePlugin 的插件并安装进来的。
@@ -510,8 +510,61 @@ repluginHostConfig {
 > 1. 若不填写插件别名，则会将内置插件的“文件名”作为其插件名
 > 1. 其优先级为：Meta-data声明的 > 文件名
 
-46、针对外置插件而言，必须要指明插件别名
+46、针对外置插件而言，必须要指明插件包名
 > 1. 若不填写插件别名，则只能允许使用“插件包名”
+
+### 插件版本
+
+#### VersionCode
+
+47、插件的VersionCode(版本号)
+> 1. 建议分为三位，如121。Integer类型不要查过32位最大值即可
+> 1. 第一位大版本
+> 1. 第二位功能版本: 新增了功能，优化了功能
+> 1. 第三位修复版本: BUG需要修复等
+
+#### 协议版本号
+
+48、插件的协议版本号的作用
+> 1. 区分新旧插件，值低于协议版本号的插件不会被使用，防止出错
+```xml
+      <meta-data
+            android:name="com.qihoo360.plugin.version.ver"
+            android:value="[你的插件协议版本号]" />
+```
+
+#### 插件框架版本号
+
+49、插件的框架协议号的作用
+> 1. 让该插件不能跑在新版app上防止出错
+```xml
+     <meta-data
+            android:name="com.qihoo360.framework.ver"
+            android:value="[你的框架版本号]" />
+```
+
+### 插件信息的获取
+
+50、插件信息的获取方法
+> 1. 获取任意正在运行的插件信息: `RePlugin.getPlugin()`, 返回null表示未安装。
+> 1. 获取所有已安装插件的信息列表: `RePlugin.getPluginInfoList()`
+> 1. 获取安装成功后的信息(新插件的信息):  `RePlugin.install()`
+> 1. `pluginInfo.getPendingUpdate`: 获取待更新的插件信息
+```java
+// 1、获取到正在运行的插件信息
+PluginInfo pi = RePlugin.getPluginInfo("exam");
+if (pi != null) {
+  // 2、获取到“新插件的信息(带更新的插件)”
+	PluginInfo newPi = pi.getPendingUpdate();
+	if (newPi != null) {
+    // 还未更新
+		...
+	} else {
+		// 没有
+		...
+	}
+}
+```
 
 ## **打开插件的Activity(31题)**
 
