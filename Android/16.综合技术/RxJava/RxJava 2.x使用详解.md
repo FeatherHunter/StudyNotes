@@ -1,10 +1,9 @@
 
-
 转载请注明链接: https://blog.csdn.net/feather_wch/article/details/88199536
 
 # RxJava 2.x使用详解
 
-版本号:2019-03-07(20:00)
+版本号:2019-03-11(18:00)
 
 ---
 
@@ -51,6 +50,7 @@
 ### doOnNext
 
 1、doOnNext是用于在订阅者接收到数据前进行一些操作
+> 在下游的onNext()回调前调用
 ```java
 Observable.just(1, 2, 3, 4)
 .doOnNext(new Consumer<Integer>() {
@@ -343,6 +343,39 @@ observable.subscribe(replaySubject);
 replaySubject.subscribe(new SubjectObserver<>("C"));
 ```
 
+## Processor
+
+1、Processor和Subject使用方法类型，区别在于`Processor支持背压`
+
+### PublishProcessor
+
+### AsyncProcessor
+
+### BehaviorProcessor
+
+### ReplayProcessor
+
+## Flowable
+
+### 背压
+
+1、背压是什么(Backpressure)?
+> 1. RxJava中通过操作符调用链，数据从上游向下游传递
+> 1. 当上游发送数据的速度大于下游处理数据的速度时，会抛出MissingBackpressureException异常。
+> 1. 这种情况就需要`背压进行流量控制`
+
+## Disposable
+
+1、Disposable的作用
+> 1. `dispose()`进行反订阅
+
+### CompositeDisposable
+
+2、CompositeDisposable的作用？
+> 1. 对下游进行管理，在Activity销毁时，释放所有的异步工作
+> 1. 避免内存泄露
+> 1.
+
 ## 操作符
 
 ### just
@@ -475,6 +508,17 @@ Observable.create(new ObservableOnSubscribe<Student>()
 1、concatMap属于有顺序的flatMap
 > 1. concatMap使用方法和flatMap完全一致
 > 1. 数据的发送符合顺序
+
+#### switchMap
+
+2、switchMap的作用?
+> 1. 将一个`Observable对象`转换为`多个Observable对象`
+> 1. 每当`源Observable`发射一个`新的数据项（Observable）时`，它将`取消订阅并停止监视``之前的数据项产生的Observable`，并开始监视当前发射的这一个。
+
+3、switchMap的使用场景
+> 1. 用户在搜索关键字时，迅速输入`old`和`new`来进行搜索。
+> 1. 结果最后搜索的`new关键字的结果返回快`，后返回`old关键字的结果`
+> 1. 此时`关键字明明是new，且显示的是查询old关键字的内容`
 
 ### Concat
 
@@ -801,6 +845,10 @@ Observable.create(new ObservableOnSubscribe<Integer>() {
     }
 ```
 
+#### intervalRange
+
+1、intervalRange的作用
+
 #### timer
 
 1、timer的作用和使用
@@ -819,6 +867,28 @@ Observable.timer(2, TimeUnit.SECONDS)
         });
 ```
 
+### repeatWhen
+
+1、repeatWhen提供重新订阅的功能
+> 重订阅需要满足两个条件：
+> 1. 需要上游回调`onComplete()`
+> 1. 告诉上游是否需要重订阅，通过`repeatWhen的Function`函数所返回的Observable确定
+>      * 如果该Observable发送了`onComplete/onError`则表示`不需要重订阅`。`否则触发重订阅`。
+
+2、repeatWhen使用时，发送onComplete，无法触发下游的onComplete回调。发送onError消息，可以触发下游的onError回调。为什么？
+> 1. repeatWhen使用的是flatMap操作符
+> 1. 下游的onComplete无法触发的原因:
+>       1. flatMap变换后得到的每个子数据流中的completed事件并不会加入到合并后的事件流中
+>       1. 只有flatMap的源事件流中的completed事件会加入到合并后的事件流中。
+>       1. 这里如果返回Observable.Empty()，相当于是子事件流中的completed事件，所以不会触发最终的下游的onComplete回调。
+> 1. 下游的onError可以触发的原因:
+>       1. 但是error事件不同，任何一个flatMap的子数据流中的error都会中断最终的合并事件流并且被下游接收到。
+
+### retryWhen
+
+1、retryWhen是收到onError()后触发是否要重订阅的逻辑判断
+
+2、repeatWhen是收到上游的onComplete()后触发是否要重订阅的逻辑判断
 
 ### defer
 
@@ -934,6 +1004,8 @@ Observable.just(1, 2, 3)
 });
 ```
 
+## CompositeDisposable
+
 ## Function
 
 ### BiFunction
@@ -945,3 +1017,4 @@ Observable.just(1, 2, 3)
 1. [操作符-官方文档](http://reactivex.io/documentation/operators.html)
 1. [RxJava 2.x 入门教程（五）](https://www.jianshu.com/p/81fac37430dd)
 1. [RxJava实战技巧大全](https://www.jianshu.com/p/14f55d3368ed)
+1. [放弃RxBus，拥抱RxJava（一）：为什么避免使用EventBus/RxBus](https://www.jianshu.com/p/61631134498e)
