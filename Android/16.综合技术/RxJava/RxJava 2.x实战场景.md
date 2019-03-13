@@ -1,15 +1,15 @@
+
 转载请注明链接: https://blog.csdn.net/feather_wch/article/details/88400574
 
 # RxJava 2.x实战场景
 
-版本号:2019-03-11(18:10)
+版本号:2019-03-13(18:10)
 
 实例参考自: [RxJava-Android-Sample](https://github.com/kaushikgopal/RxJava-Android-Samples)
 
 ---
 
-[toc]
-
+@[toc]
 ## 1-后台下载，前台更新进度
 
 1、后台进行下载任务，前台更新下载的进度
@@ -86,8 +86,7 @@ public class ImageMainActivity extends AppCompatActivity {
 }
 ```
 
-## 2-按键防抖动，一段时间内只触发一次点击。
-
+## 2-按键防抖动，一段时间内只触发一次点击【buffer】
 2、按键防抖动，短时间内快速点击Button，会触发多次点击的流程，通过buffer进行处理，在短时间内只触发一次点击事件。
 > 在两秒内快速点击10次：
 > 1. 未防抖动：点击10次Button，弹出10个Toast
@@ -153,7 +152,7 @@ public class ImageMainActivity extends AppCompatActivity {
 }
 ```
 
-## 3-关键词输入自动搜索
+## 3-关键词输入自动搜索【debounce、filter、switchMap】
 
 1、关键词输入自动搜索，是根据用户输入的关键字即时搜索对应内容，需要解决三个问题。
 > 1. 避免用户连续输入，导致大量无效搜索的情况。比如"123", 会依次搜索"1"、"2"、"3"。---`debounce操作符`
@@ -261,7 +260,7 @@ public class ImageMainActivity extends AppCompatActivity {
 }
 ```
 
-## 4-轮询向服务器发起请求
+## 4-轮询向服务器发起请求【intervalRange、repeatWhen】
 
 1、定时向服务器发起请求，两种场景:
 > 1. 间隔固定时间，发起请求
@@ -369,7 +368,7 @@ public class ImageMainActivity extends AppCompatActivity {
 }
 ```
 
-## 5-数据绑定的TextView(数据的改变会自动更新TextView)
+## 5-数据绑定的TextView(数据的改变会自动更新TextView)【PublishProcessor】
 
 1、TextView因为Model层数据的改变，自动更新本身显示的内容。
 > 1. 利用`PublishProcessor`实现
@@ -421,13 +420,12 @@ public class ImageMainActivity extends AppCompatActivity {
 }
 ```
 
-## 6-指数退避策略，在请求重试中的使用
+## 6-指数退避策略，在请求重试中的使用【retryWhen】
 
 1、什么是指数退避策略
 > 1. 根据输出的反馈(请求失败)，动态调整重试请求的等待时间
 > 1. 一般请求失败时，重新请求的等待时间为(2000ms)，如果再次失败，则延长重试等待的时间(等待时间翻倍 = 4000ms)
 > 1. 此外还有失败重新请求的次数，失败过多则不继续重试。
-
 
 2、采用指数退避策略，进行请求的重试
 ```java
@@ -519,6 +517,104 @@ public class ImageMainActivity extends AppCompatActivity {
     }
 }
 ```
+
+## 7-账号、密码、邮箱同时验证通过才允许进行后续的注册行为【combineLatest】
+
+1、很多注册页面或者登陆页面，需要用户输入的账号和密码同时满足需求，才允许进行后续的操作。需要满足同时监听多个Observable，但是在统一的地方一起验证。
+> 1. 利用`combineLatest`在账号/密码都起码输入过一次后，进行统一验证。
+```java
+public class ImageMainActivity extends AppCompatActivity {
+
+    Button mButton;
+    CompositeDisposable mCompositeDisposable = new CompositeDisposable();
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_image_main);
+
+        // 1、注册按钮
+        mButton = findViewById(R.id.button);
+
+        // 2、账号和密码的Subject
+        PublishSubject accountPublishSubject = PublishSubject.create();
+        PublishSubject passwordPublishSubject = PublishSubject.create();
+        DisposableObserver disposableObserver;
+        /**=======================================================================
+         * 3、当任意一个Observable发射数据之后，会去取其它Observable最近一次发射的数据。
+         *  1. 验证账号和密码的合法性
+         *========================================================================*/
+        Observable.combineLatest(accountPublishSubject,
+                passwordPublishSubject,
+                new BiFunction<String, String, Boolean>() {
+                    @Override
+                    public Boolean apply(String account, String password) throws Exception {
+                        // 账号需要长度大于5
+                        // 密码需要长度大于8
+                        return account.length() > 5 && password.length() > 8;
+                    }
+         }).subscribe((disposableObserver = new DisposableObserver<Boolean>() {
+            @Override
+            public void onNext(Boolean value) {
+                mButton.setText(value ? "登陆" : "账号密码不合法");
+                mButton.setClickable(value); // 是否可以点击
+            }
+            @Override
+            public void onError(Throwable throwable) {}
+            @Override
+            public void onComplete() {}
+        }));
+
+        // 4、统一管理，防止内存泄露。
+        mCompositeDisposable.add(disposableObserver);
+
+        // 5、账号/密码输入框设置监听器
+        ((EditText) findViewById(R.id.account_edittext))
+                .addTextChangedListener(new EditTextWatcher(accountPublishSubject));
+        ((EditText) findViewById(R.id.password_edittext))
+                .addTextChangedListener(new EditTextWatcher(passwordPublishSubject));
+
+
+    }
+
+    /**=============================
+     * @功能 发出EditText输入的内容
+     * =============================*/
+    class EditTextWatcher implements TextWatcher {
+
+        PublishSubject mPublishSubject;
+        public EditTextWatcher(PublishSubject publishSubject) {
+            this.mPublishSubject = publishSubject;
+        }
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {}
+        @Override
+        public void afterTextChanged(Editable s) {
+            mPublishSubject.onNext(s.toString());
+        }
+    }
+
+    // 避免内存泄露
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mCompositeDisposable.clear();
+    }
+}
+
+```
+
+## 8-先从硬盘获取缓存，再从网络获取数据。
+
+### concat
+
+### concatEager
+
+### merge
+
+### publish
 
 ## 参考资料
 

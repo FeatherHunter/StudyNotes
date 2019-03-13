@@ -1,9 +1,10 @@
 
+
 转载请注明链接: https://blog.csdn.net/feather_wch/article/details/88199536
 
 # RxJava 2.x使用详解
 
-版本号:2019-03-11(18:00)
+版本号:2019-03-13(14:00)
 
 ---
 
@@ -638,6 +639,35 @@ Observable.zip(observable1, observable2, new BiFunction<String, String, String>(
     }
 });
 ```
+
+#### combineLatest
+
+1、combineLatest的作用
+> 1. 接收`多个Observable`
+> 1. 当任意一个Observable发射数据之后，会去取其它Observable最近一次发射的数据
+> 1. 但是必须是`所有Observable至少发射过一次数据`，否则不进行回调处理
+> 1. 例如: 下面SubjectA和SubjectB都发射过数据时，才会回调`apply()`并调用`观察者的onNext()进行后续处理`
+```java
+Observable.combineLatest(subjectA,subjectB,
+        new BiFunction<String, String, Boolean>() {
+            @Override
+            public Boolean apply(String account, String password) throws Exception {
+                // 账号需要长度大于5
+                // 密码需要长度大于8
+                return account.length() > 5 && password.length() > 8;
+            }
+ });
+```
+
+#### zip和combineLatest的区别
+
+3、zip和combineLatest的区别?
+> 1. zip:
+>      1. 在一个Observable发射数据后，去组合所有Observable`最早一个未被组合的数据项`
+>      1. 也就是，组合后所发射的`第n个数据项`，必然是由`每个Observable各自所发射的第n个数据项`所组成
+> 1. combineLatest:
+>     1. 在一个Observable发射数据后，组合所有Observable`最后一个发射的数据项`
+>     1. 前提是所有Observable都至少发射过一个数据
 
 ### 数据操作
 
