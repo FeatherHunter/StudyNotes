@@ -2,7 +2,7 @@
 
 # RePlugin的使用
 
-版本号:2019-03-10(16:44)
+版本号:2019-03-13(22:00)
 
 ---
 
@@ -785,6 +785,29 @@ PluginProviderClient.query(xxx);
 
 31、不推要求“只支持64位”
 > 会导致部分机型无法使用
+
+## **重要的工具(3题)**
+
+### RePluginCallbacks
+
+1、RePluginCallbacks的作用
+> 1. 用来生成宿主和插件的ClassLoader
+> 1. 要打开的插件不存在时，回调
+> 1. 要打开的插件文件过大时，回调
+
+### RePluginEventCallbacks
+
+2、RePluginEventCallbacks的作用
+> 1. 插件化框架对外事件回调接口集
+> 1. 可回调的接口包括: 安装插件成功、失败、启动插件Activity等
+
+### RePluginConfig
+3、RePluginConfig的作用
+> 1. 主要用于对Replugin的一些初始化设置，包括:
+>     1. 是否开启插件的签名校检
+>     1. 当插件中使用某个类不存在时是否使用宿主中的类
+> 1. 内部还保持了对RepluginCallbacks和RepluginEventCallbacks的引用。
+
 
 ## 问题汇总
 
