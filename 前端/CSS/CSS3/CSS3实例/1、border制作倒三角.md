@@ -39,8 +39,9 @@ border-top: solid #333;
     height: 0;
     width: 0;
     /*制作倒三角*/
-    border: 3px dashed transparent;
-    border-top: solid #333;
+    border: 3px solid transparent;
+    border-top: 3px solid #333;
+    /*border-top-color: #333;*/
     /* 行内块元素*/
     display: inline-block;
 }
