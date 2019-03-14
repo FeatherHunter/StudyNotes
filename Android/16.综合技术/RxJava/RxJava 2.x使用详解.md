@@ -4,7 +4,7 @@
 
 # RxJava 2.x使用详解
 
-版本号:2019-03-13(14:00)
+版本号:2019-03-14(18:00)
 
 ---
 
@@ -521,9 +521,9 @@ Observable.create(new ObservableOnSubscribe<Student>()
 > 1. 结果最后搜索的`new关键字的结果返回快`，后返回`old关键字的结果`
 > 1. 此时`关键字明明是new，且显示的是查询old关键字的内容`
 
-### Concat
+### concat
 
-1、Concat的作用
+1、concat的作用
 > 1. 可以做到`多个Observable的订阅事件按顺序前后发生`
 > 1. 例如`ObservableA终止后(onComplete)`, 才会去`订阅第二个Observable`
 
@@ -590,6 +590,12 @@ Observable.concat(cache, network)
             }
         });
 ```
+
+#### concatEager
+
+1、concatEager的作用
+> 1. 多个Observable可以同时开始发射数据
+> 1. 如果后一个Observable发射完成后，前一个Observable还有发射完数据，那么它会将后一个Observable的数据先缓存起来，等到前一个Observable发射完毕后，才将缓存的数据发射出去。
 
 ### Zip
 
@@ -751,6 +757,12 @@ D/feather: 0 : 2
 D/feather: 0 : 1
 ```
 
+##### takeUntil
+
+1、takeUntil用于满足条件后，自动取消订阅。
+
+##### takeWhile
+
 #### Distinct
 
 1、Distinct的作用是去除重复的项
@@ -839,9 +851,11 @@ Observable.create(new ObservableOnSubscribe<Integer>() {
         });
 ```
 
-### 定时器
+### 创建型
 
-#### interval
+#### 时间/周期
+
+##### interval
 
 1、interval的作用和使用场景
 > 1. `间隔一定时间就发送一次数据`
@@ -875,11 +889,11 @@ Observable.create(new ObservableOnSubscribe<Integer>() {
     }
 ```
 
-#### intervalRange
+##### intervalRange
 
 1、intervalRange的作用
 
-#### timer
+##### timer
 
 1、timer的作用和使用
 > 1. `timer具有定时器的功能`
@@ -896,6 +910,13 @@ Observable.timer(2, TimeUnit.SECONDS)
             }
         });
 ```
+
+### 辅助型操作符
+
+#### delay
+
+1、delay的作用
+> 1. 用于延时发送数据
 
 ### repeatWhen
 

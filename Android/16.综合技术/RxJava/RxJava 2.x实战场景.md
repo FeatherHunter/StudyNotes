@@ -3,13 +3,14 @@
 
 # RxJava 2.x实战场景
 
-版本号:2019-03-13(18:10)
+版本号:2019-03-14(18:10)
 
 实例参考自: [RxJava-Android-Sample](https://github.com/kaushikgopal/RxJava-Android-Samples)
 
 ---
 
-@[toc]
+[toc]
+
 ## 1-后台下载，前台更新进度
 
 1、后台进行下载任务，前台更新下载的进度
@@ -610,11 +611,252 @@ public class ImageMainActivity extends AppCompatActivity {
 
 ### concat
 
+1、concat先获取缓存的数据，再去请求网络数据。
+> 1. 本地缓存: 500ms
+> 1. 网络数据: 2000ms
+> 1. 先500ms + 再2000ms = 2500ms
+```java
+public class ImageMainActivity extends AppCompatActivity {
+
+    CompositeDisposable mCompositeDisposable = new CompositeDisposable();
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_image_main);
+
+        findViewById(R.id.button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // 1、接收到缓存or网络数据
+                DisposableObserver disposableObserver = getDisposableObserver();
+                mCompositeDisposable.add(disposableObserver); // 统一管理，防止内存泄露。
+
+                Observable<List<String>> observable = Observable.concat(
+                        getCacheDataObservable().subscribeOn(Schedulers.io()),
+                        getNetworkDataObservable().subscribeOn(Schedulers.io()));
+                // 2、进行数据的查询
+                observable.observeOn(AndroidSchedulers.mainThread())
+                .subscribe(disposableObserver);
+            }
+        });
+
+    }
+
+
+    // 避免内存泄露
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mCompositeDisposable.clear();
+    }
+
+    private Observable<List<String>> getCacheDataObservable(){
+        return Observable.create(new ObservableOnSubscribe<List<String>>() {
+            @Override
+            public void subscribe(ObservableEmitter<List<String>> observableEmitter) throws Exception {
+                Log.d("feather", "开始查询【缓存】数据");
+                Thread.sleep(500);
+                Log.d("feather", "开始加载【缓存】数据");
+                ArrayList cacheDatas = new ArrayList();
+                cacheDatas.add("1 cache");
+                cacheDatas.add("2 cache");
+                cacheDatas.add("3 cache");
+                observableEmitter.onNext(cacheDatas);
+                observableEmitter.onComplete();
+            }
+        });
+    }
+
+    private Observable<List<String>> getNetworkDataObservable(){
+        return Observable.create(new ObservableOnSubscribe<List<String>>() {
+            @Override
+            public void subscribe(ObservableEmitter<List<String>> observableEmitter) throws Exception {
+                Log.d("feather", "开始查询【网络】数据");
+                Thread.sleep(2000);
+                Log.d("feather", "开始加载【网络】数据");
+                ArrayList netDatas = new ArrayList();
+                netDatas.add("1 net");
+                netDatas.add("2 net");
+                netDatas.add("3 net");
+                observableEmitter.onNext(netDatas);
+                observableEmitter.onComplete();
+            }
+        });
+    }
+
+    private DisposableObserver<List<String>> getDisposableObserver(){
+        return new DisposableObserver<List<String>>() {
+            @Override
+            public void onNext(List<String> strings) {
+                for (String string : strings) {
+                    Log.d("feather", string);
+                }
+            }
+            @Override
+            public void onError(Throwable throwable) {
+                Log.d("feather", "onError = " + throwable.getMessage());
+            }
+            @Override
+            public void onComplete() {
+                Log.d("feather", "onComplete");
+            }
+        };
+    }
+}
+
+```
+
 ### concatEager
+
+2、concatEager让本地缓存和网络请求同时进行
+> 1. 能够同步进行`读取本地缓存`、`请求网络数据`的操作。`但是后者会等待前者完成`
+> 1. 例如`读取缓存时间很长 = 2000ms`，`网络请求500ms`,最终时间`2000ms`
+```java
+// 1、接收到缓存or网络数据
+DisposableObserver disposableObserver = getDisposableObserver();
+mCompositeDisposable.add(disposableObserver); // 统一管理，防止内存泄露。
+// 2、concatEager需要列表
+List<Observable<List<String>>> observableList = new ArrayList<>();
+observableList.add(getCacheDataObservable().subscribeOn(Schedulers.io()));
+observableList.add(getNetworkDataObservable().subscribeOn(Schedulers.io()));
+// 3、concatEager
+Observable<List<String>> observable = Observable.concatEager(observableList);
+// 4、进行数据的查询
+observable.observeOn(AndroidSchedulers.mainThread())
+.subscribe(disposableObserver);
+```
 
 ### merge
 
-### publish
+3、merge因为前后无序，可能会导致缓存数据覆盖网络数据
+```java
+DisposableObserver disposableObserver = getDisposableObserver();
+mCompositeDisposable.add(disposableObserver); // 统一管理，防止内存泄露。
+// 查询缓存和网络数据
+Observable.merge(
+        getCacheDataObservable().subscribeOn(Schedulers.io()),
+        getNetworkDataObservable().subscribeOn(Schedulers.io()))
+        .observeOn(AndroidSchedulers.mainThread())
+        .subscribe(disposableObserver);
+```
+
+### takeUntil、merge、publish
+
+4、实现代码如下:
+> 1. takeUntil: 保证在网络数据返回后，缓存数据不会再发送
+> 1. merge: 缓存请求、网络请求同步进行
+> 1. publish: 避免takeUntil、merge导致的多次订阅的问题(会多次请求数据)
+```java
+public class ImageMainActivity extends AppCompatActivity {
+
+    CompositeDisposable mCompositeDisposable = new CompositeDisposable();
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_image_main);
+
+        findViewById(R.id.button).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // 1、统一管理，防止内存泄露。
+                DisposableObserver<List<String>> disposableObserver = getDisposableObserver();
+                mCompositeDisposable.add(disposableObserver);
+                // 2、请求网络数据Observable
+                final Observable<List<String>> network = getNetworkDataObservable().subscribeOn(Schedulers.io());
+
+                Observable<List<String>> observable = network.publish(new Function<Observable<List<String>>, ObservableSource<List<String>>>() {
+                    @Override
+                    public ObservableSource<List<String>> apply(Observable<List<String>> network) throws Exception {
+                        // 3、缓存数据takeUntil在网络数据返回后，就不会发出任何数据了。
+                        Observable<List<String>> cache = getCacheDataObservable().subscribeOn(Schedulers.io()).takeUntil(network);
+                        // 4、缓存、网络同步开始请求
+                        return Observable.merge(network, cache);
+                    }
+                });
+                // 5、开始订阅
+                observable
+                        .subscribeOn(Schedulers.io())
+                        .observeOn(AndroidSchedulers.mainThread())
+                        .subscribe(disposableObserver);
+            }
+        });
+
+    }
+
+    // 避免内存泄露
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mCompositeDisposable.clear();
+    }
+
+    private Observable<List<String>> getCacheDataObservable(){
+        return Observable.create(new ObservableOnSubscribe<List<String>>() {
+            @Override
+            public void subscribe(ObservableEmitter<List<String>> observableEmitter) throws InterruptedException {
+                try{
+                    Log.d("feather", "开始查询【缓存】数据");
+                    Thread.sleep(1000);
+                    Log.d("feather", "开始加载【缓存】数据");
+                    ArrayList cacheDatas = new ArrayList();
+                    cacheDatas.add("1 cache");
+                    cacheDatas.add("2 cache");
+                    cacheDatas.add("3 cache");
+                    observableEmitter.onNext(cacheDatas);
+                }catch (Exception e){
+                    if(!observableEmitter.isDisposed()){
+                        observableEmitter.onError(new Throwable("缓存数据加载失败"));
+                    }
+                }
+            }
+        });
+    }
+
+    private Observable<List<String>> getNetworkDataObservable(){
+        return Observable.create(new ObservableOnSubscribe<List<String>>() {
+            @Override
+            public void subscribe(ObservableEmitter<List<String>> observableEmitter) throws InterruptedException {
+                try{
+                    Log.d("feather", "开始查询【网络】数据");
+                    Thread.sleep(2000);
+                    Log.d("feather", "开始加载【网络】数据");
+                    ArrayList netDatas = new ArrayList();
+                    netDatas.add("1 net");
+                    netDatas.add("2 net");
+                    netDatas.add("3 net");
+                    observableEmitter.onNext(netDatas);
+                }catch (Exception e){
+                    if(!observableEmitter.isDisposed()){
+                        observableEmitter.onError(new Throwable("网络数据加载失败"));
+                    }
+                }
+            }
+        });
+    }
+
+    private DisposableObserver<List<String>> getDisposableObserver(){
+        return new DisposableObserver<List<String>>() {
+            @Override
+            public void onNext(List<String> strings) {
+                for (String string : strings) {
+                    Log.d("feather", string);
+                }
+            }
+            @Override
+            public void onError(Throwable throwable) {
+                Log.d("feather", "onError = " + throwable.getMessage());
+            }
+            @Override
+            public void onComplete() {
+                Log.d("feather", "onComplete");
+            }
+        };
+    }
+}
+
+```
 
 ## 参考资料
 
