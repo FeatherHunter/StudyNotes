@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,maximum-scale=1.0,user-scalable=no,initial-scale=1.0">
+    <script>
+        (function (doc, win) {
+            let docEl = doc.documentElement,
+                resizeEvt = 'orientationchange' in window ? 'orientationchange' : 'resize',
+                recalc = function () {
+                    let clientWidth = docEl.clientWidth;
+                    if (!clientWidth) return;
+                    if (clientWidth >= 640) {
+                        docEl.style.fontSize = '100px';
+                    } else {
+                        docEl.style.fontSize = 100 * (clientWidth / 375) + 'px';
+                    }
+                };
+
+            if (!doc.addEventListener) return;
+            win.addEventListener(resizeEvt, recalc, false);
+            doc.addEventListener('DOMContentLoaded', recalc, false);
+        })(document, window);
+    </script>
+    <title>首页</title>
+    <link rel="stylesheet" href="css/cssResetYUI.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/index.css">
+
+</head>
+<body>
+<!--top-->
+<div class="g-top">
+    <div class="g-top-time">
+        <a href="#"><i></i><span>7.0</span>h</a>
+    </div>
+    <div class="g-top-buttons">
+        <a class="g-top-buttons-today" href="#">今天</a>
+        <a class="g-top-buttons-today" href="#">番茄</a>
+    </div>
+    <div class="g-top-settings"><i></i></div>
+</div>
+<!--end top-->
+<!--progress-->
+<div class="g-progress"><span>今天时间</span></div>
+<div class="progress">
+    <div class="progress-bar progress-bar-info" role="progressbar" aria-valuenow="45" aria-valuemin="0"
+         aria-valuemax="100" style="width: 40%;">
+        <div class="g-progress-value"><i>2.0h</i><i>1.1%</i>投资</div>
+    </div>
+</div>
+<div class="progress">
+    <div class="progress-bar progress-bar-info" role="progressbar" aria-valuenow="45" aria-valuemin="0"
+         aria-valuemax="100" style="width: 70%;">
+        <div class="g-progress-value"><i>9.0h</i><i>21.1%</i>浪费</div>
+    </div>
+</div>
+<!--end progress-->
+<!--main-->
+<div class="g-main">
+    <ul>
+        <li class="g-main-item">
+            <a href="#">
+                <i class="g-main-icon"></i>
+                <div class="g-main-center">
+                    <p class="g-main-center-p main-title">固定</p>
+                    <p class="g-main-center-p">无帮助但必须花费的时间</p>
+                </div>
+            </a>
+            <i class="g-main-run"></i>
+        </li>
+        <li class="g-main-item">
+            <a href="#">
+                <i class="g-main-icon"></i>
+                <div class="g-main-center">
+                    <p class="g-main-center-p main-title">固定</p>
+                    <p class="g-main-center-p">无帮助但必须花费的时间</p>
+                </div>
+            </a>
+            <i class="g-main-run"></i>
+        </li>
+        <li class="g-main-item">
+            <a href="#">
+                <i class="g-main-icon"></i>
+                <div class="g-main-center">
+                    <p class="g-main-center-p main-title">固定</p>
+                    <p class="g-main-center-p">无帮助但必须花费的时间</p>
+                </div>
+            </a>
+            <i class="g-main-run"></i>
+        </li>
+        <li class="g-main-item">
+            <a href="#">
+                <i class="g-main-icon"></i>
+                <div class="g-main-center">
+                    <p class="g-main-center-p main-title">固定</p>
+                    <p class="g-main-center-p">无帮助但必须花费的时间</p>
+                </div>
+            </a>
+            <i class="g-main-run"></i>
+        </li>
+        <li class="g-main-item">
+            <a href="#">
+                <i class="g-main-icon"></i>
+                <div class="g-main-center">
+                    <p class="g-main-center-p main-title">固定</p>
+                    <p class="g-main-center-p">无帮助但必须花费的时间</p>
+                </div>
+            </a>
+            <i class="g-main-run"></i>
+        </li>
+        <li class="g-main-item">
+            <a href="#">
+                <i class="g-main-icon"></i>
+                <div class="g-main-center">
+                    <p class="g-main-center-p main-title">固定</p>
+                    <p class="g-main-center-p">无帮助但必须花费的时间</p>
+                </div>
+            </a>
+            <i class="g-main-run"></i>
+        </li>
+        <li class="g-main-item">
+            <a href="#">
+                <i class="g-main-icon"></i>
+                <div class="g-main-center">
+                    <p class="g-main-center-p main-title">固定</p>
+                    <p class="g-main-center-p">无帮助但必须花费的时间</p>
+                </div>
+            </a>
+            <i class="g-main-run"></i>
+        </li>
+        <li class="g-main-item">
+            <a href="#">
+                <i class="g-main-icon"></i>
+                <div class="g-main-center">
+                    <p class="g-main-center-p main-title">固定</p>
+                    <p class="g-main-center-p">无帮助但必须花费的时间</p>
+                </div>
+            </a>
+            <i class="g-main-run"></i>
+        </li>
+        <li class="g-main-item">
+            <a href="#">
+                <i class="g-main-icon"></i>
+                <div class="g-main-center">
+                    <p class="g-main-center-p main-title">固定</p>
+                    <p class="g-main-center-p">无帮助但必须花费的时间</p>
+                </div>
+            </a>
+            <i class="g-main-run"></i>
+        </li>
+        <li class="g-main-item">
+            <a href="#">
+                <i class="g-main-icon"></i>
+                <div class="g-main-center">
+                    <p class="g-main-center-p main-title">固定</p>
+                    <p class="g-main-center-p">无帮助但必须花费的时间</p>
+                </div>
+            </a>
+            <i class="g-main-run"></i>
+        </li>
+    </ul>
+</div>
+<!--end main-->
+<!--nav-->
+<div class="g-nav">
+    <div class="g-nav-item">
+        <a href="#"></a>
+    </div>
+    <div class="g-nav-item">
+        <a href="#"></a>
+    </div>
+    <div class="g-nav-item">
+        <a href="#"></a>
+    </div>
+    <div class="g-nav-item">
+        <a href="#"></a>
+    </div>
+    <!--tips目标管理-->
+    <div class="g-tips">
+        <a class="g-tips-time" href="#"></a>
+        <a class="g-tips-goals" href="#"></a>
+    </div>
+    <!--end tips-->
+</div>
+<!--end nav-->
+</body>
+<script src="js/jquery-3.3.1.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script>
+    //监听
+    window.onresize = function () {
+        changeDivHeight();
+    };
+
+    function changeDivHeight() {
+        let h = $(window).height();//获取页面可见高度
+        let h1 = (h - 60 - 10 - 25 - 50 - 80 - 20) + "px";
+        $(".g-main").css("height", h1);
+    };
+    //加载时
+    $(function () {
+        let h = $(window).height();//获取页面可见高度
+        let h1 = (h - 60 - 10 - 25 - 50 - 80 - 20) + "px";
+        $(".g-main").css("height", h1);
+    });
+</script>
+</html>

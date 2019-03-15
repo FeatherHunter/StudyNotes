@@ -1,0 +1,245 @@
+/*顶部导航*/
+.g-top {
+    width: 100%;
+    height: 0.6rem;
+    font-size: 0.16rem;
+    border-bottom: 0.01rem solid #bfbfbf;
+}
+
+.g-top-time {
+    float: left;
+    width: 0.8rem;
+    height: inherit;
+}
+
+.g-top-time a {
+    display: flex;
+    /*justify-content: center;*/
+    align-items: center;
+    width: inherit;
+    height: inherit;
+    color: #8a8a8a;
+}
+
+.g-top-time a i {
+    display: inline-block;
+    width: 0.26rem;
+    height: 0.26rem;
+    background: url("../img/sprits.png");
+    margin: 0 0.1rem;
+}
+
+.g-top-buttons {
+    margin-left: 0.45rem;
+    float: left;
+    width: 1.2rem;
+    height: inherit;
+    display: flex;
+    align-items: center;
+}
+
+.g-top-buttons-today {
+    display: inline-block;
+    height: 0.3rem;
+    width: 0.6rem;
+    border: 0.01rem solid red;
+}
+
+.g-top-settings {
+    float: right;
+    width: 0.3rem;
+    height: inherit;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.g-top-settings i {
+    display: inline-block;
+    width: 0.26rem;
+    height: 0.3rem;
+    background: url("../img/sprits.png") -0.27rem 0;
+}
+
+/*进度条*/
+.g-progress {
+    font-size: 0.16rem;
+    height: 0.25rem;
+    margin-top: 0.1rem;
+    padding-left: 0.1rem;
+}
+
+.g-progress span {
+    font-size: 0.16rem;
+}
+
+.progress {
+    height: 0.15rem;
+    width: 98%;
+    margin: 0.1rem auto 0;
+    border-radius: 0;
+    position: relative;
+
+}
+
+.progress .progress-bar {
+    /*position: relative;*/
+    animation: animate-positive 2s;
+}
+
+@keyframes animate-positive {
+    0% {
+        width: 0;
+    }
+}
+
+.g-progress-value {
+    font-size: 0.12rem;
+    color: #707070;
+    position: absolute;
+    right: 0.05rem;
+}
+
+.g-progress-value i {
+    margin-right: 0.03rem;
+}
+
+/*主体main*/
+.g-main {
+    font-size: 0.16rem;
+    width: 98%;
+    margin: 0.2rem auto 0;
+    overflow-y: auto;
+}
+
+/*滚动条样式*/
+::-webkit-scrollbar { /*滚动条整体样式*/
+    width: 4px; /*高宽分别对应横竖滚动条的尺寸*/
+    height: 4px;
+    scrollbar-track-color: #FFFFFF; /*滚动条底色*/
+    /*滚动条隐藏*/
+    display: none;
+}
+
+::-webkit-scrollbar-thumb { /*滚动条里面小方块*/
+    border-radius: 5px;
+    -webkit-box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-track { /*滚动条里面轨道*/
+    -webkit-box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.2);
+    border-radius: 0;
+}
+
+.g-main ul {
+    width: 100%;
+    margin-bottom: 0.8rem;
+}
+
+.g-main-item {
+    height: 0.65rem;
+    width: 100%;
+    background: #f7f7f7;
+    padding: 0.075rem 0.1rem;
+    margin-bottom: 0.05rem;
+}
+
+.g-main-item a {
+    display: flex;
+    height: 0.5rem;
+    align-items: center;
+    width: 85%;
+    float: left;
+}
+
+.g-main-icon {
+    display: inline-block;
+    height: 0.45rem;
+    width: 0.45rem;
+    background: url("../img/sprits.png") -0.53rem 0;
+}
+
+.g-main-center {
+    width: 1.7rem;
+    height: 0.45rem;
+    display: inline-block;
+    margin-left: 0.15rem;
+}
+
+.g-main-center-p {
+    margin: 0;
+    height: 0.20rem;
+    font-size: 0.13rem;
+    color: #A29A9C;
+}
+
+.main-title {
+    font-size: 0.16rem;
+    color: #000;
+    height: 0.24rem;
+    margin-bottom: 0.02rem;
+}
+
+.g-main-run {
+    display: inline-block;
+    height: 0.45rem;
+    width: 0.45rem;
+    background: url("../img/sprits.png") 0 -0.31rem;
+    float: right;
+    margin-top: 0.03rem;
+}
+
+/*底部导航*/
+.g-nav {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: 0.8rem;
+    display: flex;
+    justify-content: space-around;
+    border-top: 0.01rem solid #bbb;
+    background: #f7f7f7;
+}
+
+.g-nav-item {
+    width: 16%;
+    height: 0.8rem;
+    text-align: center;
+}
+
+.g-nav-item a {
+    display: inline-block;
+    height: 0.5rem;
+    width: 0.5rem;
+    background: url("../img/sprits.png") -0.98rem 0;
+    margin-bottom: 0.5rem;
+}
+
+.g-tips {
+    position: absolute;
+    bottom: 0.8rem;
+    right: 0.18rem;
+    height: 0.6rem;
+    width: 1.2rem;
+}
+
+.g-tips-time {
+    position: absolute;
+    bottom: 0.1rem;
+    left: 0.05rem;
+    display: inline-block;
+    height: 0.42rem;
+    width: 0.42rem;
+    background:url("../img/sprits.png") -149px 0;
+}
+
+.g-tips-goals{
+    position: absolute;
+    bottom: 0.1rem;
+    right: 0.05rem;
+    display: inline-block;
+    height: 0.42rem;
+    width: 0.42rem;
+    background:url("../img/sprits.png") 0 -78px;
+}
