@@ -4,11 +4,11 @@
 
 # RxJava 2.x使用详解
 
-版本号:2019-03-14(18:00)
+版本号:2019-03-15(18:00)
 
 ---
 
-[toc]
+@[toc]
 ## 基本概念
 
 1、什么是响应式编程？
@@ -66,6 +66,30 @@ Observable.just(1, 2, 3, 4)
         // 2、观察者接收到数据
     }
 });
+```
+
+### ConnectableObservable
+
+1、ConnectableObservable是什么?
+> 1. 热被观察者
+> 1. 能够持续的发出数据，不管有没有订阅者。
+
+#### publish
+
+2、如何创建一个ConnectableObservable?
+> 1. 需要通过`普通Observable`进行`publish`转换为`ConnectableObservable`
+```java
+Observable.just(1)
+        .publish();
+```
+
+#### connect
+
+3、ConnectableObservable何时开始发出数据?
+> 1. 和`Cold Observable`不同的地方在于，需要调用`connect`开始走`subscribe()内的方法`
+> 1. 会持续不断地发出数据。
+```java
+mConnectableObservable.connect();
 ```
 
 ## Observer
@@ -1055,8 +1079,6 @@ Observable.just(1, 2, 3)
 });
 ```
 
-## CompositeDisposable
-
 ## Function
 
 ### BiFunction
@@ -1069,3 +1091,6 @@ Observable.just(1, 2, 3)
 1. [RxJava 2.x 入门教程（五）](https://www.jianshu.com/p/81fac37430dd)
 1. [RxJava实战技巧大全](https://www.jianshu.com/p/14f55d3368ed)
 1. [放弃RxBus，拥抱RxJava（一）：为什么避免使用EventBus/RxBus](https://www.jianshu.com/p/61631134498e)
+1. [RxJava 教程第三部分：驯服数据流之 hot & cold Observable](http://blog.chengyunfeng.com/?p=975)
+1. [Rxjava中的ConnectableObservable](https://blog.csdn.net/u013366008/article/details/76177560)
+1. [RxJava2.0 操作符（9）—— Connectable Observable 连接操作符](https://blog.csdn.net/weixin_34297300/article/details/87316533)

@@ -1,16 +1,16 @@
 
+
 转载请注明链接: https://blog.csdn.net/feather_wch/article/details/88400574
 
 # RxJava 2.x实战场景
 
-版本号:2019-03-14(18:10)
+版本号:2019-03-15(17:50)
 
 实例参考自: [RxJava-Android-Sample](https://github.com/kaushikgopal/RxJava-Android-Samples)
 
 ---
 
-[toc]
-
+@[toc]
 ## 1-后台下载，前台更新进度
 
 1、后台进行下载任务，前台更新下载的进度
@@ -856,6 +856,218 @@ public class ImageMainActivity extends AppCompatActivity {
     }
 }
 
+```
+
+## 9-延迟1s执行一个任务/周期性执行一个任务/执行一个任务延迟1s后执行另一个任务【timer、interval、delay】
+
+### timer
+
+1、使用timer在延迟1秒后执行一个任务
+```java
+/**====================================
+ * @function 使用timer延时1s后执行任务
+ *====================================*/
+private void startBytime(){
+    Observable.timer(1000, TimeUnit.MILLISECONDS)
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new DisposableObserver<Long>() {
+                    @Override
+                    public void onNext(Long value) {
+                        Log.d("feather", "value = " + value);
+                    }
+                    @Override
+                    public void onError(Throwable throwable) {
+                        Log.d("feather", throwable.getMessage());
+                    }
+                    @Override
+                    public void onComplete() {
+                        Log.d("feather", "onComplete");
+                    }
+                });
+}
+```
+
+### interval
+
+1、每隔1s执行一次任务，第一个任务前也有1s的间隔
+> 1. 第一个任务执行前，间隔2000ms
+> 1. 后续每隔任务的执行周期是，1000ms
+```java
+private void startByInterval(){
+    Observable.interval(2000, 1000, TimeUnit.MILLISECONDS)
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new DisposableObserver<Long>() {
+                    @Override
+                    public void onNext(Long value) {
+                        Log.d("feather", "value = " + value);
+                    }
+                    @Override
+                    public void onError(Throwable throwable) {
+                        Log.d("feather", throwable.getMessage());
+                    }
+                    @Override
+                    public void onComplete() {
+                        Log.d("feather", "onComplete");
+                    }
+                });
+}
+```
+
+2、周期性1s的间隔执行一个任务，只执行五次
+> 1. interval + take 组合
+```java
+private void startByInterval(){
+    Observable.interval(2000, 1000, TimeUnit.MILLISECONDS)
+            .take(5) // 【重点】
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new DisposableObserver<Long>() {
+                    @Override
+                    public void onNext(Long value) {
+                        Log.d("feather", "value = " + value);
+                    }
+                    @Override
+                    public void onError(Throwable throwable) {
+                        Log.d("feather", throwable.getMessage());
+                    }
+                    @Override
+                    public void onComplete() {
+                        Log.d("feather", "onComplete");
+                    }
+                });
+}
+```
+
+### delay
+
+3、先执行第一个任务，等待2s后，再执行第二个任务
+```java
+private void startByDelay(){
+    Observable.just(0)
+            // 1、立即执行一个任务
+            .doOnNext(new Consumer<Integer>() {
+                @Override
+                public void accept(Integer value) throws Exception {
+                    Log.d("feather", "first value = " + value);
+                }
+            })
+            // 2、延迟下游事件的接收。在2000ms后才发送onNext，去执行后续的任务。
+            .delay(2000, TimeUnit.MILLISECONDS)
+            .subscribeOn(Schedulers.io())
+            .observeOn(AndroidSchedulers.mainThread())
+            // 3、执行第二个任务
+                .subscribe(new DisposableObserver<Integer>() {
+                    @Override
+                    public void onNext(Integer value) {
+                        Log.d("feather", "value = " + value);
+                    }
+                    @Override
+                    public void onError(Throwable throwable) {
+                        Log.d("feather", throwable.getMessage());
+                    }
+                    @Override
+                    public void onComplete() {
+                        Log.d("feather", "onComplete");
+                    }
+                });
+}
+```
+
+## 10-Activity销毁后重建，后台任务不中断，能继续展示进度【ConnectableObservable、publish、connect】
+
+1、Activity可能会因为横竖屏切换等原因导致重建，需要保持Fragment中的后台任务不会中断，并且在重建之后继续展示任务进度
+> 1. Fragment使用`setRetainInstance(true);`---避免Fragment的重建，并且只回调一次onCreate()方法
+> 1. 利用`ConnectableObservable`, `Hot Observable`持续的发出数据，在重建后，还能继续接收数据。
+```java
+public class WorkFragment extends Fragment {
+
+    private static final String TAG = "wchf";
+
+    TextView mProgressText;
+
+    ConnectableObservable<Integer> mConnectableObservable;
+    DisposableObserver mDisposableObserver;
+
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate");
+
+        /**========================================
+         * @function 用于只设置一个热被观察者，持续发送数据出去。
+         * 设置true后，Activity的重新创建不会导致Fragment的重建:
+         *  1. 不会再触发onCreate
+         *  2. 会触发onAttach
+         *  3. 会触发onActivityCreate等等方法
+         *=======================================*/
+        setRetainInstance(true);
+
+        // 1、创建普通的Observable
+        mConnectableObservable = Observable.create(new ObservableOnSubscribe<Integer>() {
+                    @Override
+                    public void subscribe(ObservableEmitter<Integer> observableEmitter) throws Exception {
+                        try{
+                            for (int i = 0; i < 100; i++) {
+                                Thread.sleep(100);
+                                observableEmitter.onNext(i);
+                            }
+                            observableEmitter.onComplete();
+                        }catch (Exception e){
+                            e.printStackTrace();
+                        }
+                    }
+                })
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+        // 2、通过publish，将Cold Observable转换为Hot Observable
+                .publish();
+        // 3、下游观察者，展示下载进度
+        mDisposableObserver = new DisposableObserver<Integer>() {
+            @Override
+            public void onNext(Integer integer) {
+                mProgressText.setText("下载进度:" + integer + "%");
+            }
+            @Override
+            public void onError(Throwable throwable) { }
+            @Override
+            public void onComplete() {
+                mProgressText.setText("下载完成");
+            }
+        };
+        // 4、订阅：监听下载进度
+        mConnectableObservable.subscribe(mDisposableObserver);
+    }
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        Log.d(TAG, "onCreateView");
+        View view = inflater.inflate(R.layout.fragment_work, container, false);
+        view.findViewById(R.id.back_work_btn).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                // 5、开启后台任务。---开始持续发送数据。
+                mConnectableObservable.connect();
+            }
+        });
+        mProgressText = view.findViewById(R.id.back_work_progress_txt);
+        return view;
+    }
+    @Override
+    public void onResume() {
+        super.onResume();
+        Log.d(TAG, "onResume");
+    }
+    @Override
+    public void onDestroy() {
+        Log.d(TAG, "onDestroy");
+        super.onDestroy();
+        if(mDisposableObserver != null && !mDisposableObserver.isDisposed()){
+            mDisposableObserver.dispose();
+        }
+    }
+}
 ```
 
 ## 参考资料
