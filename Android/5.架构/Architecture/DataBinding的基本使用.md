@@ -3,7 +3,7 @@
 
 # DataBinding的基本使用
 
-版本号:2019-03-16(12:00)
+版本号:2019-03-17(2:00)
 
 ---
 
@@ -37,9 +37,11 @@
 android.databinding.enableV2=true
 ```
 
-## 基础知识
+## 布局中的使用和绑定表达式
 
-### import
+### 基础知识
+
+#### import
 
 1、import用于导入需要用的类，避免在xml布局中报错
 ```xml
@@ -56,7 +58,7 @@ android.databinding.enableV2=true
    android:visibility="@{user.isAdult ? View.VISIBLE : View.GONE}"/>
 ```
 
-### 类型别名
+#### 类型别名
 
 2、如果导入的两个类名称一致，避免混乱，应该使用别名
 ```xml
@@ -68,7 +70,7 @@ android.databinding.enableV2=true
 ```
 > 用Vista就能代指`com.example.real.estate.View`
 
-### 导入其它类
+#### 导入其它类
 
 3、导入其它类
 ```xml
@@ -88,12 +90,12 @@ android.databinding.enableV2=true
    android:layout_height="wrap_content"/>
 ```
 
-#### context
+##### context
 
 5、布局中有个特殊的变量为context，是根View的getContext()获得的对象
 > 该名`context`通过显式的variable，可以被重写掉。
 
-### include
+#### include
 
 1、databinding支持从父布局将变量传递到内部include包含的布局中
 ```xml
@@ -135,7 +137,7 @@ android.databinding.enableV2=true
 </layout>
 ```
 
-### 基本使用
+#### 基本使用
 
 1、Databinding的使用是在布局中通过标签`layout、data、variable`实现
 > 1-使用如下: 将用户类User，作为别名user。将账号和密码和对应控件绑定。
@@ -195,12 +197,12 @@ public class User {
 
 ```
 
-### 报错: 找不到android.databinding
+#### 报错: 找不到android.databinding
 
 1、报错的原因是，后来更改了整体的包名，导致生成的databiding类出错
 > 将整个项目clean，重新生成文件
 
-## 数据绑定和注入
+### 数据绑定和注入
 
 1、因为布局是`activity_databinding_layout.xml`因此生成的类是`ActivityDatabindingLayoutBinding`
 
@@ -218,7 +220,7 @@ public class User {
     }
 ```
 
-### Fragment、RecyclerView中使用数据绑定
+#### Fragment、RecyclerView中使用数据绑定
 
 3、Fragment、RecyclerView中使用数据绑定，可以使用下面的方法
 ```java
@@ -228,7 +230,7 @@ ListItemBinding binding = ListItemBinding.inflate(layoutInflater, viewGroup, fal
 ListItemBinding binding = DataBindingUtil.inflate(layoutInflater, R.layout.list_item, viewGroup, false);
 ```
 
-## 表达式
+### 表达式
 
 1、DataBinding在xml的布局中还可以使用表达式
 
@@ -280,13 +282,13 @@ android:text='@{user.account != null ? user.account : ""}'
 ```xml
 android:text='@{user.account ?? ""}'
 ```
-### DataBinding对于空指针异常的处理
+#### DataBinding对于空指针异常的处理
 
 1、DataBinding会自动处理空指针异常
 > 1. 如果String为null，就赋值为`null`
 > 1. 如果int为空，就赋值为`0`
 
-### 报错:Identifiers must have user defined types from the XML file. View is missing it
+#### 报错:Identifiers must have user defined types from the XML file. View is missing it
 
 1、解决原因：在设置控件的显示状况时，使用了View，却没有引入
 > 引入View
@@ -299,7 +301,7 @@ android:text='@{user.account ?? ""}'
     </data>
 ```
 
-## 集合的使用
+### 集合的使用
 
 1、Databinding中还可以使用集合，如: List、Map、SparseArray等等
 > 1-布局中引入。`记住<这个符号需要使用&lt;来表示`
@@ -336,9 +338,9 @@ android:text="@{map[key]}"
 ```
 
 
-## 资源的使用
+### 资源的使用
 
-#### plural
+##### plural
 
 1、plural复数形式字符串的使用
 ```
@@ -350,7 +352,7 @@ android:text="@{map[key]}"
 android:text="@{@plurals/orange(orangeCount, orangeCount)}"
 ```
 
-#### 需要改写形式的资源
+##### 需要改写形式的资源
 
 1、需要改写形式的资源
 |Type|	Normal reference|	Expression reference|
@@ -363,7 +365,7 @@ android:text="@{@plurals/orange(orangeCount, orangeCount)}"
 |color int|	@color|	@color|
 |ColorStateList|	@color|	@colorStateList|
 
-## 事件处理
+### 事件处理
 
 1、View的事件处理对应的方法有哪些
 |Class|	Listener setter|	Attribute|
@@ -373,7 +375,7 @@ android:text="@{@plurals/orange(orangeCount, orangeCount)}"
 |ZoomControls|	setOnZoomInClickListener(View.OnClickListener)|	android:onZoomIn|
 |ZoomControls|	setOnZoomOutClickListener(View.OnClickListener)|	android:onZoomOut|
 
-### 方法引用
+#### 方法引用
 
 2、方法引用的好处
 > 1. 可以在编译时间被检查，如果方法不存在，或者签名错误
@@ -414,7 +416,7 @@ binding.setHandlers(new ClickHandlers());
 ```
 
 
-### 绑定监听器
+#### 绑定监听器
 
 3、绑定监听器和方法引用的区别在于，绑定监听器可以执行任意的表达语句
 
@@ -457,8 +459,234 @@ binding.setHandlers(new ClickHandlers());
 android:onClick="@{(v) -> v.isVisible() ? doSomething() : void}"
 ```
 
-## Binding adapters
+## 处理可观察的对象
 
+1、Data Binding可以让我们的数据对象拥有能通知其他对象的能力。共有三类可观察的目标
+> 1. 对象
+> 1. 字段
+> 1. 集合
+
+### 可观察字段
+
+1、可观察的字段有如下9种
+> 1.ObservableBoolean-布尔值
+> 1.ObservableByte
+> 1.ObservableChar
+> 1.ObservableShort
+> 1.ObservableInt
+> 1.ObservableLong
+> 1.ObservableFloat
+> 1.ObservableDouble
+> 1.ObservableParcelable-可序列化
+
+2、ObservableField解决String常量导致无法更新UI的问题
+> 1-xml布局中
+```xml
+<variable name="password"
+          type="android.databinding.ObservableField&lt;String>"/>
+<Button
+          android:text='@{password}' />
+```
+> 2-Java中更改String的值
+```java
+// 1、初始值
+ObservableField<String> password = new ObservableField<>("old password");
+// 2、绑定
+binding.setPassword(password);
+// 3、设置新值
+password.set("new password");
+```
+
+3、可观察字段的实例：使用`public final`避免访问操作的装箱和拆箱
+```java
+private static class User {
+    public final ObservableField<String> firstName = new ObservableField<>();
+    public final ObservableField<String> lastName = new ObservableField<>();
+    public final ObservableInt age = new ObservableInt();
+}
+// 设置值
+user.firstName.set("Google");
+// 获取值
+int age = user.age.get();
+```
+
+### 可观察集合
+
+4、可观察集合: ObservableMap
+> 1-使用ObservableMap展示账号和密码
+```xml
+<layout xmlns:android="http://schemas.android.com/apk/res/android">
+    <data>
+        <import type="android.databinding.ObservableMap"/>
+        <variable name="user" type="ObservableMap&lt;String, Object>"/>
+    </data>
+    <LinearLayout
+        android:orientation="vertical">
+
+        <Button
+            android:text='@{user.account}'/>
+
+        <Button
+            android:text='@{String.valueOf(user.age)}' />
+
+    </LinearLayout>
+</layout>
+```
+> 2-Java中填充入数据
+```java
+        ObservableArrayMap<String, Object> user = new ObservableArrayMap<>();
+        user.put("account", "feather");
+        user.put("password", "123456");
+        user.put("age", 17);
+        binding.setUser(user);
+```
+
+5、可观察的列表: ObservableArrayList
+> 1-xml
+```xml
+    <data>
+        <import type="android.databinding.ObservableArrayList"/>
+        <variable name="user" type="ObservableArrayList&lt;Object>"/>
+    </data>
+
+    <Button
+        android:text='@{user[0]}'/>
+    <Button
+        android:text='@{String.valueOf(user[1])}' />
+```
+> 2-ObservableArrayList展示数据
+```java
+        ObservableArrayList<Object> user = new ObservableArrayList<>();
+        user.add("feather");
+        user.add(20);
+        binding.setUser(user);
+```
+
+### 可观察对象
+
+6、可观察对象是什么?
+> 1. 一个类实现了`Observable接口`，允许进行监听器的注册，并且提供了通知的能力。
+> 1. 为了方便使用，应该直接使用`BaseObservable`。内部完成了监听器注册和移除的逻辑。
+
+7、BaseObservable的使用
+> 1. 使用`@Bindable`注解`getter`
+> 1. 在`setter`中调用`notifyPropertyChanged()`
+```java
+private static class User extends BaseObservable {
+    private String firstName;
+    private String lastName;
+
+    @Bindable
+    public String getFirstName() {
+        return this.firstName;
+    }
+
+    @Bindable
+    public String getLastName() {
+        return this.lastName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+        notifyPropertyChanged(BR.firstName);
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+        notifyPropertyChanged(BR.lastName);
+    }
+}
+```
+
+8、BR是什么?
+> 1. BR是`DataBinding自动生成的类`，包含了所有`需要数据绑定的资源ID`
+> 1. `@Bindable`注解在编译期间，会在`BR类`中产生一个Entry
+
+9、PropertyChangeRegistry的作用
+
+## 绑定类
+
+1、绑定类是什么?
+> 1. 在xml中配置好之后，`DataBinding`会自动产生对应的类，如: `ActivityDatabindingLayoutBinding`
+> 1. 该类继承自`ViewDataBinding`
+
+### 初始化
+
+2、绑定类的初始化
+```java
+// 1、第一种
+View viewRoot = LayoutInflater.from(this).inflate(layoutId, parent, attachToParent);
+ViewDataBinding binding = DataBindingUtil.bind(viewRoot);
+
+// 2、第二种：用于Fragment，或者List的Adapter中
+ListItemBinding binding = ListItemBinding.inflate(layoutInflater, viewGroup, false);
+// or
+ListItemBinding binding = DataBindingUtil.inflate(layoutInflater, R.layout.list_item, viewGroup, false);
+
+// 3、将inflate和绑定分尅
+MyLayoutBinding binding = MyLayoutBinding.bind(viewRoot);
+```
+
+### 控件的ID
+
+3、DataBinding会为布局中具有ID的控件在产生的绑定类中创建一个不可变的字段
+> 1. 例如下面的View，会产生名称和ID一样的字段。firstName和lastName
+> 1. 这个机制比调用`findViewById()`更快
+```xml
+        <Button
+            android:id="@+id/account"/>
+
+        <Button
+            android:id="@+id/password"/>
+```
+> 从Binding类中获取到同名的控件，比findViewById更快。
+```java
+ActivityDatabindingLayoutBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_databinding_layout);
+// 名为account的Button
+Button account = binding.account;
+```
+
+### ViewStubs
+
+1、DataBinding在生成的Binding类中使用`ViewStubProxy`代表`ViewStub`
+> 1. `ViewStubProxy`必须监听`ViewStub的OnInflateListener`，因为ViewStub一开始并不是在View的层级中的
+> 1. 可以在`ViewStubProxy`上设置一个`OnInflateListener`, 在建立绑定后调用。
+
+### 动态变量
+
+2、RecyclerView中需要用到动态变量
+> 1. 需要在`调用onBindViewHolder()`方法后才能分配绑定的数值
+> 1. 需要`重新设置变量`并且`立即进行绑定`(默认是在下一帧的时候绑定，但是这个时候需要立即绑定)
+```java
+public void onBindViewHolder(BindingHolder holder, int position) {
+    final T item = items.get(position);
+    // 1、重新设置变量
+    holder.getBinding().setVariable(BR.item, item);
+    // 2、立即进行绑定
+    holder.getBinding().executePendingBindings();
+}
+
+```
+
+### 自定义binding类的名称
+
+1、自定义绑定类的名称
+```xml
+// 1、自定义类名
+<data class="ContactItem">
+    …
+</data>
+
+// 2、更改类所在的包
+<data class=".ContactItem">
+    …
+</data>
+<data class="com.example.ContactItem">
+    …
+</data>
+```
+
+## Binding Adapters
 
 ## 知识扩展
 
