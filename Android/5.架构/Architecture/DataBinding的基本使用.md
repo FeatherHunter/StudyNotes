@@ -3,7 +3,7 @@
 
 # DataBinding的基本使用
 
-版本号:2019-03-17(2:00)
+版本号:2019-03-17(19:20)
 
 ---
 
@@ -688,6 +688,129 @@ public void onBindViewHolder(BindingHolder holder, int position) {
 
 ## Binding Adapters
 
+1、属性`android:text="@{user.name}"`内部是什么处理机制?
+> 1. 首先找到了`setText(xxx)`这个方法，和`text=`相匹配
+> 1. 再根据参数`user.name`匹配到对应的`user.getName()`这个方法
+
+2、如果没有对应的属性，利用Databinding也可以为任何setter创造出属性
+> 例如: DrawerLayout, 没有多余的属性
+```xml
+<android.support.v4.widget.DrawerLayout
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    app:scrimColor="@{@color/scrim}"
+    app:drawerListener="@{fragment.drawerListener}">
+```
+> 1. 会自动使用`setScrimColor(int)`和`setDrawerListener(DrawerListener)`方法
+> 1. 即使没有对应的这些属性。
+
+### 注解@BindingMethods
+
+3、如果一些属性具有的setter和其属性名不匹配，就可以使用`BindingMethods`注解
+> 1. `@BindingMethods`注解中，还可以包含多个`@BindingMethod注解`
+> 1. 将ImageView的hint属性和`setImageTintList`相关联
+```java
+@BindingMethods({
+       @BindingMethod(type = "android.widget.ImageView",
+                      attribute = "android:tint",
+                      method = "setImageTintList"),
+})
+
+```
+
+### 注解@BindingAdapter
+
+4、有的时候原有的属性名需要绑定上自定义的逻辑
+> 1-假如: 某些View没有`android:paddingLeft`对应的设置器，只有方法`setPadding(left, top, right, bottom)`
+> 2-通过下面方法可以进行自定义。第一个参数：决定该和该属性关联的View的类型。第二个参数：决定了该绑定表达式接收的参数类型。
+```java
+@BindingAdapter("android:paddingLeft")
+public static void setPaddingLeft(View view, int padding) {
+  view.setPadding(padding,
+                  view.getPaddingTop(),
+                  view.getPaddingRight(),
+                  view.getPaddingBottom());
+}
+```
+
+#### 多个参数: 利用Glide加载图片，在错误情况展示默认图片。
+
+1、现在有一个需求，利用Databinding动态传入不同url，利用Glide加载图片后在绑定的ImageView上展示
+> 1-xml
+```xml
+        <ImageView
+            android:id="@+id/head_portrait"
+            xxx
+            app:imageUrl="@{user.headUrl}"
+            app:imageError="@{@drawable/googlelogo}"/>
+```
+> 2-@BindingAdapter
+```java
+// DataBindingActivity.java
+    @BindingAdapter({"imageUrl", "imageError"})
+    public static void loadImage(ImageView view, String url, Drawable error){
+        Glide.with(view).load(url).error(error).into(view);
+    }
+```
+> 3-在Activity中进行绑定
+```java
+public class DataBindingActivity extends AppCompatActivity {
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        ActivityDatabindingLayoutBinding binding = DataBindingUtil.setContentView(this, R.layout.activity_databinding_layout);
+
+        // 指定头像的URL
+        User user = new User("account", "password", "https://github.com/bumptech/glide/raw/master/static/glide_logo.png");
+        binding.setUser(user);
+    }
+}
+```
+> 4-使用该方法的注意点：**必须`app:imageUrl`和`app:imageError`**
+
+##### requireAll=false
+
+3、如何在指定一个属性的时候就触发绑定的Adapter?
+> 1. 使用`@BindingAdapter`的属性`requireAll=false`
+```java
+    @BindingAdapter(value={"imageUrl", "imageError"}, requireAll = false)
+    public static void loadImage(ImageView view, String url, Drawable error){
+        Glide.with(view).load(url).error(error).into(view);
+    }
+```
+> 2-xml中只使用一个属性，也能匹配到
+```xml
+<ImageView
+    android:id="@+id/head_portrait"
+    app:imageUrl="@{user.headUrl}"/>
+```
+
+### 注解@BindingConversion
+
+1、@BindingConversion的作用：自定义类型转换
+> 1. 例如`android:bakcground`需要的是`Drawable`，但是传入的是`int color`就需要进行类型转换
+> 2-xml
+```xml
+<View
+   android:background="@{isError ? @color/red : @color/white}"
+   android:layout_width="wrap_content"
+   android:layout_height="wrap_content"/>
+```
+> 3-Java
+```java
+@BindingConversion
+public static ColorDrawable convertColorToDrawable(int color) {
+    return new ColorDrawable(color);
+}
+```
+
+2、DataBinding严禁使用不同的数据类型，如下:
+```xml
+android:background="@{isError ? @drawable/error : @color/white}"
+```
+
 ## 知识扩展
 
 ### @plurals
@@ -728,7 +851,133 @@ String subtitle = getResources().getQuantityString(
         1);  // 3. 填充占位符的内容
 ```
 
+## 数据的双向绑定
+
+1、什么是数据的双向绑定?
+> 1. 数据发生变化后，去通知UI进行改变。
+> 1. UI改变后，反过去通知数据层，比如进行数据的保存等操作。
+
+2、数据双向绑定的简单实例
+> 1-使用形如"@={xxx}"进行双向绑定, 如下:
+```xml
+        <CheckBox
+            android:id="@+id/remember_me_cb"
+            xxx
+            android:checked="@={user.remember}"/>
+```
+> 2-在Bean中实现`BaseObservable`接口，并且使用`@Bindable`
+>      1. set和get方法必须要匹配字段名，不然会报错。
+>      2. 在set方法中进行特殊操作，然后执行`notifyPropertyChanged`再反过去改变UI的操作。
+```java
+public class User extends BaseObservable {
+    boolean remember;
+
+    public User(boolean remember) {
+        this.remember = remember;
+    }
+
+    @Bindable
+    public boolean getRemember() {
+        return remember;
+    }
+
+    public void setRemember(boolean remember) {
+        if(this.remember != remember) {
+            this.remember = remember;
+
+            // 根据UI的改变，做出一些操作。例如存储账号和密码。这里是设置为未选中状态
+            if(this.remember == true){
+                this.remember = false;
+                // 通知属性已经改变
+                notifyPropertyChanged(BR.remember);
+            }
+        }
+    }
+}
+```
+
+### 自定义属性
+
+1、自定义属性的双向绑定
+> 1-setter，注意：必须要打破潜在的无限循环。--- 数据改变
+```java
+@BindingAdapter("time")
+public static void setTime(MyView view, Time newValue) {
+    // Important to break potential infinite loops.
+    if (view.time != newValue) {
+        view.time = newValue;
+    }
+}
+```
+> 2-getter --- View的属性改变
+```java
+@InverseBindingAdapter("time")
+public static Time getTime(MyView view) {
+    return view.getTime();
+}
+```
+
+2、对自定义View使用自定义的监听器
+```java
+@BindingAdapter("app:timeAttrChanged")
+public static void setListeners(
+        MyView view, final InverseBindingListener attrChange) {
+    // Set a listener for click, focus, touch, etc.
+}
+```
+> 双向绑定的DataBinding会自动生成一个属性，例如`app:timeAttrChanged`，是原属性加上后缀拼接成的`app:xxxAttrChanged`
+
+### Converters转换器
+
+1、Converter转换器的使用
+> 1-有可能输入的数据是long值，但是需要展示的是日期的字符串，就需要进行转换
+> 2-转换器。使用`注解@InverseMethod`，指明需要反过来转换所使用的转换方式。
+```java
+public class Converter {
+    @InverseMethod("stringToDate")
+    public static String dateToString(long value) {
+        // Converts long to String.
+        return "" + value * 2;
+    }
+
+    public static long stringToDate(String value) {
+        // Converts String to long.
+        if(TextUtils.isEmpty(value)){
+            return 0;
+        }
+        return Integer.parseInt(value);
+    }
+}
+```
+> 3-xml中使用转换器
+```xml
+<import type="com.hao.architecture.Converter"/>
+<EditText
+    android:id="@+id/birth_date"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:text="@={Converter.dateToString(user.birthDate)}"
+/>
+```
+
+### 系统内置的支持双向绑定的属性
+
+1、系统内置的支持双向绑定的属性和其Adapter(可以去看源码)
+|Class|	Attribute(s)|	Binding adapter|
+|---|---|---|
+|AdapterView|	android:selectedItemPosition android:selection|	AdapterViewBindingAdapter|
+|CalendarView|	android:date|	CalendarViewBindingAdapter|
+|CompoundButton	android:checked|	CompoundButtonBindingAdapter|
+|DatePicker|	android:year android:month android:day|	DatePickerBindingAdapter|
+|NumberPicker|	android:value|	NumberPickerBindingAdapter|
+|RadioButton|	android:checkedButton|	RadioGroupBindingAdapter|
+|RatingBar|	android:rating|	RatingBarBindingAdapter|
+|SeekBar|	android:progress|	SeekBarBindingAdapter|
+|TabHost|	android:currentTab|	TabHostBindingAdapter|
+|TextView|	android:text|	TextViewBindingAdapter|
+|TimePicker|	android:hour android:minute|	TimePickerBindingAdapter|
 
 ## 问题汇总
 
 ## 参考资料
+1. [官方文档: Data Binding Library](https://developer.android.com/topic/libraries/data-binding)
