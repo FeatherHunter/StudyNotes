@@ -91,3 +91,13 @@ $('p:not(.pp)').css('background','orange');
 $('p:even').css('background','green');
 $(':header').css('background','yellow');
 ```
+
+6、属性选择器
+> 1.使用XPath表达式来选择带有给定属性的元素；
+
+|选择器|jquery模式|描述|
+|---|---|---|
+|[attribute]|`$('[href]')`|获取带有herf属性的元素|
+|[attribute=value]|`$('[href='#']')`|获取href值为'#'的元素|
+|[attribute!=value]|`$('[href!='#']')`|获取href值不为'#'的元素|
+|[attribute$=value]|`$('[href$='.jpg']')`|获取herf属性值包含以'.jpg'结尾的元素|
