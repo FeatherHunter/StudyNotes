@@ -2,7 +2,7 @@
 
 # LiveData基本教程
 
-版本号:2019-03-18(22:30)
+版本号:2019-03-19(00:30)
 
 ---
 
@@ -103,6 +103,185 @@ public class UserViewModel extends ViewModel {
 > 1. app组件的`onCreate()`方法
 > 1. 不适合在`onResume()`等方法中，可能会调用多次
 > 1. 能确保组件能尽可能快的展示出数据。只要app组件处于启动状态(STARTED)就会立即接收到`LiveData对象`中的数据---前提是已经监听了LiveData
+
+2、监听LiveData实例
+```java
+public class DataBindingActivity extends AppCompatActivity {
+
+    ActivityDatabindingLayoutBinding mBinding;
+    User mUser;
+    private UserViewModel mUserViewModel;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // DataBinding
+        // xxx
+
+        //  1. 创建用户信息的ViewModel
+        mUserViewModel = ViewModelProviders.of(this).get(UserViewModel.class);
+        //  2. 创建更新UI的观察者
+        Observer<String> nameObserver = new Observer<String>() {
+            @Override
+            public void onChanged(@Nullable String s) {
+                // 利用DataBinding更新: 用户账号
+                mUser.setAccount(s);
+                mBinding.setUser(mUser);
+            }
+        };
+        //  3. 注册观察者
+        mUserViewModel.getAccount().observe(this, nameObserver);
+    }
+}
+
+```
+
+
+3、ViewModelProviders为什么找不到?
+> 1. 引用的版本太老了，需要新的Lifecyle扩展库(目前可以用的最新版)
+> android.arch.lifecycle
+```
+    // ViewModel and LiveData
+    implementation "android.arch.lifecycle:extensions:1.1.1"
+```
+> androidx
+```
+    // 引入lifecycle
+    def lifecycle_version = "2.0.0"
+
+    // ViewModel and LiveData
+    implementation "androidx.lifecycle:lifecycle-extensions:$lifecycle_version"
+```
+
+### 更新LiveData对象
+
+1、MutableLiveData类自动提供`setValue(T)、postValue(T)`用于更新值
+
+2、更新LiveData对象实例
+```java
+button.setOnClickListener(new OnClickListener() {
+    @Override
+    public void onClick(View v) {
+        String anotherName = "John Doe";
+        model.getCurrentName().setValue(anotherName);
+    }
+});
+```
+> 1. 调用`setValue()或者postValue()`都会调用所有观察者的`onChanged()`方法
+
+### Room使用LiveData
+3、Room数据持久化库，支持`observable查询`
+> 1. 该查询能返回`LiveData对象`
+> 1. Observable查询是`DAO-Database Access Object`的一部分
+> 1. Room自动生成所有更新`LiveData对象`所需要的代码(当数据库更新的时候)
+> 1. 查询操作是在后台线程执行异步操作
+
+## 扩展的LiveData
+
+1、扩展LiveData
+```java
+package com.hao.architecture;
+
+import android.arch.lifecycle.LiveData;
+
+import java.math.BigDecimal;
+
+public class StockLiveData extends LiveData<BigDecimal> {
+    private StockManager stockManager;
+
+    public StockLiveData(String symbol) {
+        stockManager = new StockManager(symbol);
+    }
+
+    private SimplePriceListener listener = new SimplePriceListener() {
+        @Override
+        public void onPriceChanged(BigDecimal price) {
+            // 更新LiveData并且通知所有活跃的观察者
+            setValue(price);
+        }
+    };
+
+    @Override
+    protected void onActive() {
+        // 具有活跃的观察者时调用
+        stockManager.requestPriceUpdates(listener);
+    }
+
+    @Override
+    protected void onInactive() {
+        // 没有任何活跃的观察者时调用
+        stockManager.removeUpdates(listener);
+    }
+}
+```
+> Fragment中使用
+```java
+public class MyFragment extends Fragment {
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        super.onActivityCreated(savedInstanceState);
+        LiveData<BigDecimal> myPriceListener = ...;
+        myPriceListener.observe(this, price -> {
+            // Update the UI.
+        });
+    }
+}
+```
+
+2、LiveData作为生命周期感知组件，可以在多个Activity中共享: 使用单例
+```java
+public class StockLiveData extends LiveData<BigDecimal> {
+    private static StockLiveData sInstance;
+
+    @MainThread
+    public static StockLiveData get(String symbol) {
+        if (sInstance == null) {
+            sInstance = new StockLiveData(symbol);
+        }
+        return sInstance;
+    }
+
+    //xxx
+
+}
+```
+> 多个Fragment中使用：LiveData仅仅当一个或者多个LifecycleOwner处于活跃状态时，才会和系统服务连接。
+```java
+public class MyFragment extends Fragment {
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        StockLiveData.get(symbol).observe(this, price -> {
+            // Update the UI.
+        });
+    }
+}
+```
+
+## 转换LiveData
+
+1、有的时候需要在分发LiveData的数值到观察者前进行处理，可以利用`Transformation.map()`
+```java
+LiveData<User> userLiveData = ...;
+LiveData<String> userName = Transformations.map(userLiveData, user -> {
+    user.name + " " + user.lastName
+});
+```
+
+### 创造新的transformations
+
+1、可以使用`MediatorLiveData`
+
+## 合并多个LiveData
+
+1、MediatorLiveData是LiveData的子类
+> 允许merge多个LiveData源
+
+2、LiveData merge的使用场景
+> 1. 如果具有一个LiveData对象，可以根据本地数据库或者网络数据进行更新
+> 1. 就可以将两种LiveData来源添加到MediatorLiveData对象中
+>     1. 和本地数据库关联的LiveData
+>     1. 和网络数据关联的LiveData
+> 1. Activity只需要观察`MediatorLiveData`对象，就能接收到来自两个数据源的更新
 
 ## 参考资料
 1. [LiveData](https://developer.android.google.cn/topic/libraries/architecture/livedata)
