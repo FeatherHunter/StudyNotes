@@ -3,7 +3,7 @@
 
 # DataBinding的基本使用
 
-版本号:2019-03-17(19:20)
+版本号:2019-03-20(0:20)
 
 ---
 
@@ -811,46 +811,6 @@ public static ColorDrawable convertColorToDrawable(int color) {
 android:background="@{isError ? @drawable/error : @color/white}"
 ```
 
-## 知识扩展
-
-### @plurals
-
-1、android中的Plurals（Quantity Strings）类型的作用
-> 在不同语言中，可能出现单复数的情况，根据不同的数量，选择不同的语句是很重要的
-> 例如: 1 device 和 2 devices 的区别
-
-2、@plurals的语法
-```xml
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <plurals
-        name="plural_name">
-        <item
-            quantity=["zero" | "one" | "two" | "few" | "many" | "other"]
-            >text_string</item>
-    </plurals>
-</resources>
-```
-
-3、使用
-> 1-xml中定义资源
-```xml
-<！--定义到资源文件即可 -->
-<plurals name="subtitle_plural">
-    <!--在使用时，可以根据数量来选择不同的字符串-->
-    <!--还有zero、few等其它选项-->
-    <item quantity="one">%s crime</item>
-    <item quantity="other">%s crimes</item>
-</plurals>
-```
-> 2-Java使用
-```java
-String subtitle = getResources().getQuantityString(
-        R.plurals.subtitle_plural,  // 1. 文本id
-        1,   // 2. 数量，对应于"zero"、"two"等等
-        1);  // 3. 填充占位符的内容
-```
-
 ## 数据的双向绑定
 
 1、什么是数据的双向绑定?
@@ -976,6 +936,46 @@ public class Converter {
 |TabHost|	android:currentTab|	TabHostBindingAdapter|
 |TextView|	android:text|	TextViewBindingAdapter|
 |TimePicker|	android:hour android:minute|	TimePickerBindingAdapter|
+
+## 知识扩展
+
+### @plurals
+
+1、android中的Plurals（Quantity Strings）类型的作用
+> 在不同语言中，可能出现单复数的情况，根据不同的数量，选择不同的语句是很重要的
+> 例如: 1 device 和 2 devices 的区别
+
+2、@plurals的语法
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals
+        name="plural_name">
+        <item
+            quantity=["zero" | "one" | "two" | "few" | "many" | "other"]
+            >text_string</item>
+    </plurals>
+</resources>
+```
+
+3、使用
+> 1-xml中定义资源
+```xml
+<！--定义到资源文件即可 -->
+<plurals name="subtitle_plural">
+    <!--在使用时，可以根据数量来选择不同的字符串-->
+    <!--还有zero、few等其它选项-->
+    <item quantity="one">%s crime</item>
+    <item quantity="other">%s crimes</item>
+</plurals>
+```
+> 2-Java使用
+```java
+String subtitle = getResources().getQuantityString(
+        R.plurals.subtitle_plural,  // 1. 文本id
+        1,   // 2. 数量，对应于"zero"、"two"等等
+        1);  // 3. 填充占位符的内容
+```
 
 ## 问题汇总
 

@@ -17,3 +17,6 @@
 ## 使用可观察的ViewModel对Binding Adapter进行更多的控制
 
 ## 参考资料
+
+1. [update RecyclerView with Android LiveData](https://stackoverflow.com/questions/44489235/update-recyclerview-with-android-livedata)
+2. [googlesamples/android-architecture-components](https://github.com/googlesamples/android-architecture-components/blob/master/BasicSample/app/src/main/java/com/example/android/persistence/ui/ProductAdapter.java)
