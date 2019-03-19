@@ -2,11 +2,11 @@
 
 #  ViewModel基本教程
 
-版本号:2019-03-19(14:30)
+版本号:2019-03-19(22:30)
 
 ---
 
-@[toc]
+[toc]
 ## 简介
 
 1、ViewModel是什么?
@@ -142,3 +142,24 @@ public class DetailFragment extends Fragment {
     }
 }
 ```
+
+2、利用ViewModel共享Fragment的数据有什么好处?
+> 1. Activity不需要关心相关的任何事情
+> 1. Fragment不需要知道其他有哪些Fragment也在依赖这些数据
+> 1. 当某个Fragment结束的时候，ViewModel能自动处理好生命周期相关的事务
+
+## ViewModel替代Loaders
+
+1、ViewModel替换那些用来保持UI中的数据和数据库同步的Loaders
+> 1. 利用ViewModel可以将Loaders和UI的逻辑相分离
+
+2、ViewModel进行UI和数据库数据同步的方案
+> 1. `ViewModel`确保在设备配置改变时，数据依然存在
+> 1. `Room`在数据库改变时通知`LiveData`
+> 1. `LiveData`察觉到改变时，通知UI更新相应的数据
+
+## 参考资料
+
+1. [官方文档: ViewModel](https://developer.android.com/topic/libraries/architecture/viewmodel)
+1. [如何在设备设置改变时，保存、持久化、管理数据?](https://developer.android.com/topic/libraries/architecture/saving-states.html)
+1. [官方Android APP 架构指导手册](https://developer.android.com/jetpack/docs/guide#fetching_data)
