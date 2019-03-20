@@ -1,9 +1,11 @@
 转载请注明链接：https://blog.csdn.net/feather_wch/article/details/79729132
 
-#Android架构
-版本：2018/3/28-1(16:00)
+# Android架构(MVC/MVP/MVVM与模块化、组件化)
+版本：2019/3/2-1(10:00)
 
-##MVC
+[toc]
+
+## MVC
 
 1、Android中MVC是什么？特点？
 >1. `Model`:针对业务模型建立的数据结构和类（与View无关，只与业务相关）
@@ -16,7 +18,7 @@
 >1. `Activity`并不是`MVC`中标准的`Controller`，既有`Controller`的职责也有`View`的职责，导致`Activity`的代码过于臃肿。
 >2. `View层`和`Model层`互相耦合，不易于开发和维护。
 
-##MVP
+## MVP
 
 3、Android中的MVP模式
 >1. `MVP(Model-View-Presenter)`
@@ -27,6 +29,7 @@
 
 4、MVP和MVC的区别
 >1. `MVP`中绝对不允许`View`直接访问`Model`
+>2. 本质是`增加了一个接口`降低一层`耦合度`
 
 5、MVP的特点
 >1. `Presenter`完全将`Model`和`View`分离，主要逻辑处于`Presenter`中。
@@ -67,12 +70,12 @@ public interface LoadTasksCallBack<T> {
     void onSuccess(T data);
     void onFailed();
 }
-//Model层-任务抽象基类： NetTask.java
+//Model层-任务抽象基类【业务接口】： NetTask.java
 public interface NetTask<T> {
     void execute(T data, LoadTasksCallBack callBack);
 }
 /**=============================================
- * Model层核心-具体任务:
+ * Model层核心-具体任务【业务的实际操作】:
  *   1. 实现Model层获取数据的操作.
  * //NetInfoTask.java
  *=============================================*/
@@ -201,7 +204,7 @@ public class HttpActivity extends Activity implements NetInfoContract.View{
 }
 ```
 
-##MVVM
+## MVVM
 
 10、MVVM模式的作用和特点？
 >1. `Model-View-ViewModel`，将`Presenter`替换为`ViewModel`。
@@ -212,5 +215,36 @@ public class HttpActivity extends Activity implements NetInfoContract.View{
 ![MVVM](http://www.jcodecraeer.com/uploads/20160414/1460565638651974.png)
 
 
-##参考和学习资料
+## 模块化和组件化
+11、什么是模块化
+>Modular programming is a software design technique that emphasizes separating the functionality of a program into independent, interchangeable modules, such that each contains everything necessary to execute only one aspect of the desired functionality.
+>1. 一种`软件设计技术`
+>2. 将`项目`的功能拆分为`独立`、`可交换`的模块
+>3. 每个`模块`都包含执行`单独功能`的`必要内容`。
+
+12、什么是组件化
+>1. 组件化软件工程也被成为组件化开发，是一种软件工程的分支。
+>2. 强调将一个软件系统拆分为独立的组件(组件可以使模块也可以是web资源等等)
+
+13、模块化和组件化的区别
+>1. 两者目的都是`重用和解耦`
+>2. 主要是`叫法不同`
+>3. `模块化`侧重于重用，`组件化`更侧重于`业务解耦`
+
+14、组件化优点
+>1. 组件间可以灵活组建
+>2. 一个`组件`的更改，只要`对外提供的接口`没有变化，则`其他组件`不需要再测试。
+>3. 缺点：对技术、业务理解度有更高要求。
+
+15、模块化的层次拆分
+>1. 基础库
+>2. 通用业务层
+>3. 应用层
+
+16、模块间通信
+>1. 可以自己实现但比较麻烦
+>2. 建议用`阿里巴巴`的开源库。
+
+## 参考和学习资料
 1. [认清Android框架 MVC，MVP和MVVM](https://blog.csdn.net/jdsjlzx/article/details/51174396#t2)
+1. [Data Binding](https://blog.csdn.net/feather_wch/article/details/79789597)

@@ -3,7 +3,7 @@
 
 # MVVM-Architecture Component实战
 
-版本号:2019-03-20(18:10)
+版本号:2019-03-20(21:10)
 
 ---
 
@@ -25,54 +25,6 @@
 > 1. MVMV中:
 >     1. ViewModel通过观察者模式和View层交互
 > 1. 注意！按照[MMVM传统定义](https://en.wikipedia.org/wiki/Model%E2%80%93view%E2%80%93viewmodel)，MVP和MVMV之间的区别并不是完全符合上面的说法，但是在Android中这是最适合理解的解释。
-
-### 补充: MVP
-
-#### 优点
-
-
-#### 缺点
-
-2、MVP具有哪些弊病？
-> 1. 粒度不好控制，需要创建非常多的类和接口
-> 1. 重用Presenter会实现过多不需要的接口
-> 1. Presenter和View间通过`Interface`进行通信，且非常频繁，一旦View的数据发生变化，就需要更改对应的接口。
-
-3、如何解决MVP的弊端
-> 1. 硬解决:
->      * 通过`Template`自动生成需要的类和接口，减少复制粘贴的冗余工作量
-> 1. 软解决:
->      1. 过于简单的逻辑没必要使用Presenter，可以直接处理
->      1. 将类似的业务逻辑划分到一起，充分利用Presenter和Model可以重用的特点。
-
-#### 主流实现方式
-1、MVP架构主流实现方式有两种
-> 1. 第一种:【使用最多】将`Activity、Fragment`作为View，抽象出一个`Presenter层`
-> 1. 第二种: 将`Activity、Fragment`作为Presenter，抽象出一个`View层`
-
-
-3、第一种MVP框架的优点和缺点
-> * 缺点:
->      1. 不可以直接和Activity、Fragment的生命周期做绑定
-
-4、为什么要和Activity、Fragment的生命周期做绑定？
-
-##### TheMVP
-
-2、阿里框架TheMVP是典型的第二种MVP框架：抽象出View层
-> 1. 将Activity和Fragment作为Presenter
-> 1. 将UI操作抽到`Delegate`中，作为View层。
-
-5、TheMVP的优点
-> 1. 能少写很多类
-> 1. 可以直接和Activity、Fragment的生命周期做绑定
-> 1. 方便重用View【然而现实中View层变化很频繁，大多是重用Presenter】
-
-5、TheMVP的缺点
-> 1. 不能重用Presenter
-> 1. 对Presenter的实现类有限制，必须是Activity、Fragment
-> 1. Adapter、Dialog就必须根据其特性重写对应的Presenter基类
-> 1. Presenter基类继承了Activity或者Fragment，如果需要通过继承使用其他Activity、Fragment就需要修改Presenter基类。
 
 ## 实战: 采用ViewModel和LiveData
 
@@ -298,7 +250,57 @@ public class User
     }
 }
 ```
+## MVP
 
+### 优点
+
+1、MVP的优点
+> 1. 利用Presenter将Model和View完全解耦
+> 1. View的变更不会影响Presenter
+> 1. Presenter可以复用
+
+
+### 缺点
+
+2、MVP具有哪些弊病？
+> 1. 粒度不好控制，需要创建非常多的类和接口
+> 1. 重用Presenter会实现过多不需要的接口
+> 1. Presenter和View间通过`Interface`进行通信，且非常频繁，一旦View的数据发生变化，就需要更改对应的接口。
+
+3、如何解决MVP的弊端
+> 1. 硬解决:
+>      * 通过`Template`自动生成需要的类和接口，减少复制粘贴的冗余工作量
+> 1. 软解决:
+>      1. 过于简单的逻辑没必要使用Presenter，可以直接处理
+>      1. 将类似的业务逻辑划分到一起，充分利用Presenter和Model可以重用的特点。
+
+### 主流实现方式
+4、MVP架构主流实现方式有两种
+> 1. 第一种:【使用最多】将`Activity、Fragment`作为View，抽象出一个`Presenter层`
+> 1. 第二种: 将`Activity、Fragment`作为Presenter，抽象出一个`View层`
+
+
+5、第一种MVP框架的缺点
+> 1. 不可以直接和Activity、Fragment的生命周期做绑定
+
+6、为什么要和Activity、Fragment的生命周期做绑定？
+
+#### TheMVP
+
+7、阿里框架TheMVP是典型的第二种MVP框架：抽象出View层
+> 1. 将Activity和Fragment作为Presenter
+> 1. 将UI操作抽到`Delegate`中，作为View层。
+
+8、TheMVP的优点
+> 1. 能少写很多类
+> 1. 可以直接和Activity、Fragment的生命周期做绑定
+> 1. 方便重用View【然而现实中View层变化很频繁，大多是重用Presenter】
+
+9、TheMVP的缺点
+> 1. 不能重用Presenter
+> 1. 对Presenter的实现类有限制，必须是Activity、Fragment
+> 1. Adapter、Dialog就必须根据其特性重写对应的Presenter基类
+> 1. Presenter基类继承了Activity或者Fragment，如果需要通过继承使用其他Activity、Fragment就需要修改Presenter基类。
 
 ## 参考资料
 
