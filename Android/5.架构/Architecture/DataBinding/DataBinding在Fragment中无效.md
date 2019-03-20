@@ -7,7 +7,7 @@
 
 ---
 
-@[toc]
+[toc]
 ## Fragment中无效
 
 在Fragment中使用Databinding的时候，遇到无论如何设置都无法生效。后来发现Fragment有特殊的使用方法。
