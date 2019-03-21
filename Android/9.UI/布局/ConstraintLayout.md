@@ -3,9 +3,7 @@
 
 # ConstraintLayout
 
-History
-1. 2018/4/12-1
-2. 2019/3/21(14:47)
+版本: 2019/3/21(23:47)
 
 ---
 
@@ -585,6 +583,113 @@ app:constraint_referenced_ids="a_txt,b_txt"
 
 ### Placeholder
 
+1、Placeholder的作用?
+> 1. 一种占位的作用
+> 1. 通过`Placeholder的setContentId(view.getId());`可以设置具体的控件
+> 1. `TransitionManager.beginDelayedTransition(mConstraintLayout);`启动平滑的动画效果
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:id="@+id/constraintLayout"
+    android:layout_height="match_parent">
+
+    <android.support.constraint.Placeholder
+        android:id="@+id/placeholder"
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="8dp"
+        android:layout_marginBottom="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/mail" />
+
+    <ImageButton
+        android:id="@+id/favorite"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="16dp"
+        android:background="#00000000"
+        android:tint="#E64A19"
+        android:src="@drawable/ic_launcher_foreground"
+        app:layout_constraintEnd_toStartOf="@id/mail"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageButton
+        android:tint="#512DA8"
+        android:id="@+id/mail"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="16dp"
+        android:background="#00000000"
+        android:src="@drawable/ic_launcher_foreground"
+        app:layout_constraintEnd_toStartOf="@id/save"
+        app:layout_constraintStart_toEndOf="@id/favorite"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageButton
+        android:tint="#D32F2F"
+        android:id="@+id/save"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="16dp"
+        android:background="#00000000"
+        android:src="@drawable/ic_launcher_foreground"
+        app:layout_constraintEnd_toStartOf="@id/play"
+        app:layout_constraintStart_toEndOf="@id/mail"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageButton
+        android:tint="#FFA000"
+        android:id="@+id/play"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="16dp"
+        android:background="#00000000"
+        android:src="@drawable/ic_launcher_foreground"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/save"
+        app:layout_constraintTop_toTopOf="parent" />
+
+
+</android.support.constraint.ConstraintLayout>
+```
+```java
+public class ConstraintLayoutActivity extends AppCompatActivity {
+
+    Placeholder mPlaceholder;
+    ConstraintLayout mConstraintLayout;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_constraint_layout);
+
+        findViewById(R.id.favorite).setOnClickListener(new onClick());
+        findViewById(R.id.mail).setOnClickListener(new onClick());
+        findViewById(R.id.save).setOnClickListener(new onClick());
+        findViewById(R.id.play).setOnClickListener(new onClick());
+        mConstraintLayout = findViewById(R.id.constraintLayout);
+        mPlaceholder = findViewById(R.id.placeholder);
+    }
+
+    class onClick implements View.OnClickListener{
+        @Override
+        public void onClick(View v) {
+            // 1. 执行顺滑的动画效果
+            TransitionManager.beginDelayedTransition(mConstraintLayout);
+            // 2. 将点击的View放置到placeholder中
+            mPlaceholder.setContentId(v.getId());
+        }
+    }
+}
+```
+
 ### Constraints
 
 ### 虚拟视图的原理
@@ -602,7 +707,240 @@ app:constraint_referenced_ids="a_txt,b_txt"
 
 ### ConstraintSet
 
+1、ConstraintSet是什么?
+> 能在代码中轻松地改变控件的位置大小，不再需要使用LayoutParams
+
+2、ConstraintSet的方法
+```java
+ConstraintSet constraintSet = new ConstraintSet();
+// 1. clone
+constraintSet.clone(ConstraintLayout constraintLayout);
+constraintSet.clone(ConstraintSet set);
+constraintSet.clone(Context context, int constraintLayoutId);
+constraintSet.clone(Constraints constraints);
+
+// 2. 设置flow1控件的顶边与flow2的底边对齐,且之间margin值是50px:
+constraintSet.connect(view1.getId(), ConstraintSet.TOP,    // 第一个控件的顶部
+                      view2.getId(), ConstraintSet.BOTTOM, // 第二个控件的底部
+                      50);        // 之间的margin
+
+// 3. 设置view2水平剧中于parent
+constraintSet.centerVertically(R.id.view2, ConstraintSet.PARENT_ID);
+//constraintSet.centerHorizontally(R.id.view2, ConstraintSet.PARENT_ID);
+
+// 4. 设置view1的高度为120px
+constraintSet.constrainHeight(R.id.view1, 300);
+
+// 5. apply使设置生效
+constraintSet.applyTo(binding.constraintLayout);
+```
+
 ### TransitionManager
+
+1、ConstraintSet和TransitionManager实现水平、垂直布局变化的效果
+> 1-水平方向布局
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageButton
+        android:id="@+id/favorite"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:background="#00000000"
+        android:tint="#E64A19"
+        android:src="@drawable/ic_launcher_foreground"
+        app:layout_constraintEnd_toStartOf="@id/mail"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+
+    <ImageButton
+        android:tint="#512DA8"
+        android:id="@+id/mail"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:background="#00000000"
+        android:src="@drawable/ic_launcher_foreground"
+        app:layout_constraintEnd_toStartOf="@id/save"
+        app:layout_constraintStart_toEndOf="@id/favorite"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+
+    <ImageButton
+        android:tint="#D32F2F"
+        android:id="@+id/save"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:background="#00000000"
+        android:src="@drawable/ic_launcher_foreground"
+        app:layout_constraintEnd_toStartOf="@id/play"
+        app:layout_constraintStart_toEndOf="@id/mail"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+
+    <ImageButton
+        android:tint="#FFA000"
+        android:id="@+id/play"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:background="#00000000"
+        android:src="@drawable/ic_launcher_foreground"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toEndOf="@id/save"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+
+
+</android.support.constraint.ConstraintLayout>
+```
+> 2-垂直方向布局，ID相同
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageButton
+        android:id="@+id/favorite"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_marginTop="72dp"
+        android:layout_marginEnd="8dp"
+        android:background="#00000000"
+        android:src="@drawable/ic_launcher_foreground"
+        android:tint="#E64A19"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.51"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+    <ImageButton
+        android:id="@+id/mail"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="112dp"
+        android:layout_marginEnd="8dp"
+        android:background="#00000000"
+        android:src="@drawable/ic_launcher_foreground"
+        android:tint="#512DA8"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.498"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/favorite" />
+
+    <ImageButton
+        android:id="@+id/save"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="100dp"
+        android:layout_marginEnd="8dp"
+        android:background="#00000000"
+        android:src="@drawable/ic_launcher_foreground"
+        android:tint="#D32F2F"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.498"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/mail" />
+
+    <ImageButton
+        android:id="@+id/play"
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:background="#00000000"
+        android:src="@drawable/ic_launcher_foreground"
+        android:tint="#FFA000"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintHorizontal_bias="0.486"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/save"
+        app:layout_constraintVertical_bias="0.383" />
+
+</android.support.constraint.ConstraintLayout>
+```
+> 3-测试页面Activity的布局
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <include layout="@layout/constraint_horizontal_layout"
+        android:id="@+id/constraintLayout"/>
+
+    <Button
+        android:id="@+id/vertical_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="垂直布局"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintRight_toLeftOf="@+id/horizontal_btn"/>
+
+
+    <Button
+        android:id="@+id/horizontal_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="水平布局"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toRightOf="@+id/vertical_btn"/>
+
+</android.support.constraint.ConstraintLayout>
+```
+> 4-Activity中动画切换
+```java
+public class ConstraintLayoutActivity extends AppCompatActivity {
+
+    ConstraintLayout mConstraintLayout;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_constraint_layout);
+
+        mConstraintLayout = findViewById(R.id.constraintLayout);
+
+        // 1. 转换为垂直的布局
+        findViewById(R.id.vertical_btn).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ConstraintSet constraintSet = new ConstraintSet();
+                constraintSet.clone(ConstraintLayoutActivity.this, R.layout.constraint_vertical_layout);
+                TransitionManager.beginDelayedTransition(mConstraintLayout);
+                constraintSet.applyTo(mConstraintLayout);
+            }
+        });
+        // 2. 转换为水平的布局
+        findViewById(R.id.horizontal_btn).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ConstraintSet constraintSet = new ConstraintSet();
+                constraintSet.clone(ConstraintLayoutActivity.this, R.layout.constraint_horizontal_layout);
+                TransitionManager.beginDelayedTransition(mConstraintLayout);
+                constraintSet.applyTo(mConstraintLayout);
+            }
+        });
+    }
+}
+```
+
+2、constraintSet.clone(activity,layout):的作用
+> 将布局的定位信息，存储到constraintSet中
+
+3、TransitionManager.beginDelayedTransition():的作用
+> 通过新旧scene的变化，简单实现了动画效果
 
 ## 7-优化Optimizer(1.1.x)
 
@@ -707,8 +1045,13 @@ app:layout_optimizationLevel="none | standard | direct | barrier | chain | demen
 > 1. ConstraintLayout的性能体现在了`Android实现的Cassowary algorithm`算法上
 > 1. ConstraintLayout要避免嵌套了多层布局
 
+### Android Transition Framework
+
+1. [Android Transition Framework详解---超炫的动画框架](https://www.jianshu.com/p/e497123652b5)
 
 ## 参考和学习资料
 1. [ConstraintLayout 完全解析 快来优化你的布局吧](https://blog.csdn.net/lmj623565791/article/details/78011599)
 1. [android ConstraintLayout使用详解](https://www.jianshu.com/p/f86f800964d2)
 1. [官方: ConstraintLayout](https://codelabs.developers.google.com/codelabs/constraint-layout/index.html)
+1. [解析ConstraintLayout的性能优势](https://mp.weixin.qq.com/s/gGR2itbY7hh9fo61SxaMQQ)
+1. [Beautiful animations using Android ConstraintLayout](https://robinhood.engineering/beautiful-animations-using-android-constraintlayout-eee5b72ecae3)
