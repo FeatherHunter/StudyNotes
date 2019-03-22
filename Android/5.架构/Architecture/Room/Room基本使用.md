@@ -4,7 +4,7 @@
 
 #  Room基本使用
 
-版本号:2019-03-22(16:30)
+版本号:2019-03-23(1:30)
 
 ---
 
@@ -151,6 +151,33 @@ userDao.insertAll(new User("wang", 10), new User("chen", 23), new User("hao", 16
 List<User> userList = userDao.getAll();
 ```
 
+## 报错
+
+### Schema export directory is not provided to the annotation processor so we cannot export the schema. You can either provide `room.schemaLocation` annotation processor argument OR set exportSchema to false.
+
+1、报错`Schema export directory is not provided to the annotation processor so we cannot export the schema. You can either provide `room.schemaLocation` annotation processor argument OR set exportSchema to false.`
+> 给Entity加上属性
+```java
+@Database(entities = {User.class}, version = 1, exportSchema = false)
+public abstract class AppDatabase extends RoomDatabase
+{
+  // 省略
+}
+```
+
+### Cannot access database on the main thread since it may potentially lock the UI for a long period of time.
+
+1、报错`Cannot access database on the main thread since it may potentially lock the UI for a long period of time.`
+> 不能在主线程访问db
+```java
+// 开启子线程访问db
+```
+
+### UNIQUE constraint failed: User.account (code 1555 SQLITE_CONSTRAINT_PRIMARYKEY)
+
+1、报错`UNIQUE constraint failed: User.account (code 1555 SQLITE_CONSTRAINT_PRIMARYKEY)`
+> 插入了键值相同的实体，避免做出这样的操作。
+
 ## 详细教程
 
 1、Room不允许在主线程中访问数据库，除非在buid的时候使用allowMainThreadQueries()方法
@@ -287,7 +314,203 @@ public class Book
 
 ### 嵌套对象
 
+11、嵌套对象，User实体的字段为其他类型的对象
+> 地址Address
+```java
+@Entity
+public class Address {
+    String name;
+    String address;
+
+    public Address(String name, String address) {
+        this.name = name;
+        this.address = address;
+    }
+
+  // xxx
+}
+```
+> User中通过`@Embedded`在内部嵌套对象
+```java
+@Entity
+public class User{
+    @NonNull
+    @PrimaryKey
+    String account;
+    String password;
+    String name;
+    int age;
+    String headurl;
+
+    @Embedded(prefix = "address")
+    Address address;
+
+    public User(){
+
+    }
+
+    public User(String name, String account, String password, int age, String headUrl, Address address) {
+        this.name = name;
+        this.account = account;
+        this.password = password;
+        this.age = age;
+        this.headurl = headUrl;
+        this.address = address;
+    }
+}
+
+```
+
+12、如果嵌套的对象的字段名重复怎么办?
+> 1. 使用`@Embedded(prefix = "address")`在前面加上前缀，避免冲突
+
+## Daos
+
+1、Dao类是Room的重要组件，该类提供了所有操作数据库的方法
+
+### 插入`@Insert`
+
+1、`@Insert注解`用于将所有参数插入到数据库中
+```java
+@Dao
+public interface MyDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    public void insertUsers(User... users);
+
+    @Insert
+    public void insertBothUsers(User user1, User user2);
+
+    @Insert
+    public void insertUsersAndFriends(User user, List<User> friends);
+}
+```
+
+2、`@Insert注解的onConflict `的作用
+> 1. 用于指定放生冲突时的`策略`
+> 1. 当`@Index的unique属性为true时`，发生冲突因为默认策略是`OnConflictStrategy.ABORT`会直接崩溃
+> 1. 使用`OnConflictStrategy.REPLACE`能替换老数据
+> 1. [SQLite冲突策略](https://sqlite.org/lang_conflict.html)
+
+
+3、`@Insert`方法的返回值
+```java
+    @Insert
+    long insert(User user);
+    Long insert(User user);
+
+    @Insert
+    List<Long> insert(List<User> users);
+    List[] insert(List<User> users);
+```
+> 1. 插入单个实体，返回`新条目的行id`
+> 1. 插入一组实体，返回`新条目的行id的集合`
+
+### 更新`@Update`
+
+1、`@Update注解`进行数据更新(主键相同)
+```java
+@Dao
+public interface MyDao {
+    @Update
+    public void updateUsers(User... users);
+}
+```
+
+### 删除`@Delete`
+
+1、`@Delete注解`进行数据删除(主键相同)
+```java
+@Dao
+public interface MyDao {
+    @Delete
+    public void deleteUsers(User... users);
+}
+```
+
+### 查询`@Query`
+
+1、`@Query`能进行数据的查询
+> 1. `@Query`的值为SQL语句，可以被SQLite执行。
+> 1. `@Query`支持查询语句，删除语句和更新语句，不支持插入语句。
+```java
+@Dao
+public interface MyDao {
+    @Query("SELECT * FROM user")
+    public User[] loadAllUsers();
+}
+```
+
+#### 参数
+
+2、`@Query`的value中支持添加绑定参数
+> `:minAge`对应于方法的参数`int minAge`
+```java
+@Dao
+public interface MyDao {
+//传入单个参数
+    @Query("SELECT * FROM user WHERE age > :minAge")
+    public User[] loadAllUsersOlderThan(int minAge);
+}
+```
+
+3、允许传入多个参数，或者多次引用相同的参数
+```java
+@Dao
+public interface MyDao {
+  // 1. 多个参数
+    @Query("SELECT * FROM user WHERE age BETWEEN :minAge AND :maxAge")
+    public User[] loadAllUsersBetweenAges(int minAge, int maxAge);
+
+  // 2. 多次引用相同的参数
+    @Query("SELECT * FROM user WHERE first_name LIKE :search "
+           + "OR last_name LIKE :search")
+    public List<User> findUserWithName(String search);
+}
+```
+
+4、Room允许传入一个参数集合
+```java
+@Dao
+public interface MyDao {
+    @Query("SELECT first_name, last_name FROM user WHERE region IN (:regions)")
+    public List<NameTuple> loadUsersFromRegions(List<String> regions);
+}
+```
+
+####
+
+## RxJava
+
+## 类型转换器
+
+## 数据库升级
+
+1、数据库升级是在新增表或者修改原来的结构时所需要的
+> 1. Room提供了 Migration 类用于迁移数据库
+> 1. 每一个 Migration 需要在构造函数里指定开始版本和结束版本
+> 1. 在运行时，Room会按照提供版本的顺序顺序执行每个Migration的migrate()方法，将数据库升级到最新的版本。
+```java
+Room.databaseBuilder(getApplicationContext(), MyDb.class, "database-name")
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build();
+
+static final Migration MIGRATION_1_2 = new Migration(1, 2) {
+    @Override
+    public void migrate(SupportSQLiteDatabase database) {
+        database.execSQL("CREATE TABLE `Fruit` (`id` INTEGER, "
+                + "`name` TEXT, PRIMARY KEY(`id`))");
+    }
+};
+
+static final Migration MIGRATION_2_3 = new Migration(2, 3) {
+    @Override
+    public void migrate(SupportSQLiteDatabase database) {
+        database.execSQL("ALTER TABLE Book "
+                + " ADD COLUMN pub_year INTEGER");
+    }
+};
+```
 
 ## 参考资料
 
 1. [Android Room使用](https://www.jianshu.com/p/7354d5048597)
+1. [SQLite冲突策略](https://sqlite.org/lang_conflict.html)
