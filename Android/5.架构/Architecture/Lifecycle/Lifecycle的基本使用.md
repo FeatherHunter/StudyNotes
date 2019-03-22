@@ -1,15 +1,14 @@
-转载请注明链接: https://blog.csdn.net/feather_wch/article/details/88630095
 
+转载请注明链接: https://blog.csdn.net/feather_wch/article/details/88630095
 > 谷歌的架构组件 Lifecycle的基本使用
 
 # Lifecycle的基本使用
 
-版本号:2019-03-17(23:00)
+版本号:2019-03-22(11:00)
 
 ---
 
 [toc]
-
 ## 简介
 
 1、Lifecycle组件是在其他组件的生命周期状态发生改变时，产生相应行为的一种组件。
@@ -192,6 +191,7 @@ public class MyLocation implements LifecycleObserver {
 1、LifecycleOwner的作用?
 > 1. 一个接口
 > 1. 具有方法`getLifecycle()`，例如Activity就可以通过该方法，获取到Lifecycle
+> 1. `getLifecycle()`的内部返回的是`LifecycleRegistry`，通过`LifecycleRegistry`处理不同的状态。
 
 2、如何监控整个app的生命周期?
 > 1. 使用`ProcessLifecycleOwner`
@@ -229,6 +229,7 @@ public class MyLocation implements LifecycleObserver {
 ### 自定义LifecycleOwner
 
 6、要自定义LifecycleOwner需要借助LifecycleRegistry
+> 就是通过`LifecycleRegistry的markState()`进行状态的切换
 > 自定义Activity
 ```java
 public class MyActivity extends Activity implements LifecycleOwner {
@@ -255,6 +256,12 @@ public class MyActivity extends Activity implements LifecycleOwner {
     }
 }
 ```
+
+### LifecycleRegistry
+
+7、LifecycleRegistry是什么?
+> 1. Lifecycle的实现类
+> 1. 通过`makeState()`方法进行状态的切换
 
 ## 实践要点
 
