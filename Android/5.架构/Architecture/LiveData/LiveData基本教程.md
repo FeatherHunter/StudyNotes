@@ -1,13 +1,14 @@
+
+
 转载请注明链接: https://blog.csdn.net/feather_wch/article/details/88648559
 
 # LiveData基本教程
 
-版本号:2019-03-19(00:30)
+版本号:2019-03-22(11:30)
 
 ---
 
 [toc]
-
 ## 简介
 
 1、LiveData的简介
@@ -68,7 +69,7 @@
 
 ### 创建LiveData对象
 
-1、创建LiveData对象
+2、创建LiveData对象
 > 1. `LiveData`能用来包裹所有数据，包括实现了`Collections`的对象，例如List
 > 1. `LiveData`通常存储在`ViewModel`之中, 并通过`get方法`来获取
 ```java
@@ -93,18 +94,18 @@ public class UserViewModel extends ViewModel {
 
 ```
 
-2、为什么将LiveData放置到ViewModel中，而不放到activity或者fragment中？
+3、为什么将LiveData放置到ViewModel中，而不放到activity或者fragment中？
 > 1. 避免fragment和activity的代码臃肿
 > 1. 将`LiveData`和特定的activity/fragment解耦，能够在configuration改变的时候，LiveData依然存活。
 
 ### 观察LiveData对象
 
-1、在App组件的哪个生命周期适合观察LiveData对象？为什么？
+4、在App组件的哪个生命周期适合观察LiveData对象？为什么？
 > 1. app组件的`onCreate()`方法
 > 1. 不适合在`onResume()`等方法中，可能会调用多次
 > 1. 能确保组件能尽可能快的展示出数据。只要app组件处于启动状态(STARTED)就会立即接收到`LiveData对象`中的数据---前提是已经监听了LiveData
 
-2、监听LiveData实例
+5、监听LiveData实例
 ```java
 public class DataBindingActivity extends AppCompatActivity {
 
@@ -137,7 +138,7 @@ public class DataBindingActivity extends AppCompatActivity {
 ```
 
 
-3、ViewModelProviders为什么找不到?
+6、ViewModelProviders为什么找不到?
 > 1. 引用的版本太老了，需要新的Lifecyle扩展库(目前可以用的最新版)
 > android.arch.lifecycle
 ```
@@ -155,9 +156,9 @@ public class DataBindingActivity extends AppCompatActivity {
 
 ### 更新LiveData对象
 
-1、MutableLiveData类自动提供`setValue(T)、postValue(T)`用于更新值
+7、MutableLiveData类自动提供`setValue(T)、postValue(T)`用于更新值
 
-2、更新LiveData对象实例
+8、更新LiveData对象实例
 ```java
 button.setOnClickListener(new OnClickListener() {
     @Override
@@ -170,7 +171,7 @@ button.setOnClickListener(new OnClickListener() {
 > 1. 调用`setValue()或者postValue()`都会调用所有观察者的`onChanged()`方法
 
 ### Room使用LiveData
-3、Room数据持久化库，支持`observable查询`
+9、Room数据持久化库，支持`observable查询`
 > 1. 该查询能返回`LiveData对象`
 > 1. Observable查询是`DAO-Database Access Object`的一部分
 > 1. Room自动生成所有更新`LiveData对象`所需要的代码(当数据库更新的时候)
@@ -269,7 +270,7 @@ LiveData<String> userName = Transformations.map(userLiveData, user -> {
 
 ### 创造新的transformations
 
-1、可以使用`MediatorLiveData`
+2、可以使用`MediatorLiveData`
 
 ## 合并多个LiveData
 
@@ -282,6 +283,31 @@ LiveData<String> userName = Transformations.map(userLiveData, user -> {
 >     1. 和本地数据库关联的LiveData
 >     1. 和网络数据关联的LiveData
 > 1. Activity只需要观察`MediatorLiveData`对象，就能接收到来自两个数据源的更新
+
+## LiveData与Lifecycle
+
+1、为什么LiveData能作为生命感知组件
+```java
+mUserViewModel.getUserListLiveData().observe(ArchActivity.this, new Observer<List<User>>()
+        {
+            @Override
+            public void onChanged(@Nullable List<User> users)
+            {
+                for (User user : users)
+                {
+                    Log.d("mvvm", "name = " + user.getName() + " age = " + user.getAge());
+                }
+            }
+        });
+```
+> 1. `LiveData的observe()`会将`Observer观察者`包装成`LifecycleObserver`
+> 1. 让`Activity、Fragment`这些LifecycleOwner对这些观察者进行注册
+> 1. 当Activity、Fragment的生命周期改变时，去通知LiveData，作相应处理
+
+
+2、为什么LiveData只会在观察者的生命周期处于活跃状态时，才去通知观察者更新UI
+> 1. LiveData对Activity、Fragment的生命周期进行了感知
+> 1. 当LifecycleOwner的生命周期改变时，会通知LiveData
 
 ## 参考资料
 1. [LiveData](https://developer.android.google.cn/topic/libraries/architecture/livedata)
