@@ -1,8 +1,10 @@
+
+
 转载请注明链接: https://blog.csdn.net/feather_wch/article/details/88667037
 
 #  ViewModel基本教程
 
-版本号:2019-03-19(22:30)
+版本号:2019-03-22(11:30)
 
 ---
 
@@ -157,6 +159,15 @@ public class DetailFragment extends Fragment {
 > 1. `ViewModel`确保在设备配置改变时，数据依然存在
 > 1. `Room`在数据库改变时通知`LiveData`
 > 1. `LiveData`察觉到改变时，通知UI更新相应的数据
+
+## 知识扩展
+
+### Fragment的setRetainInstance
+
+1、通过Fragment的setRetainInstance(true)实现Configuration Changes时，数据依然存活的特性。
+> 1. Fragment调用setRetainInstance(true)后，Fragment实例在配置改变如屏幕旋转后依旧存活
+> 1. 不会再触发onCreate
+> 1. 其他的如onAttach()、onActivityCreated()依旧会触发
 
 ## 参考资料
 
