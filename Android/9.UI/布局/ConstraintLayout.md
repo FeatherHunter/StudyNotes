@@ -1,9 +1,9 @@
 
 转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79585647
 
-# ConstraintLayout
+# ConstraintLayout实例讲解
 
-版本: 2019/3/21(23:47)
+版本: 2019/3/22(8:10)
 
 ---
 
@@ -942,6 +942,149 @@ public class ConstraintLayoutActivity extends AppCompatActivity {
 3、TransitionManager.beginDelayedTransition():的作用
 > 通过新旧scene的变化，简单实现了动画效果
 
+4、TransitionManager如何自定义动画效果
+```java
+AutoTransition autoTransition = new AutoTransition();
+autoTransition.setDuration(1000);
+TransitionManager.beginDelayedTransition(mConstraintLayout, autoTransition);
+```
+
+
+### 实战
+
+1、ConstraintLayout动画的优势是什么？
+> 1. 代码简洁，容易实现
+> 1. ConstriantLayout因为有Guildelide、Barrier、Chaines等特性，动画效果很强
+
+2、使用两个几乎相同的布局是否导致了xml文件的重复?
+> 1. 使用两个xml，能够改写除了id之外的很多属性，比如大小、TextSize、visibility等等
+> 1. 如果不想重复，`可以代码中借助ConstraintSet动态调整控件的位置`
+
+3、ConstraintLayout做动画效果的注意点！
+> * CL只会在直接子View上做动画。
+>     1. 嵌套的子View需要代码手动处理
+>     1. 使用ConstraintLayout作为嵌套的布局
+>     1. 不要嵌套，一层搞定
+> * CL只会做布局改变的动画,ConstraintSet会将布局/约束之外的改变丢弃掉
+> * 代码中动态改变View的属性，CL做动画时不会将这些考虑到内，只会在原始状态和新状态间变换
+
+1、借助ConstraintSet和TransitionManager做出一个ImageView的上下变换
+> 1-思路是两个内部控件一致的布局，但是位置不同。借助ConstraintSet和TransitionManager进行动画效果
+> 2-布局:activity_constraint_layout
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/constraintlayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/imageview"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:src="@drawable/ic_launcher_foreground"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"/>
+
+    <Button
+        android:id="@+id/vertical_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="垂直布局"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintRight_toLeftOf="@+id/horizontal_btn"/>
+
+
+    <Button
+        android:id="@+id/horizontal_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="水平布局"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toRightOf="@+id/vertical_btn"/>
+
+</android.support.constraint.ConstraintLayout>
+```
+> 3-布局2:activity_veritical_layout
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<android.support.constraint.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/imageview"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:src="@drawable/ic_launcher_foreground"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"/>
+
+    <Button
+        android:id="@+id/vertical_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="垂直布局"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintRight_toLeftOf="@+id/horizontal_btn"/>
+
+
+    <Button
+        android:id="@+id/horizontal_btn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="水平布局"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toRightOf="@+id/vertical_btn"/>
+
+</android.support.constraint.ConstraintLayout>
+```
+> 4-动画
+```java
+public class ConstraintLayoutActivity extends AppCompatActivity {
+    ConstraintLayout mConstraintLayout;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_constraint_layout);
+
+        mConstraintLayout = findViewById(R.id.constraintlayout);
+
+        ConstraintSet constraintSet1 = new ConstraintSet();
+        ConstraintSet constraintSet2 = new ConstraintSet();
+        constraintSet1.clone(this, R.layout.activity_constraint_layout);
+        constraintSet2.clone(this, R.layout.activity_veritical_layout);
+
+        // 1. 转换为垂直的布局
+        findViewById(R.id.vertical_btn).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                TransitionManager.beginDelayedTransition(mConstraintLayout);
+                constraintSet2.applyTo(mConstraintLayout);
+            }
+        });
+        // 2. 转换为水平的布局
+        findViewById(R.id.horizontal_btn).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                TransitionManager.beginDelayedTransition(mConstraintLayout);
+                constraintSet1.applyTo(mConstraintLayout);
+            }
+        });
+    }
+}
+```
+
 ## 7-优化Optimizer(1.1.x)
 
 1、通过`app:layout_optimizationLevel`能开启优化，参数如下
@@ -955,6 +1098,25 @@ app:layout_optimizationLevel="none | standard | direct | barrier | chain | demen
 > 1. chain: 优化chains约束
 > 1. demensions: 优化维度测量，减少匹配约束元素的度量数量
 
+## ConstraintLayout 2.0
+
+## ConstraintHelper
+
+## Linear Helper
+
+## Flow
+
+## Post Layout effects
+
+### Layers
+
+## Circular Reveal
+
+## Decorators
+
+## Bottom Panel Decorator
+
+## ConstraintSet
 
 ## 8-实战
 
@@ -1055,3 +1217,4 @@ app:layout_optimizationLevel="none | standard | direct | barrier | chain | demen
 1. [官方: ConstraintLayout](https://codelabs.developers.google.com/codelabs/constraint-layout/index.html)
 1. [解析ConstraintLayout的性能优势](https://mp.weixin.qq.com/s/gGR2itbY7hh9fo61SxaMQQ)
 1. [Beautiful animations using Android ConstraintLayout](https://robinhood.engineering/beautiful-animations-using-android-constraintlayout-eee5b72ecae3)
+1. [New Features in ConstraintLayout 2.0](http://androidkt.com/new-features-in-constraintlayout-2-0/)
