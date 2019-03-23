@@ -3,7 +3,7 @@
 
 # DataBinding的基本使用
 
-版本号:2019-03-20(0:20)
+版本号:2019-03-23(13:20)
 
 ---
 
@@ -975,6 +975,19 @@ String subtitle = getResources().getQuantityString(
         R.plurals.subtitle_plural,  // 1. 文本id
         1,   // 2. 数量，对应于"zero"、"two"等等
         1);  // 3. 填充占位符的内容
+```
+
+### gradlew进行报错定位
+
+1、在项目根目录(有gradlew)的目录下执行:
+```
+./gradlew compileDebugJavaWithJavac
+```
+> 输出信息：就定位到了目标真正错误的地方
+```
+F:\Project\FeatherLogin\app\src\main\java\com\hao\featherlogin\User.java:11: 错误: Entities and Pojos must have a usable public constructor. You can have an empty constructor or a constructor whose parameters match the fields (by name and type).
+......
+......
 ```
 
 ## 问题汇总
