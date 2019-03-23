@@ -5,7 +5,7 @@ BroadcastReceiver的基本知识和原理详解。
 >本文是我一点点归纳总结的干货，但是难免有疏忽和遗漏，希望不吝赐教。
 
 # BroadcastReceiver详解
-版本：2018/9/1-1(18:16)
+版本：2019/3/1-1(18:16)
 
 ---
 
@@ -34,7 +34,7 @@ BroadcastReceiver的基本知识和原理详解。
 
 4、有序广播是什么？
 >1. 调用`sendOrderedBroadcast()`发送
->2. 广播接收者会按照`priority优先级`从大到校进行排序
+>2. 广播接收者会按照`priority优先级`从大到小进行排序
 >3. `优先级`相同的广播，`动态注册`的广播优先处理
 >4. 广播接收者还能对`广播`进行`截断和修改`
 
@@ -50,10 +50,10 @@ BroadcastReceiver的基本知识和原理详解。
 
 6、BroadcasReceiver和LocalBroadcastReceiver
 >1. `BroadcasReceiver`是跨应用广播，利用`Binder机制`实现。
->2. `LocalBroadcastReceiver`是`应用内广播`，利用`Handler`实现。利用`IntentFilter`的`match`功能，提供消息的发布与接收，实现应用内通信，效率较高。
+>2. `LocalBroadcastReceiver`是`应用内广播`，利用`Handler`实现。利用`IntentFilter`的`match`功能，提供消息的发布与接收，实现应用内通信，效率较高。只支持动态注册
 
 7、本地广播的优点
->1. 效率更改。
+>1. 效率更高。
 >2. 发送的广播不会离开我们的应用，不会泄露关键数据。
 >3. 其他程序无法将广播发送到我们程序内部，不会有安全漏洞。
 
