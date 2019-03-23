@@ -2,7 +2,7 @@
 
 #  Room和RxJava
 
-版本号:2019-03-23(14:30)
+版本号:2019-03-23(16:30)
 
 ---
 
@@ -173,14 +173,21 @@ Maybe<User> getUserById(String userId);
 
 
 11、Flowable/Observable的使用实例
+> 查询用户信息
 ```java
         Flowable<User> userFlowable = userDao.findUserByAccount(account);
         userFlowable.subscribe(new Subscriber<User>() {
             @Override
             public void onSubscribe(Subscription s) {
                 Logger.d(s);
+                /**===========================
+                 *  1. 上游发送65535个数据, 非常重要(不写或者数值低，都会导致后面接不到数据)
+                 *  2. 调用该方法才会触发下游的onNext()
+                 *===============================*/
+                s.request(Integer.MAX_VALUE);
             }
 
+            // 后续每次数据更新都会触发该onNext
             @Override
             public void onNext(User user) {
                 Logger.d(user);
