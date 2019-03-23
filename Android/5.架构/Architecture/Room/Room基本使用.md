@@ -4,7 +4,7 @@
 
 #  Room基本使用
 
-版本号:2019-03-23(1:30)
+版本号:2019-03-23(15:30)
 
 ---
 
@@ -167,7 +167,7 @@ public abstract class AppDatabase extends RoomDatabase
 
 ### Cannot access database on the main thread since it may potentially lock the UI for a long period of time.
 
-1、报错`Cannot access database on the main thread since it may potentially lock the UI for a long period of time.`
+2、报错`Cannot access database on the main thread since it may potentially lock the UI for a long period of time.`
 > 不能在主线程访问db
 ```java
 // 开启子线程访问db
@@ -175,8 +175,13 @@ public abstract class AppDatabase extends RoomDatabase
 
 ### UNIQUE constraint failed: User.account (code 1555 SQLITE_CONSTRAINT_PRIMARYKEY)
 
-1、报错`UNIQUE constraint failed: User.account (code 1555 SQLITE_CONSTRAINT_PRIMARYKEY)`
+3、报错`UNIQUE constraint failed: User.account (code 1555 SQLITE_CONSTRAINT_PRIMARYKEY)`
 > 插入了键值相同的实体，避免做出这样的操作。
+
+### Please provide the necessary Migration path via RoomDatabase.Builder.addMigration(Migration ...) or allow for destructive migrations via one of the RoomDatabase.Builder.fallbackToDestructiveMigration* methods.
+
+4、报错` or allow for destructive migrations via one of the RoomDatabase.Builder.fallbackToDestructiveMigration* methods.`
+>
 
 ## 详细教程
 
@@ -189,11 +194,11 @@ Room.databaseBuilder(context.getApplicationContext(), AppDatabase.class, "user.d
 
 ### Entity
 
-1、Room默认使用`类名`作为`表名`，`字段名`作为`列名`
+2、Room默认使用`类名`作为`表名`，`字段名`作为`列名`
 
 ### 忽略字段
 
-2、`@Ignore`注解不希望存储的字段
+3、`@Ignore`注解不希望存储的字段
 ```java
 @Ignore
 Bitmap picture;
@@ -201,7 +206,7 @@ Bitmap picture;
 
 ### 列名自定义
 
-3、`@ColumnInfo`自定义列名
+4、`@ColumnInfo`自定义列名
 ```java
 @ColumnInfo(name = "name")
 private String mName;
@@ -209,7 +214,7 @@ private String mName;
 
 ### 主键
 
-4、`@PrimaryKey`指定主键
+5、`@PrimaryKey`指定主键
 ```java
 @PrimaryKey
 private int uid;
@@ -219,7 +224,7 @@ private int uid;
 ```
 
 #### 复合主键
-5、`@Entity的primaryKeys`指定复合主键
+6、`@Entity的primaryKeys`指定复合主键
 ```java
 @Entity(primaryKeys = {"name", "age"})
 public class User
@@ -233,12 +238,12 @@ public class User
 
 ### 索引
 
-6、索引有什么用?
+7、索引有什么用?
 > 1. 可以加快查找速度
 > 1. 当`表的更新和插入较为频繁时`，`不适合建立索引`
 
 
-7、`@Entity的indices`可以建立索引
+8、`@Entity的indices`可以建立索引
 ```java
 @Entity(indices = {@Index("name"), @Index(value = {"age", "address"})})
 public class User
@@ -254,7 +259,7 @@ public class User
 
 #### 索引唯一性
 
-8、`@Entity的indices中使用unique`可以保证多个字段形成的组，不会同时具有相同的数据
+9、`@Entity的indices中使用unique`可以保证多个字段形成的组，不会同时具有相同的数据
 > 两个User的年龄和地址不能同时相同
 ```java
 @Entity(indices = {@Index(value = {"age", "address"}, unique = true)})
@@ -271,7 +276,7 @@ public class User
 
 ### 关系
 
-9、Room禁止使用直接关系，但可以在两个实体之间定义`外键`
+10、Room禁止使用直接关系，但可以在两个实体之间定义`外键`
 > 1. User的id和Book的user_id具有关系
 ```java
 @Entity
@@ -295,7 +300,7 @@ public class Book
 
 ```
 
-10、外键有什么用?
+11、外键有什么用?
 > 1. 例如当`删除了一个user`后，具有相同`user_id`的`book也会全部删除`
 > 1. `@ForeignKey的onDelete需要为CASCADE`
 ```java
@@ -314,7 +319,7 @@ public class Book
 
 ### 嵌套对象
 
-11、嵌套对象，User实体的字段为其他类型的对象
+12、嵌套对象，User实体的字段为其他类型的对象
 > 地址Address
 ```java
 @Entity
@@ -361,7 +366,7 @@ public class User{
 
 ```
 
-12、如果嵌套的对象的字段名重复怎么办?
+13、如果嵌套的对象的字段名重复怎么办?
 > 1. 使用`@Embedded(prefix = "address")`在前面加上前缀，避免冲突
 
 ## Daos
@@ -370,7 +375,7 @@ public class User{
 
 ### 插入`@Insert`
 
-1、`@Insert注解`用于将所有参数插入到数据库中
+2、`@Insert注解`用于将所有参数插入到数据库中
 ```java
 @Dao
 public interface MyDao {
@@ -385,14 +390,14 @@ public interface MyDao {
 }
 ```
 
-2、`@Insert注解的onConflict `的作用
+3、`@Insert注解的onConflict `的作用
 > 1. 用于指定放生冲突时的`策略`
 > 1. 当`@Index的unique属性为true时`，发生冲突因为默认策略是`OnConflictStrategy.ABORT`会直接崩溃
 > 1. 使用`OnConflictStrategy.REPLACE`能替换老数据
 > 1. [SQLite冲突策略](https://sqlite.org/lang_conflict.html)
 
 
-3、`@Insert`方法的返回值
+4、`@Insert`方法的返回值
 ```java
     @Insert
     long insert(User user);
@@ -407,7 +412,7 @@ public interface MyDao {
 
 ### 更新`@Update`
 
-1、`@Update注解`进行数据更新(主键相同)
+5、`@Update注解`进行数据更新(主键相同)
 ```java
 @Dao
 public interface MyDao {
@@ -418,7 +423,7 @@ public interface MyDao {
 
 ### 删除`@Delete`
 
-1、`@Delete注解`进行数据删除(主键相同)
+6、`@Delete注解`进行数据删除(主键相同)
 ```java
 @Dao
 public interface MyDao {
@@ -429,7 +434,7 @@ public interface MyDao {
 
 ### 查询`@Query`
 
-1、`@Query`能进行数据的查询
+7、`@Query`能进行数据的查询
 > 1. `@Query`的值为SQL语句，可以被SQLite执行。
 > 1. `@Query`支持查询语句，删除语句和更新语句，不支持插入语句。
 ```java
@@ -442,7 +447,7 @@ public interface MyDao {
 
 #### 参数
 
-2、`@Query`的value中支持添加绑定参数
+8、`@Query`的value中支持添加绑定参数
 > `:minAge`对应于方法的参数`int minAge`
 ```java
 @Dao
@@ -453,7 +458,7 @@ public interface MyDao {
 }
 ```
 
-3、允许传入多个参数，或者多次引用相同的参数
+9、允许传入多个参数，或者多次引用相同的参数
 ```java
 @Dao
 public interface MyDao {
@@ -468,7 +473,7 @@ public interface MyDao {
 }
 ```
 
-4、Room允许传入一个参数集合
+10、Room允许传入一个参数集合
 ```java
 @Dao
 public interface MyDao {
@@ -477,11 +482,94 @@ public interface MyDao {
 }
 ```
 
-####
+#### 只获取部分字段
 
-## RxJava
+11、很多时候只需要实体的少数几个字段，这时就可以将要获取的列打包取出
+> 1. 这样可以节省资源，并且查询速度更快
+> 1. Room支持将查询的结果映射到返回的字段上
+```java
+// 该类只获取姓名
+public class NameTuple {
+    @ColumnInfo(name="first_name")
+    public String firstName;
+
+    @ColumnInfo(name="last_name")
+    public String lastName;
+}
+```
+> 获取部分字段
+```java
+@Dao
+public interface MyDao {
+    @Query("SELECT first_name, last_name FROM user")
+    public List<NameTuple> loadFullName();
+}
+```
+
+#### RxJava
+
+12、Room支持返回RxJava2的`Plubisher`和`Flowable`对象
+```java
+@Dao
+public interface MyDao {
+    @Query("SELECT * from user where id = :id LIMIT 1")
+    public Flowable<User> loadUserById(int id);
+}
+```
+
+#### Cursor
+
+13、Room可以直接返回Cursor对象
+```java
+@Dao
+public interface MyDao {
+    @Query("SELECT * FROM user WHERE age > :minAge LIMIT 5")
+    public Cursor loadRawUsersOlderThan(int minAge);
+}
+```
+
+#### 多表查询
+
+14、Room中的多表查询
+```java
+@Dao
+public interface MyDao {
+    @Query("SELECT * FROM book "
+           + "INNER JOIN loan ON loan.book_id = book.id "
+           + "INNER JOIN user ON user.id = loan.user_id "
+           + "WHERE user.name LIKE :userName")
+   public List<Book> findBooksBorrowedByNameSync(String userName);
+}
+```
 
 ## 类型转换器
+
+1、Room支持字符串和基本数据类型的存储，但是如果不是基本类型，就需要`类型转换器`
+> 1. User对象有个Date类型的字段birthday
+> 1. 利用`@TypeConverter`可以将不可存储的类型转换为可以存储的类型
+>
+> 转换器
+```java
+public class Converters {
+    @TypeConverter
+    public static Date fromTimestamp(Long value) {
+        return value == null ? null : new Date(value);
+    }
+
+    @TypeConverter
+    public static Long dateToTimestamp(Date date) {
+        return date == null ? null : date.getTime();
+    }
+}
+```
+> Room使用转换器: `@TypeConverters`将转换器添加到`AppDatabase`上
+```java
+@Database(entities = {User.java}, version = 1)
+@TypeConverters({Converter.class})
+public abstract class AppDatabase extends RoomDatabase {
+    public abstract UserDao userDao();
+}
+```
 
 ## 数据库升级
 
@@ -509,6 +597,12 @@ static final Migration MIGRATION_2_3 = new Migration(2, 3) {
     }
 };
 ```
+
+## 知识扩展
+
+### Cursor
+
+1、Android中Cursor是什么？
 
 ## 参考资料
 
