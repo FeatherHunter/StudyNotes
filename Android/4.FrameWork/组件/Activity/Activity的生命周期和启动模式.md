@@ -4,7 +4,7 @@
 
 # Activity的生命周期和启动模式
 
-版本:2018/9/28-1(0:30)
+版本:2019/3/25-1(0:30)
 
 ---
 
@@ -37,7 +37,7 @@
 > 1. 在当前Activity上面有个Dialog，并且退出Dialog
 > 1. Activity先执行`onPause()`处于可见、不可交互，然后回到`onResume()`进入可交互状态。
 
-3、什么情况下会执行：onStop()->onRestart()->onResume()
+3、什么情况下会执行：onStop()->onRestart()->onStart()
 > 1. 从新的Activity返回到当前Activity时
 > 1. 切换到桌面，又切换回当前Activity。
 
