@@ -4,11 +4,15 @@
 
 # Activity的生命周期和启动模式
 
-版本:2019/3/25-1(0:30)
+版本:2019/3/25-1(1:30)
 
 ---
 
 [toc]
+
+
+![高效学习-Activity](https://github.com/FeatherHunter/StudyNotes/blob/master/assets/android/learn_more/activity_learn_more.jpg?raw=true)
+
 ## 四种状态(1)
 
 1、Activity的四种状态
