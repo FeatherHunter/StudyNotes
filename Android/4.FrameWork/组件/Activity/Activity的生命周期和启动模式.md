@@ -1,14 +1,17 @@
+
+
+
+
 转载请注明链接：http://blog.csdn.net/feather_wch/article/details/79279307
 
 # Activity的生命周期和启动模式
 
-版本:2019/3/25-1(18:30)
+版本:2019/3/26-1(11:30)
 
 ---
 
 [toc]
-
-## 四种状态(1)
+## 四种状态(2)
 
 1、Activity的四种状态
 |形态|介绍|
@@ -18,7 +21,14 @@
 |`stopped`|被另一个`Activity`完全覆盖, `不可见`, 保持状态信息和成员变量|
 |`killed`|被`System`回收|
 
-## 生命周期(19)
+2、Activity的四种状态是如何切换的?
+> * Activity的生命周期，本质就是四种状态的来回切换
+> 1. onStart()/onResume，会将状态切换到`active/running状态`
+> 1. onPause()，会将状态从`active/running状态`切换到`pause状态`
+> 1. onStop(), 会将状态从`pause状态`切换到`stop状态`
+> 1. onPause()/onStop()->onStart()/onResume, 会将状态从`pause/stop状态`切换到`active/running状态`
+
+## 生命周期(20)
 
 1、为什么要有生命周期?
 > 1. 能在Activity处于不同状态时，做最合适的工作。
@@ -118,23 +128,31 @@ Note left of activity1: 直接执行onResume()
 > 1. onPause中进行耗时操作，会导致打开第二个Activity较慢
 > 1. 【结合项目经验】遇到一个Activity启动就是很慢，后面定位到是前一个Activity的onPause()有耗时操作
 
-14、onStart和onStop决定了是否可见?
+14、“onStart是可见不可交互、onResume是可见可交互”的说法是否正确?
+> 1. 不准确
+> 1. onStart()之后会立即调用onResume()
+> 1. onResume()调用之后，调用了`addView()并且serVisibile()`，此时Activity才真正可见。
+> 1. 因此`onStart()、onResume()`回调时，都处于不可见状态。
 
-15、onPause和onResume决定了是否可交互?
+15、onStart和onStop决定了是否可见?
+> NO，不准确
 
-16、内存不足Activity被释放，onPause和onStop都一定会执行?onDstory不一定执行?
+16、onPause和onResume决定了是否可交互?
+> NO，不准确
+
+17、内存不足Activity被释放，onPause和onStop都一定会执行?onDstory不一定执行?
 > 1. onPause一定执行
 > 1. onStop不一定
 > 1. onDestory一定不执行
 
 ### 源码分析
 
-17、Activity和AMS之间关于生命周期的机制
+18、Activity和AMS之间关于生命周期的机制
 >1. 启动`Activity`的请求会由`Instrumentation`处理，会通过`Binder`向`AMS`发送请求
 > 2. `AMS`内部维护着一个`ActivityStack`并负责栈内的`Activity`的状态同步
 > 3. `AMS`通过`ActivityThread`去同步`Activity`的状态从而完成`生命周期`方法的调用。
 
-18、ActivityStack的resumeTopActivityInnerLocked()
+19、ActivityStack的resumeTopActivityInnerLocked()
 ```java
     //ActivityStack.java
     private boolean resumeTopActivityInnerLocked(ActivityRecord prev, ActivityOptions options) {
@@ -149,7 +167,7 @@ Note left of activity1: 直接执行onResume()
     }
 ```
 
-19、启动新Activity的大致流程
+20、启动新Activity的大致流程
 > 1. `ActivityStack`会先执行栈顶Activity的`onPause`，之后才会执行启动新Activity
 > 2. 在`ActivityStackSupervisor`的`realStartActivityLocked()`会调用`app.thread.scheduleLauchActivity()`进行新Activity的启动
 > 3. 最终会调用`ActivityThread`中的`handleLauchActivity()`
@@ -530,7 +548,7 @@ public FragmentState(Fragment frag) {
 |缺点2|数据的保存/恢复和Activity代码耦合|||
 |优点||数据和UI代码分离|数据持久|
 
-## 进程优先级(4)
+## 进程优先级(5)
 
 1、为什么Android中进程要分优先级?
 > 在系统资源不足时，根据优先级进行合理的资源调度，释放优先级低的进程
@@ -552,6 +570,9 @@ public FragmentState(Fragment frag) {
 4、用户在操作一个Activity，该Activity进程正在和另一个进程的Service交互，这个Service所属的进程是属于哪个级别的?
 > 处于前台进程
 
+5、Activity的前台还是后台如何区分?
+> 1. Activity本身没有前台/后台相关的状态
+> 1. Activity所处的任务栈是前台的，Activity就是前台的
 
 ## Configuration Changes(8)
 
