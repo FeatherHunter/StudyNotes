@@ -364,6 +364,61 @@ private PackageManager mPackageManager;
 
 #### Context的创建
 
+##### Activity
+
+1、启动Activity的过程中创造Activity所属的Context
+> 1. ActivityThread的performLaunchActivity，构造ContextImpl
+> 2. 利用ContextImpl的createActivityContext()构造ContextImpl对象，本质就是用ContextImpl新增的五个重要字段赋值：ClassLoader、activityToken、主线程ActivityThread、Resources、LoadedApk
+> 3. 让ContextImpl持有Activity的引用
+> 4. Activity.attach()方法中通过ContextWrapper新增attachBaseContext()方法，让内部的mBase持有ContextImpl的引用
+```java
+    // ActivityThread.java-创建ContextImpl，ContextImpl内部持有Activity，Activity内部的mBase持有ContextImpl(继承自ContextThemeWrapper <- ContextWrapper)
+    private Activity performLaunchActivity(ActivityClientRecord r, Intent customIntent) {
+        // ......
+        // 1. 创建一个ContextImpl对象
+        ContextImpl appContext = createBaseContextForActivity(r);
+        // 2.
+        appContext.setOuterContext(activity);
+        activity.attach(appContext, xxx);
+    }
+
+    // ActivityThread.java-调用ContextImpl静态方法构建属于Activity的Context
+    private ContextImpl createBaseContextForActivity(ActivityClientRecord r) {
+        ContextImpl appContext = ContextImpl.createActivityContext(
+                this, r.packageInfo, r.activityInfo, r.token, displayId, r.overrideConfig);
+        // ....
+        return appContext;
+    }
+
+    // ContextImpl.java-构造出属于Activity的ContextImpl，本质就是给ContextImpl新增的字段赋值。
+    static ContextImpl createActivityContext(ActivityThread mainThread,
+                                             LoadedApk packageInfo, ActivityInfo activityInfo, IBinder activityToken, int displayId,
+                                             Configuration overrideConfiguration) {
+        // 1. 获取到LoadedApk中的ClassLoader
+        ClassLoader classLoader = packageInfo.getClassLoader();
+        if (packageInfo.getApplicationInfo().requestsIsolatedSplitLoading()) {
+            classLoader = packageInfo.getSplitClassLoader(activityInfo.splitName);
+        }
+
+        // 2. 使用mainThread、LoadedApk、activityToken、classLoader构建ContextImpl
+        ContextImpl context = new ContextImpl(null, mainThread, packageInfo, activityInfo.splitName,
+                activityToken, null, 0, classLoader);
+        // 3. 同过ResourcesManager构造出属于Activity的Resources，设置到ContextImpl之中
+        final ResourcesManager resourcesManager = ResourcesManager.getInstance();
+        context.setResources(resourcesManager.createBaseActivityResources(activityToken,
+                packageInfo.getResDir(),
+                splitDirs,
+                packageInfo.getOverlayDirs(),
+                packageInfo.getApplicationInfo().sharedLibraryFiles,
+                displayId,
+                overrideConfiguration,
+                compatInfo,
+                classLoader));
+
+        return context;
+    }
+```
+
 ### 横向拓展
 
 1、getApplication与getApplicationContext有什么区别?
@@ -374,6 +429,8 @@ private PackageManager mPackageManager;
 > 1. ContentProvider本身没有Context，但是其对应的应用肯定有一个自身的ApplicationContext
 
 3、Context和内存泄漏
+
+4、App中有多个Context对象，那么context.getResources()得到的资源是同一份吗
 
 ### 创造性拓展
 
