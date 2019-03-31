@@ -10,12 +10,11 @@ Fragment有这一篇就够了！汲取各路大神精华，亲自从源码剖析
 
 
 # Android Fragment详解
-版本: 2018/9/3-1(20:23)
+版本: 2019/3/30-1(20:23)
 
 ---
 
-[TOC]
-
+[toc]
 ---
 
 
@@ -1042,6 +1041,81 @@ void moveToState(Fragment f, int newState, int transit, int transitionStyle, boo
         }
     }
     ...
+}
+```
+
+## 实战场景
+
+### 预加载首页的所有页面
+
+1、 预加载首页的所有页面
+```java
+// 预加载所有fragment，且只展示第3个Store的Fragment
+loadMultipleFragment(R.id.fl_container, 2, tabsFragment);
+
+// 加载多个Fragment
+private void loadMultipleFragment(int containerId, int showPosition, ArrayList<SupportFragment> targetFragments){
+    // 1. 获取到Fragment的事物
+    FragmentTransaction fragmentTransaction = getChildFragmentManager().beginTransaction();
+    // 2. add所有需要加载的fragment，并将除了需要展示的fragment都进行hide
+    for (int i = 0; i < targetFragments.size(); i++)
+    {
+        SupportFragment fragment = targetFragments.get(i);
+        fragmentTransaction.add(containerId, fragment);
+        if(i != showPosition){
+            fragmentTransaction.hide(fragment);
+        }
+    }
+    fragmentTransaction.commit();
+}
+```
+
+#### 点击底部Button，加载不同的Fragment
+2、点击底部Button，加载不同的Fragment
+```java
+//如果已加载就用show hide方式切换，如果没加载就直接加载新Fragment
+if (findStackFragment(tabsFragment.get(id).getClass(), getChildFragmentManager(), true) != null)
+{
+    // 如果show和hide的Fragment不是同一个
+    getChildFragmentManager().beginTransaction().show(tabsFragment.get(id)).hide(tabsFragment.get(lastPosition)).commit();
+}else{
+    getChildFragmentManager().beginTransaction().add(tabsFragment.get(id))..hide(tabsFragment.get(lastPosition)).commit();
+}
+```
+> 判断目标Fragment是否已经加载
+```java
+// 正常方式: 利用Tag找到该Fragment，但是如果是fragment存在于FragmentPagerAdapter中，这种方式就不准了，需要遍历子childFragment列表
+<T extends SupportFragment> T findStackFragment(Class<T> fragmentClass, FragmentManager fragmentManager, boolean isChild)
+{
+    Fragment fragment = null;
+    if (isChild)
+    {
+        // 如果是 查找子Fragment,则有可能是在FragmentPagerAdapter/FragmentStatePagerAdapter中,这种情况下,
+        // 它们的Tag是以android:switcher开头,所以这里我们使用下面的方式
+        List<Fragment> childFragmentList = fragmentManager.getFragments();
+        if (childFragmentList == null)
+            return null;
+
+        for (int i = childFragmentList.size() - 1; i >= 0; i--)
+        {
+            Fragment childFragment = childFragmentList.get(i);
+            if (childFragment instanceof SupportFragment
+                && childFragment.getClass().getName().equals(fragmentClass.getName()))
+            {
+                fragment = childFragment;
+                break;
+            }
+        }
+    }
+    else
+    {
+        fragment = fragmentManager.findFragmentByTag(fragmentClass.getName());
+    }
+    if (fragment == null)
+    {
+        return null;
+    }
+    return (T) fragment;
 }
 ```
 
