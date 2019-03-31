@@ -144,7 +144,13 @@ public void startActivityForResult(String who, Intent intent, int requestCode, B
 }
 ```
 
-##### 文件、目录
+6、ContentProvider
+```java
+// 获取到ContentProvider的ContentResolver
+public abstract ContentResolver getContentResolver();
+```
+
+##### 数据库、文件、目录
 
 1、数据库相关
 ```java
@@ -189,28 +195,31 @@ public abstract File getDir(String name, @FileMode int mode);
 
 
 
-##### 资源类
+##### 资源类、sp、系统服务
 
 
 1、资源类相关的API
 ```java
 // 1. 返回App包的AssetManager
 public abstract AssetManager getAssets();
+// 2. 获取到Resources-Resources必须要是AssetManager返回的
+public abstract Resources getResources();
+// 3. 获取到主题
+public int getThemeResId() {
+    return 0;
+}
+public abstract Resources.Theme getTheme();
 
-// 2. 获取颜色
+// 4. 获取颜色
 public final int getColor(@ColorRes int id) {
     return getResources().getColor(id, getTheme());
 }
 
-// 3. 获取到ContentProvider的ContentResolver
-public abstract ContentResolver getContentResolver();
-
-// 4. 获取到Drawable
+// 5. 获取到Drawable
 public final Drawable getDrawable(@DrawableRes int id) {
     return getResources().getDrawable(id, getTheme());
 }
-// 5. 获取到Resources-Resources必须要是AssetManager返回的
-public abstract Resources getResources();
+
 
 // 6. String
 public final String getString(@StringRes int resId) {
@@ -221,16 +230,50 @@ public final CharSequence getText(@StringRes int resId) {
     return getResources().getText(resId);
 }
 
-// 8. 获取到
-public int getThemeResId() {
-    return 0;
-}
-public abstract Resources.Theme getTheme();
 
-// 6. SharePreference
-public abstract SharedPreferences getSharedPreferences(String name, @PreferencesMode int mode);
-
+// 8. 墙纸相关都已经废弃
+public abstract Drawable getWallpaper();
+public abstract void setWallpaper(Bitmap bitmap) throws IOException;
 ```
+
+2、SharedPreference
+```java
+// 8. SharePreference
+public abstract SharedPreferences getSharedPreferences(String name, @PreferencesMode int mode);
+```
+
+##### 系统服务
+
+1、获取到系统服务
+```java
+public abstract @Nullable Object getSystemService(@ServiceName String name);
+```
+
+2、可以获取的系统服务有下面
+|Context字符串|系统服务|作用|
+|---|---|---|
+| WINDOW_SERVICE  |android.view.WindowManager   |最顶层的WindowManager可以放置自定义的Windows|
+| LAYOUT_INFLATER_SERVICE  |android.view.LayoutInflater   | 在当前Context中展开布局资源   |
+| ACTIVITY_SERVICE  | android.app.ActivityManager  | 和系统的activity状态进行交互  |
+| POWER_SERVICE  | android.os.PowerManager  | 能量管理  |
+| ALARM_SERVICE   |android.app.AlarmManager   | 在规定的时间点接收到通知(intents)  |
+| NOTIFICATION_SERVICE   | android.app.NotificationManager  | 通知栏，通知用户关于后台的事件   |
+| KEYGUARD_SERVICE   | android.app.KeyguardManager  | 控制键盘保护  |
+| LOCATION_SERVICE   | android.location.LocationManager  | 控制位置更新(Gps)  |
+| SEARCH_SERVICE   | android.app.SearchManager  | 处理搜索  |
+| VIBRATOR_SERVICE   | android.os.Vibrator  | “震动器”  |
+| CONNECTIVITY_SERVICE   | android.net.ConnectivityManager  | 网络连接的管理  |
+| IPSEC_SERVICE  |  android.net.IpSecManager | 管理Socket和Networks的IPSec  |
+| WIFI_SERVICE   |  android.net.wifi.WifiManager | 管理WIFI连接  |
+| WIFI_AWARE_SERVICE   | android.net.wifi.aware.WifiAwareManager  |  管理WIFI的感知发现和连接 |
+| WIFI_P2P_SERVICE  | android.net.wifi.p2p.WifiP2pManager  | 管理WIFI的直接连接  |
+| INPUT_METHOD_SERVICE   | android.view.inputmethod.InputMethodManager  | 管理输入  |
+| UI_MODE_SERVICE   | android.app.UiModeManager  |  控制UI模式 |
+| DOWNLOAD_SERVICE   |android.app.DownloadManager   |用于请求HTTP下载   |
+| BATTERY_SERVICE   | android.os.BatteryManager  | 管理电源状态  |
+| JOB_SCHEDULER_SERVICE   | android.app.job.JobScheduler  | 处理计划的任务  |
+| NETWORK_STATS_SERVICE   | android.app.usage.NetworkStatsManager  | 进行网络使用分析   |
+| HARDWARE_PROPERTIES_SERVICE  | android.os.HardwarePropertiesManager  | 访问硬件属性  |
 
 ##### Handler
 
@@ -263,15 +306,77 @@ public abstract Context getApplicationContext();
 public abstract ApplicationInfo getApplicationInfo();
 ```
 
+#### ContextImpl源码解析
+
+1、ContextImpl直接继承自Context
+```java
+class ContextImpl extends Context {
+}
+```
+
+2、ContextImpl具有的重要属性
+> 除了LoadedApk和ActivitThread是default，其他属性都是private-也就是无法继承到子类中
+```java
+// 1. SharedPreferences相关
+private static ArrayMap<String, ArrayMap<File, SharedPreferencesImpl>> sSharedPrefsCache;
+private ArrayMap<String, File> mSharedPrefsPaths;
+
+// 2. 主线程
+final @NonNull ActivityThread mMainThread;
+
+// 3. LoadedApk
+final @NonNull LoadedApk mPackageInfo;
+
+// 4. ClassLoader
+private @Nullable ClassLoader mClassLoader;
+// LoadeApk中获取到ClassLoader
+@Override
+public ClassLoader getClassLoader() {
+    return mClassLoader != null ? mClassLoader : (mPackageInfo != null ? mPackageInfo.getClassLoader() : ClassLoader.getSystemClassLoader());
+}
+
+// 5. IBinder mActivityToken
+private final @Nullable IBinder mActivityToken;
+
+// 6. Resources、ResourcesManager、Theme
+private final @NonNull ResourcesManager mResourcesManager;
+private @NonNull Resources mResources;
+private Resources.Theme mTheme = null;
+
+// 7. PackageManager-能获取到app的信息
+private PackageManager mPackageManager;
+```
+
+#### ContextWrapper、ContextThemeWrapper
+
+1、ContextWrapper仅仅是持有ContextImpl对象的引用，其他的方法调用都是直接转交给ContextImpl处理
+
+2、ContextThemeWrapper在ContextWrapper的基础上扩展了4个UI相关属性
+> 1. 主题和Resources
+> 1. LayoutInflater
+```java
+    private Resources.Theme mTheme;
+    private LayoutInflater mInflater;
+    private Configuration mOverrideConfiguration;
+    private Resources mResources;
+```
+
+
+#### Context的创建
+
 ### 横向拓展
 
 1、getApplication与getApplicationContext有什么区别?
 
-2、一个App到底有几个Context
+2、一个App到底有几个Context?
+> 1. App中Context的总数 = Application的Context(1个)+Activity的数量+Service的数量
+> 1. 广播没有Context
+> 1. ContentProvider本身没有Context，但是其对应的应用肯定有一个自身的ApplicationContext
 
 3、Context和内存泄漏
 
 ### 创造性拓展
+
 
 ## 纠错
 
@@ -282,3 +387,4 @@ public abstract ApplicationInfo getApplicationInfo();
 ## 问题汇总
 
 ## 参考资料
+1. [Android应用Context详解及源码解析](https://blog.csdn.net/yanbober/article/details/45967639)
