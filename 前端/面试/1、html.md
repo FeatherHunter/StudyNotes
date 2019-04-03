@@ -57,13 +57,17 @@
 
 7、iframe有那些缺点？
 > 1.优点：解决加载缓慢的第三方内容如图标和广告等的加载问题
-> 1.
-  Security sandbox
-  并行加载脚本
+> 1. 解决加载缓慢的第三方内容如图标和广告等的加载问题
+> 2. Security sandbox
+> 3. 并行加载脚本
+```
+```
 > 2.`<iframe>`的缺点：
-    iframe会阻塞主页面的Onload事件；
-    即时内容为空，加载也需要时间
-    没有语意
-    解决加载缓慢的第三方内容如图标和广告等的加载问题
-Security sandbox
-并行加载脚本
+> 1. iframe会阻塞主页面的Onload事件；
+> 2. 即时内容为空，加载也需要时间
+> 3. 没有语意
+
+8、行内元素有哪些？块级元素有哪些？空元素有哪些？
+> 1.行内元素有：span a img input select strong
+> 2.块级元素有：div ul ol dl dt dd h1 h2 h3 h4 p...
+> 3.常见的空元素：br hr img input link meta  base area command embed keygen param source track wbr....
