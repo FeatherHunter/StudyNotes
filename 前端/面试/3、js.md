@@ -150,3 +150,56 @@ attributes   节点(元素)的属性节点
 > 4.另一种垃圾收集算法是"引用计数", 这种算法的思想是跟踪记录所有值被引用的次数. js引擎目前都不再使用这种算法, 但在IE中访问非原生JS对象(如DOM元素)时, 这种算法仍然可能会导致问题
 > 5.当代码中存在循环引用现象时, "引用计数" 算法就会导致问题
 > 6.解除变量的引用不仅有助于消除循环引用现象, 而且对垃圾收集也有好处. 为了确保有效地回收内存, 应该及时解除不再使用的全局对象, 全局对象属性以及循环引用变量的引用
+
+16、js有几种函数调用方式?
+> 1.方法调用模型    var obj = { func : function(){};}    obj.func()
+> 2.函数调用模式　　var func = function(){}    func();
+> 3.构造器调用模式
+> 4.apply/ call调用模式
+
+17、描述事件模型?IE的事件模型是怎样的？事件代理是什么？事件代理中怎么定位实际事件产生的目标？
+> 1.捕获->处于目标->冒泡，IE应该是只有冒泡没有捕获
+> 2.事件代理就是在父元素上绑定事件来处理，通过event对象的target来定位
+
+18、js动画有哪些实现方法?
+> 1.用定时器 setTimeout和setInterval
+
+19、还有什么实现动画的方法
+> 1.js动画: 使用定时器
+> 2.CSS : transition , animation
+> 1. transition 包含4种属性：transition-delaytransition-durationtransition-propertytransition-timing-function，对应动画的4种属性： 延迟、持续时间、对应css属性和缓动函数，
+> 2. transform 包含7种属性：animation-nameanimation-durationanimation-timing-functionanimation-delayanimation-directionanimation-iteration-countanimation-fill-modeanimation-play-state，它们可以定义动画名称，持续时间，缓动函数，动画延迟，动画方向，重复次数，填充模式
+```
+```
+> 3.HTML5 动画
+> 1. canvas
+> 2. svg
+> 3. webgl
+
+20、面向对象有哪几个特点?
+> 1.封装, 继承, 多态
+
+21、如何判断属性来自自身对象还是原型链?
+> 1.hasOwnPrototype
+
+22、图片预加载的实现
+> 1.使用jQuery图片预加载插件Lazy Load
+> 1. 加载jQuery, 与jquery.lazyload.js
+> 2. 设置图片的占位符为data-original, 给图片一个特别的标签,比如class=".lazy"
+> 3. 然后延迟加载: $('img.lazy').lazyload();这个函数可以选择一些参数:
+```
+图片预先加载距离：threshold，通过设置这个值，在图片未出现在可视区域的顶部距离这个值时加载。
+事件绑定加载的方式：event
+图片限定在某个容器内：container
+```
+> 2.使用js实现图片加载: 就是new一个图片对象, 绑定onload函数, 赋值url
+> 3.用CSS实现图片的预加载
+> 1. 写一个CSS样式设置一批背景图片，然后将其隐藏
+> 2. 改进: 使用js来推迟预加载时间, 防止与页面其他内容一起加载
+```
+```
+> 4.用Ajax实现预加载：其实就是通过ajax请求请求图片地址. 还可以用这种方式加载css,js文件等
+
+23、如果在同一个元素上绑定了两个click事件, 一个在捕获阶段执行, 一个在冒泡阶段执行. 那么当触发click条件时, 会执行几个事件? 执行顺序是什么?
+> 1.绑定在目标元素上的事件是按照绑定的顺序执行的
+> 1.  绑定在被点击元素的事件是按照代码顺序发生，其他元素通过冒泡或者捕获“感知”的事件，按照W3C的标准，先发生捕获事件，后发生冒泡事件。所有事件的顺序是：其他元素捕获阶段事件 -> 本元素代码顺序事件 -> 其他元素冒泡阶段事件 
