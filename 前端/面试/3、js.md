@@ -202,4 +202,33 @@ attributes   节点(元素)的属性节点
 
 23、如果在同一个元素上绑定了两个click事件, 一个在捕获阶段执行, 一个在冒泡阶段执行. 那么当触发click条件时, 会执行几个事件? 执行顺序是什么?
 > 1.绑定在目标元素上的事件是按照绑定的顺序执行的
-> 1.  绑定在被点击元素的事件是按照代码顺序发生，其他元素通过冒泡或者捕获“感知”的事件，按照W3C的标准，先发生捕获事件，后发生冒泡事件。所有事件的顺序是：其他元素捕获阶段事件 -> 本元素代码顺序事件 -> 其他元素冒泡阶段事件 
+> 1. 绑定在被点击元素的事件是按照代码顺序发生，
+> 2. 其他元素通过冒泡或者捕获“感知”的事件，
+> 3. 按照W3C的标准，先发生捕获事件，后发生冒泡事件。所有事件的顺序是：其他元素捕获阶段事件 -> 本元素代码顺序事件 -> 其他元素冒泡阶段事件
+```html
+<div class="div1" id="one">
+    <div class="div2" id="two"></div>
+</div>
+```
+```js
+//点击div2，触发的事件顺序是：首先是找到父元素div1的捕获事件，其次是目标元素div2的事件（按照代码顺序执行），最后执行div1的冒泡事件
+//捕获 one
+//冒泡 two
+//捕获 two
+//冒泡 one
+let div1 = document.getElementById('one');
+let div2 = document.getElementById('two');
+
+div2.addEventListener('click', function () {
+    console.log('冒泡', 'two');
+}, false);
+div2.addEventListener('click', function () {
+    console.log('捕获', 'two');
+}, true);
+div1.addEventListener('click', function () {
+    console.log('冒泡', 'one');
+}, false);
+div1.addEventListener('click', function () {
+    console.log('捕获', 'one');
+}, true);
+```
