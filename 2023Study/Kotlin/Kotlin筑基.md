@@ -164,6 +164,8 @@ login("wch", ::printResult) //用符号引用调用具名函数
     name = null
     name?.capitalize()
 ```
+!!
+> 确保是有数值的才能用，这个和java一样，有风险
 
 
 16、let的安全调用
@@ -187,11 +189,19 @@ if(name != null){
 
 18、空合并 ?:
 ```kotlin
-name ?: "这个是null哦" // 如果name = null会执行 ?: 后面的
+var name:String? = "李小龙"
+name = null
+println(name ?: "原来你是鼎鼎大名null")
+
+// ?: 前面为空，才执行
+// 如果name = null会执行 ?: 后面的
 ```
 let + ?:
 ```kotlin
-name?.let{"$it"} ?: "name的内容为null哦"
+//let + ?:
+var name:String? = "李小龙"
+name = null
+println(name?.let { "我的名字是$it" } ?: "原来我是鼎鼎大名null")
 ```
 
 ## 异常处理
@@ -211,13 +221,13 @@ checkNotNull(value)
 requireNotNull(value)
 
 var value = false
-require(value) // false 异常
+require(value) // false 会抛出异常
 ```
 
 ## subString
 ```kotlin
 subString(0, index)
-subString(o until index)
+subString(0 until 10)
 // 两者等价
 ```
 
@@ -327,6 +337,16 @@ val r1 = sourcePwd.replace(Regex("[AKMNO]")){ //Regex 中 写正则表达式
     it.value // 啥也没做
     // 可以加逻辑，把AKMNO替换成需要的内容
 }
+
+// 用正则表达式Regex进行替换，可以加密和解密
+val newName = name.replace(Regex("[ADG]")){
+    when(it.value){
+        "A"->"1"
+        "D"->"2"
+        "G"->"3"
+        else->it.value
+    }
+}
 ```
 
 ## == 和 === 区别
@@ -406,10 +426,23 @@ public inline fun <T> T.apply(block: T.() -> Unit): T {
     return this // return this，用于链式调用
 }
 ```
+
+## let
 let源码： (T) 拥有it
 ```kotlin
 public inline fun <T, R> T.let(block: (T) -> R): R {
     return block(this)
+}
+```
+使用：
+```kotlin
+val r = a?.let {
+     // 能执行到这里it一定不为null
+    if(it.isBlank()){
+        "DEFAULT"
+    }else{
+        it
+    }
 }
 ```
 
@@ -1390,3 +1423,5 @@ mode属性：
 - `LazyThreadSafetyMode.PUBLICATION`: 懒加载属性是线程安全的。在多线程环境中，`by lazy` 使用一种更高效的并发控制来进行初始化，可以在多个线程同时访问属性时进行初始化。这种模式通常比 `SYNCHRONIZED` 模式具有更好的性能。
 
 **LazyThreadSafetyMode.PUBLICATION不适合单例模式，可能创建更多的实例**
+
+## 函数和方法

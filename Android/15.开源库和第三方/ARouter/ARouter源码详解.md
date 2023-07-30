@@ -2136,7 +2136,7 @@ public class RouteMeta {
     private Element rawType;        // Raw type of route
     /**========================================
      *  2、路由的目标。
-     *   如: HostActivity.class、MainFragment.class、MyInterceptor.cass、
+     *   如: HostActivity.class、MainFragment.class、MyInterceptor.class、
      *=======================================*/
     private Class<?> destination;   // Destination. 例如: class com.alibaba.android.arouter.core.AutowiredServiceImpl; class com.alibaba.android.arouter.core.InterceptorServiceImpl;
     /**========================================
@@ -3201,7 +3201,7 @@ public class ARouter$$Group$$arouter implements IRouteGroup {
 }
 
 ```
-```
+```groovy
 Warehouse.groupsIndex: size = 1
  0 = "arouter" -> "class com.alibaba.android.arouter.routes.ARouter$$Group$$arouter"
 
