@@ -498,6 +498,8 @@ public interface AutowiredService extends IProvider {
 
 #### 自定义Kotlin实现依赖注入逻辑
 
+**需要kapt才可以，很多注意事项 =>未完待续**
+
 **该代码感受一下意思，并不能运行**
 ```kotlin
 @AutoService(Processor::class)
@@ -683,7 +685,7 @@ public class RouterManager {
     private LruCache<String, ARouterGroup> groupLruCache;
     private LruCache<String, ARouterPath> pathLruCache;
 
-    // 为了拼接，例如:ARouter$$Group$$personal
+    // 拼接为了查找，例如:ARouter$$Group$$personal
     private final static String FILE_GROUP_NAME = "ARouter$$Group$$";
 
     private RouterManager() {
@@ -790,6 +792,80 @@ public class RouterManager {
     }
 }
 ```
+
+BundleManager:帮助跳转时参数传递（支持链式调用）
+```java
+/**
+ * 跳转时 ，用于参数的传递
+ */
+public class BundleManager {
+
+    // Intent传输  携带的值，保存到这里
+    private Bundle bundle = new Bundle();
+
+    public Bundle getBundle() {
+        return this.bundle;
+    }
+
+    // 对外界提供，可以携带参数的方法
+    public BundleManager withString(@NonNull String key, @Nullable String value) {
+        bundle.putString(key, value);
+        return this; // 链式调用效果 模仿开源框架
+    }
+
+    public BundleManager withBoolean(@NonNull String key, @Nullable boolean value) {
+        bundle.putBoolean(key, value);
+        return this;
+    }
+
+    public BundleManager withInt(@NonNull String key, @Nullable int value) {
+        bundle.putInt(key, value);
+        return this;
+    }
+
+    public BundleManager withBundle(Bundle bundle) {
+        this.bundle = bundle;
+        return this;
+    }
+
+    // Derry只写到了这里，同学们可以自己增加 ...
+
+    // 直接完成跳转
+    public Object navigation(Context context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            return RouterManager.getInstance().navigation(context, this); // 把自己传入，就能传递参数了
+        }
+        return null;
+    }
+}
+```
+
+最终跳转效果：
+```java
+RouterManager.getInstance()
+    .build("/app/LoginActivity")
+    .withInt("age", 22)
+    .withString("name", "feather")
+    .navigation();
+```
+
+#### 初步：总结
+
+Navigation：
+1. group、path合法性检查
+1. 构造出用于携带参数的BundleManager(),放入参数
+1. navigation()-缓存中查找Root(Group)类，不存在就Class.forName(),newInstance()创建并且缓存
+1. 缓存或者Root类的内部中找到Group(Path)类的名称，不存在就newInstance构造，并缓存
+1. Group内部的集合中，查找到MainActivity对应的RouteMeta，里面有MainActivity.class
+1. startActivity()跳转
+
+## 图片路由/共享
+
+## 实体Bean共享
+
+## 方法互调
+
+## ARouter源码全流程打通
 
 # ARouter插件提高速度
 
