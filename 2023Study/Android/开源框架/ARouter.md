@@ -234,7 +234,7 @@ for (Element element : routeElements) { //Element可以是MainActivity、LoginFr
 }
 ```
 
-## 集成IARouterGroup
+## 生成IARouterGroup
 ```java
 // Interface of ARouter
 // com.alibaba.android.arouter.facade.template.IRouteGroup
@@ -319,6 +319,80 @@ JavaFile.builder(PACKAGE_OF_GENERATE_FILE,
 ```
 
 **和传统，方法-类-包，顺序不同，有implements需要直接生成JavaFile**
+
+### 实战生成Root文件
+```java
+            /***======================================================================
+             * @目标代码:
+             * public class ARouter$$Root$$app implements IRouteRoot{
+             *     @Override
+             *     public void loadInto(Map<String, Class<? extends IRouteGroup>> routes) {
+             *         routes.put("/app/MainActivity", ARouter$$Group$$login.class);
+             *     }
+             * }
+             *=====================================================================*/
+            /**==================================================
+             * （一）构造出方法
+             *==================================================*/
+            // 1. 构造参数 Map<String, Class<? extends IRouteGroup>>
+            ParameterizedTypeName inputRoutesType = ParameterizedTypeName.get(
+                ClassName.get(Map.class),
+                ClassName.get(String.class),
+                ParameterizedTypeName.get(
+                        ClassName.get(Class.class),
+                        // TypeElement type_IRouteGroup = elementUtils.getTypeElement("xxx.IRouteGroup");
+                        // IRouteGroup的子类 === ? extends IRouteGroup
+                        WildcardTypeName.subtypeOf(ClassName.get(type_IRouteGroup))
+                )
+            );
+            // 参数类型名 + 变量名
+            ParameterSpec inputRoutesSpec = ParameterSpec.builder(inputRoutesType, "routes").build();
+            // 2、构造出方法
+            MethodSpec.Builder loadIntoMethodBuilder = MethodSpec.methodBuilder("loadInto") // 方法名
+                    .addAnnotation(Override.class)
+                    .addModifiers(PUBLIC)
+                    .addParameter(inputRoutesSpec);
+            /**==================================================
+             * （二）构造出语句
+             *==================================================*/
+            for (Map.Entry<String, String> entry : rootMap.entrySet()) {
+                loadIntoMethodBuilder.addStatement("routes.put($S, $T.class)",
+                        entry.getKey(), // "/app/MainActivity"
+                            // packageName + simpleName // ARouter$$Group$$login
+                        ClassName.get(PACKAGE_OF_GENERATE_FILE, entry.getValue()));
+            }
+            /**==================================================
+             * （三）构造出类文件
+             *==================================================*/
+            JavaFile.builder("com.alibaba.android.arouter.routes", // 包名
+                    TypeSpec.classBuilder("ARouter$$Root$$app") // Java文件名
+                            .addJavadoc(WARNING_TIPS)
+                            // 父类接口 xxx.IRouteRoot
+                            .addSuperinterface(ClassName.get(elementUtils.getTypeElement(ITROUTE_ROOT)))
+                            .addModifiers(PUBLIC)
+                            // 加入方法
+                            .addMethod(loadIntoMethodOfRootBuilder.build())
+                            .build()
+            ).build().writeTo(mFiler);
+```
+
+**MethodSpec.Builder中要生成返回值，需要returns(xxx)方法**
+
+## WildcardTypeName
+
+作用是什么？
+1. 用于表示通配符类型的名称。通配符类型是一种特殊的泛型类型。
+1. 在泛型和注解处理器等场景中起着重要的作用。
+```java
+//Class<? extends IRouteGroup>>
+WildcardTypeName.subtypeOf(ClassName.get(type_IRouteGroup))
+```
+
+## ClassName.get(xxx)
+
+作用：
+1. `javax.lang.model.element`包中的静态方法，用于获取给定元素（`Element`）的完全限定类名（Fully Qualified Class Name）。
+1. 多用于APT, 可获取`类、方法、字段`
 
 ## 注解处理器：思路总结
 1. 注解处理器出好了每个Element（判断好类型）
