@@ -1,13 +1,36 @@
-# ARouter
+# 重学ARouter
 
-[本文链接，点击这里]()
+[本文链接，点击这里](https://blog.csdn.net/feather_wch/article/details/132006639)
 
 ==>【ARouter优化】：不进行全局加载，用到再加载。
 ==> 提高启动速度
+==> 支持到ANdroid 13，没有任何额外API
+==> EventBus优化，大量反射注册类中的Method拿到注解并且缓存起来，用Apt帮助生成中间类加快启动速度
 
 核心点：
 1. Apt + JavaPoet, EventBus是传统的一行行写入
 1. Apt生成Group类和Path类，Group中存放group和生成Path类映射关系，Path类中存入时path和Activity.class的映射关系。
+
+组件化的意义：不相互依赖，可以交互，任意组合，高度解耦，自动拆卸，重复利用，分层独立化
+
+缺少点：build(Personal.PersonalMainActivity) 直接.出来 => 思路，自动生成类
+拦截器 => AOP 思想，不需要AspectJ
+
+ARouter拦截器如何实现？【不是责任链模式】
+1. 跳转到Activity时，除了绿色通道，会先交给拦截器进行拦截判断
+2. CountDownLaunch根据拦截器数量建立，执行拦截器方法，并且await进行等待
+```java
+CancelableCountDownLatch interceptorCounter = new CancelableCountDownLatch(Warehouse.interceptors.size());
+_excute(0, interceptorCounter, postcard);
+//阻塞线程直到超时，或者计数归0
+interceptorCounter.await(postcard.getTimeout(), TimeUnit.SECONDS);
+```
+3. 执行完一个拦截器，计数-1，并且执行下一个拦截器
+```java
+counter.countDown();
+_excute(index + 1, counter, postcard); 
+```
+4. 顺利通过到拦截器底层，再startActivity
 
 [TOC]
 
@@ -580,6 +603,10 @@ class MyAutowiredProcessor: BaseProcessor() {
             elements.forEach {
                 //  instance.name = instance.getIntent().getStringExtra("name")
                 autowiredMethodSpec.addStatement("xxxxxxxxxxxxx", it.simpleName)
+
+                // @ 未来扩展：图片共享
+                // autowiredMethodSpec.addStatement(xxx)里面，实现类似如下话语
+                // a.setOrderDrawable(RouterMmanager.getInstance().build("/order/getDrawable").navigation) // 可以导航出目标资源文件的R.drawable.xxx
             }
 
             // （四）生成文件, 每个Activity、Fragment都生成一个文件。该代码无法测试稳定性
@@ -778,7 +805,8 @@ public class RouterManager {
                         case ACTIVITY:
                             Intent intent = new Intent(context, routerBean.getMyClass()); // 例如：getClazz == Order_MainActivity.class
                             intent.putExtras(bundleManager.getBundle()); // 携带参数
-                            context.startActivity(intent, bundleManager.getBundle());
+                            // context.startActivity(intent, bundleManager.getBundle()); // 大部分手机有问题，没有任何反应
+                            context.startActivity(intent);
                             break;
                         //同学们可以自己扩展 类型
                     }
@@ -861,20 +889,378 @@ Navigation：
 
 ## 图片路由/共享
 
+路由Navigation+依赖注入：两种方法结合1，自动化，高效
+
+需要实现部分：
+1、arouter-api: Call 跨业务毁掉
+```java
+/**
+ * 跨模块业务回调，空接口可集成拓展/实现
+ *
+ * 图片共享   组件 和 组件之间
+ * Bean共享  组件 和 组件之间
+ * ....
+ */
+public interface Call {
+}
+```
+2、common公共模块：OrderDrawable 用于各个模块查询到
+```kotlin
+public interface OrderDrawable extends Call {
+    int getDrawable();
+}
+```
+3、order订单模块：OrderDrawableImpl 实现，真正提供Drawable的资源ID
+```java
+// order 自己决定 自己的暴漏
+@ARouter(path = "/order/getDrawable")
+// 【会被扫描到，构建出RouteMeta并且存储】
+public class OrderDrawableImpl implements OrderDrawable {
+    @Override
+    public int getDrawable() {
+        return R.drawable.ic_ac_unit_black_24dp; // 自己决定暴露
+    }
+}
+```
+
+4、arouter-compiler: **RouteProcessor.java**-为了能路由出来数据
+```java
+// 在生成的类似 ARouter$$Group$$order 文件中，添加逻辑。
+// * 添加RouterBean.TypeEnum.CALL 的 RouterBean
+
+    @Override
+    public boolean process(Set<? extends TypeElement> set, RoundEnvironment roundEnvironment) {
+
+        // 【TODO 新增点1】
+        TypeElement callType = elementTool.getTypeElement(ProcessorConfig.CALL);
+        TypeMirror callMirror = callType.asType(); // 自描述 callMirror
+
+        // xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+        // TODO  一系列的检查工作
+        RouterBean routerBean = new RouterBean.Builder()
+                    .addGroup(aRouter.group())
+                    .addPath(aRouter.path())
+                    .addElement(element)
+                    .build();
+        TypeMirror elementMirror = element.asType();
+        if (typeTool.isSubtype(elementMirror, activityMirror)) { // android.app.Activity
+            routerBean.setTypeEnum(RouterBean.TypeEnum.ACTIVITY);
+        } else if (typeTool.isSubtype(elementMirror, callMirror)) { // 【TODO 新增点2】
+            routerBean.setTypeEnum(RouterBean.TypeEnum.CALL);
+        }
+
+        // xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    }
+```
+
+5、arouter-api: **RouteManager.java**-navigation路由到该图片的资源ID
+```java
+RouterBean routerBean = loadPath.getPathMap().get(path);
+if (routerBean != null) {
+    switch (routerBean.getTypeEnum()) {
+        case ACTIVITY:
+            Intent intent = new Intent(context, routerBean.getMyClass()); // 例如：getClazz == Order_MainActivity.class
+            intent.putExtras(bundleManager.getBundle()); // 携带参数
+            // context.startActivity(intent, bundleManager.getBundle()); // 大部分手机有问题，没有任何反应
+            context.startActivity(intent);
+            break;
+
+    /**===========================================
+     *       navigation()中增加对Call的处理
+     * ==========================================*/
+        case CALL: 
+            // OrderAddressImpl.class  OrderBean getOrderBean
+            Class<?> clazz = routerBean.getMyClass(); // OrderUserImpl BaseUser实体
+            Call call = (Call) clazz.newInstance();
+            bundleManager.setCall(call);
+            return bundleManager.getCall();
+
+        //同学们可以自己扩展 类型
+    }
+}
+```
+
+6、arouter-compiler: **MyAutowiredProcessor.java**-自动依赖注入
+```java
+// autowired()生成的参数依赖注入文件中，添加类似代码：
+if (typeUtils.isSubtype(typeMirror, callMirror)) { // 实现了Call接口
+    // t.orderDrawable = (OrderDrawable) RouterManager.getInstance().build("/order/getDrawable").navigation(t);
+    methodContent = "t." + fieldName + " = ($T) $T.getInstance().build($S).navigation(t)";
+    method.addStatement(methodContent,
+            TypeName.get(typeMirror),
+            ClassName.get(ProcessorConfig.AROUTER_API_PACKAGE, ProcessorConfig.ROUTER_MANAGER),
+            annotationValue);
+    return;
+} else { // 对象的传输
+    methodContent = "t.getIntent().getSerializableExtra($S)";
+}
+```
+
+### 实战角度
+
+#### 公共基础库
+
+新增暴露接口OrderDrawable
+```java
+public interface OrderDrawable extends Call {
+    int getDrawable();
+}
+```
+
+#### 暴露图片方
+
+实现OrderDrawable
+```java
+// order 自己决定 自己的暴漏
+@ARouter(path = "/order/getDrawable")
+public class OrderDrawableImpl implements OrderDrawable {
+    @Override
+    public int getDrawable() {
+        return R.drawable.ic_ac_unit_black_24dp; // 自己决定暴露
+    }
+}
+```
+
+#### 使用图片方
+依赖注入实现
+```java
+@AutowiredGet("/order/getDrawable")
+OrderDrawable orderDrawable; // 公共基础库common
+```
+
+
 ## 实体Bean共享
 
-## 方法互调
+实现部分：
+1. common模块：IUser集成Call
+```java
+// IUser等价于OrderDrawable
+public interface IUser extends Call {
+    BaseUser getUserInfo(); //根据不同子模块的具体实现，调用得到不同的结果
+}
+/**
+ * 例如：用户实体父类
+ */
+public class BaseUser implements Serializable {
+    private String name;
+    private String account;
+    private String password;
+    private String phoneNumber;
+    private int gender;
+}
+
+```
+2. order模块：UserInfo实现自IUser
+```java
+// 扩展BaseUser
+public class UserInfo extends BaseUser {
+    private String token;
+    private int vipLevel;
+}
+```
+
+3. order模块：UserInfoImpl实现UserInfo,打上注解@ARouter // APT会根据这个类的父类是Call，特殊处理采用Call类型
+```java
+@ARouter(path = "/order/getUserInfo")
+public class OrderUserImpl implements IUser {
+    @Override
+    public BaseUser getUserInfo() {
+        // 我order模块，具体的Bean，由我自己
+        UserInfo userInfo = new UserInfo();
+        userInfo.setName("Derry");
+        userInfo.setAccount("154325354");
+        userInfo.setPassword("1234567890");
+        userInfo.setVipLevel(999);
+        return userInfo;
+    }
+}
+```
+4. app/使用者模块:UserInfo，打上注解@AutowiredGet
+```java
+#MainActivity.java
+    @Parameter(name = "/order/getUserInfo")
+    IUser iUser; // 公共基础库common
+```
+
+## 方法互调：网络请求功能
+
+personal模块想要调用order订单模块的网络请求要怎么做？
+
+1. common模块：IRequestOrder
+2. common模块：OrderBean
+3. order模块：RequestImpl implements IRequestOrder
+4. personal模块：依赖注入(注解)、请求
+
+1、common模块：IRequestOrder
+```java
+/**
+ * 订单模块对外暴露接口，其他模块可以获取返回业务数据
+ */
+public interface IRequestOrder extends Call {
+    OrderBean getOrderBean(String key, String ip) throws IOException;
+}
+```
+2、common模块：OrderBean
+```java
+/**
+ * {"resultcode":"200","reason":"查询成功",
+ * "result":{"Country":"美国","Province":"加利福尼亚","City":"","Isp":""},"error_code":0}
+ */
+public class OrderBean {
+    private String resultcode;
+    private String reason;
+    private Result result;
+    private int error_code;
+
+    public static class Result {
+        private String Country;
+        private String Province;
+        private String City;
+        private String Isp;
+    }
+}
+```
+3、order模块：RequestOrderImpl implements IRequestOrder
+```java
+// Retrofit相关
+public interface OrderServices {
+    @POST("/ip/ipNew")
+    @FormUrlEncoded
+    Call<ResponseBody> get(@Field("ip") String ip, @Field("key") String key);
+}
+```
+```java
+@ARouter(path = "/order/getOrderBean") // /order/getOrderBean
+public class RequestOrderImpl implements IRequestOrder {
+
+    private final static String BASE_URL = "http://apis.juhe.cn/";
+
+    // 暴漏给 各个模块使用
+    @Override
+    public OrderBean getOrderBean(String key, String ip) throws IOException {
+        Retrofit retrofit = new Retrofit.Builder()
+                .baseUrl(BASE_URL)
+                .build();
+        OrderServices host = retrofit.create(OrderServices.class);
+
+        // Retrofit GET同步请求
+        Call<ResponseBody> call = host.get(ip, key);
+
+        retrofit2.Response<ResponseBody> response = call.execute();
+        if (response != null && response.body() != null) {
+            JSONObject jsonObject = JSON.parseObject(response.body().string());
+            OrderBean orderBean = jsonObject.toJavaObject(OrderBean.class);
+            System.out.println("order订单组件中独有的网络请求功能：解析后结果 >>> " + orderBean.toString());
+            return orderBean;
+        }
+        return null;
+    }
+}
+```
+4、personal模块：
+```java
+    // 拿order模块的 网络请求功能
+    @AutowiredGet(name = "/order/getOrderBean")
+    IRequestOrder requestOrder;
+
+    new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    OrderBean orderBean = requestOrder.getOrderBean("aa205eeb45aa76c6afe3c52151b52160", "144.34.161.97");
+                    Log.e(Cons.TAG, "从Personal跨组件到Order，并使用Order网络请求功能：" + orderBean.toString());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+    }).start();
+```
+
+## 对象传输：ARouter支持
+
+1. common模块：自定义Bean如Student，传入参数
+1. compiler模块：AutowiredProcessor中，getIntent.getSerializableExtra("student")
+1. 使用者模块：@AutowiredGet注解标记字段。
 
 ## ARouter源码全流程打通
 
-# ARouter插件提高速度
+## ARouter插件提高速度
 
 ```groovy
 classpath "com.alibaba:arouter-register:1.0.2"
 ```
-可以提升800ms到1.1s
-根据字节码插桩找到类似于register的类，然后向该类的 loadRouteMap 方法中插入逻辑即可
+
+性能：可以提升800ms到1.1s
+
+原理：根据字节码插桩找到类似于register的类，然后向该类的 loadRouteMap 方法中插入逻辑即可
 
 Arouter自动加载路由表的插件是使用的通过gradle插桩技术在编译期插入代码来达到自动加载路由表信息。那么在 ARouter 初始化的时候就不会再去查找过滤相应的以 com.alibaba.android.arouter.routes开头的类名了，从而达到减少初始化时间的目的。
 
 会自动加载所有的插件
+
+### 原有性能损耗
+
+1、遍历app的dex，找到其中包名“com.alibaba.android.arouter.routes”下所有的类名，并且打包成集合返回
+2、ARouter的init做的工作就是把所有找到的类，调用loadInfo方法，调用routes.put("service", ARouter$$Group$$Service.class)
+3、性能损耗很大
+```java
+Set<String> routerMap;
+routerMap = ClassUtils.getFileNameByPackageName(mContext, ROUTE_ROOT_PAKCAGE);
+
+// 双重循环，查找Dex文件
+for (final String path : paths) {
+    // xxx
+    //NOT use new DexFile(path), because it will throw "permission error in /data/dalvik-cache"
+    dexfile = DexFile.loadDex(path, path + ".tmp", 0);
+    // xxx
+    while (dexEntries.hasMoreElements()) {
+        String className = dexEntries.nextElement();
+        if (className.startsWith(packageName)) {
+            classNames.add(className);
+        }
+    }
+}
+```
+
+### 性能优化
+
+项目名：arouter-gradle-plugin
+
+1. 耗时代码进行优化
+1. 可以提升800ms到1.1s
+
+### 实战plugin进行初始化
+
+ASM字节码插桩，不需要再去遍历Dex后拿到生成的**class**并且加入到Caches缓存中。
+
+留下字节码插桩空壳方法：ASM去调用生成ARouter$$Root$$ModuleName.java的loadInto
+```java
+    private static void loadRouterMap() {
+        registerByPlugin = false;
+        // auto generate register code by gradle plugin: arouter-auto-register
+        // looks like below:
+        // registerRouteRoot(new ARouter..Root..modulejava()); // module 1
+        // registerRouteRoot(new ARouter..Root..modulekotlin()); // module 2
+    }
+
+    private static void registerRouteRoot(IRouteRoot routeRoot) {
+        markRegisteredByPlugin();
+        if (routeRoot != null) {
+            routeRoot.loadInto(Warehouse.groupsIndex);
+        }
+    }
+```
+
+
+## 参考资料
+
+Github的ARouter地址：https://github.com/alibaba/ARouter
+
+中文ARouter使用API：https://github.com/alibaba/ARouter/blob/master/README_CN.md
+
+官方解释，最全的：https://developer.aliyun.com/article/71687
+
+可能是最详细的ARouter源码分析：https://www.jianshu.com/p/bc4c34c6a06c
+
+通俗易懂的文章：https://blog.csdn.net/CodeFarmer__/article/details/102762029
