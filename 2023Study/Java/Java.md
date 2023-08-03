@@ -468,6 +468,23 @@ signal/signalAll
 2. ARouter => Interceptor拦截器的处理
 3. 基于AQS实现
 
+## JUC架构
+操作系统：Mutex、Condition
+基础工具：synchronized、CAS、LockSupport
+AQS: CAS(资源竞争) + LockSupport(阻塞) + 条件队列（虚拟双向队列，CLH变体）
+ReentrantLock：AQS
+BlockingQueue：ReentrantLock
+ThreadPoolExecutor：BlockingQueue + ReentrantLock + CAS
+CopyOnWriteArrayList：
+ConcurrentHashMap：synchronized + xxx
+CountDownLatch: AQS
+CyclicBarrier: AQS
+AtomicInteger、AtomicRefrence、LongAddr
+
+### LongAddr
+分段CAS
+
+
 ## 线程
 1、多线程上下文切换中，上下文是指什么？切换是指什么？
 1. 上下文：某一时间点CPU寄存器和PC的内容
@@ -475,6 +492,40 @@ signal/signalAll
 
 
 2、绿色线程是什么？用于JVM调度，JDK1.3后废弃
+
+
+3、Thread start做了什么？
+> 一言以蔽之，JVM层面JavaThread->OS层面的OSThread->pthread->JavaCalls->Thread.run
+```c++
+start0() // native
+->thread.c#JVM_startThread()
+  ->jvm.c#JavaThread(&thread_entry, xxx) // JVM层面的Thread对象，传入创建后需要执行的方法
+    thread.cpp#
+      ->属性保存
+      ->os::create_thread ===> JVM跨平台核心，看JVM在OS目录下，有windows、linux等目录
+     os_linux.cpp#
+        ->创建OSThread对象
+        ->(JavaThread)thread->set_osThread(osThread) 建立联系
+        ->pthread_create               // ========> mmkv
+        ->父线程while()等待子线程初始化完成
+            //子线程
+             -> 将创建的内核线程 和 OSThread(父线程) 关联
+             -> 初始化操作
+             -> while()中wait等待父线程 // wait  ======> mmkv、Linux
+        ->帮助子线程prepare，
+          ->将JVM的JavaThread和上层线程对象（我们的）互相关联
+          ->设置优先级
+        ->父线程OSThread执行start() // 将状态改为Runnable  
+          ->将状态改为Runnable  
+          ->notify()子线程  // notify =====>linux 、mmkv
+            // 子线程
+            thread.cpp#
+             ->JavaThread::run()
+             ->取出属性的方法并且执行
+             ->JavaCalls() // 访问Java方法的大门
+               ->执行到Thread.run()
+```
+
 
 ### 死锁
 1、什么是死锁？
@@ -567,13 +618,60 @@ signal/signalAll
 6、线程池结合ThreadLocal容易出现内存泄漏
 ==> 哈希冲突，开放寻址法，线性探测（+1）
 
-## Executor
+
+
+## 线程池
+1、线程组ThreadGroup：构成树形结构，方便管理（如统一中断）
+> 没有指明线程组，就都是main线程组
+
+2、重要元素
+1. corePoolSize 核心线程数
+2. maximumPoolSize 最大线程数
+3. keepAliveTime：
+4. 队列
+5. 工厂
+6. 拒绝策略
+
+3、为什么一定是阻塞队列？
+1. 让核心线程在取任务处，阻塞等待。（空闲时）
+
+4、核心线程，在没任务时干什么？
+1. 保活：任务执行完后，while循环会去取阻塞队列的下一个任务，无任务阻塞
+2. 回收：超过核心线程数的线程执行完任务后，回收
+3. 实现：当线程数 > core, 队列中取任务会用workQueue.poll(keepAliveTime, Unit)
+
+5、线程池调度线程执行的例子
+1. 11个线程都空闲，要取任务，core = 10， 因为 11 > 10，都会超时等待poll
+2. 超时后，11个线程都会退出while()，调用processWorkerExit() // 没有该方法会导致11个线程都停止
+3. 会和核心线程数比较，多的return（消失），核心的调用addWorker()，会换一个新的Thread对象执行
+
+6、CTL什么意思？Control，控制
+
+### Executor
 1、Executor的优点和缺点
 1. 性能：减少创建和销毁的开销
 2. 解耦：将任务的提交和任务处理想分离，方便管理
 
 2、Executor是顶级接口
 3、Executors是工具类
+
+### 五种状态
+1、线程池的五种状态
+1. Running （new出来就是）
+2. ShutDown（shutdown）剩余任务还会执行，
+3. Stop（shutdownNow）剩余的也不执行
+4. Tidying 清理中
+5. Terminated terminated()
+
+2、线程池如何回收阻塞中的线程池？
+1. 中断
+2. 中断后，还会getTask-判断状态去return，不拿任务就stop，还拿任务就shutdown
+
+3、onShutDown()和terminated()空方法给子类去实现
+
+4、中断只是信号，不一定要停止。
+1. Thread.interrupted()返回值决定要做什么 // 会恢复标志位
+
 
 # JVM
 
