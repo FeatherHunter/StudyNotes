@@ -10,6 +10,11 @@ Recompose
 @Composable和suspend都是语言级别的
 Snapshot机制
 
+1. 没有最好的架构，最有最适合的架构。
+1. MVP用DataBinding也可以，MVP用ViewModel(只是组件库)
+1. ViewModel和MVVM的VM层 VM是中间层
+
+
 ## 无架构
 
 Model：数据/模型，对数据获取不依赖View

@@ -7,6 +7,104 @@
 
 [TOC]
 
+## 函数和方法
+1、inline fun是什么？
+> 内联函数
+
+2、inline fun<reified T> ===> Java泛型擦除
+1. 内联函数 + 具体化的泛型
+2. reified可以解决泛型擦除问题，拿到泛型的class对象
+3. 原理：方法内联，编译器直接拿到目标的class对象
+
+3、泛型擦除是什么？
+1. 低版本泛型被擦除
+2. 高版本泛型没有擦除，可以通过signature拿到泛型类型（多一层转换）
+
+4、函数和方法的区别？
+1. 函数：根据输入，执行任务，输出结果
+2. 方法：类和对象的行为
+
+5、函数不是方法
+1. 他们的类型是完全不同的
+2. 函数没有receiver
+3. 方法有receiver，是第一个参数
+
+6、函数和方法在Kotlin中的比较  ===> Java
+```kotlin
+// 函数的类型
+fun func1():Unit{}
+val val1: ()->Unit = ::func1
+// 方法的类型
+class Student{
+    fun func2():Unit{} // 无参数
+    fun func3(name:String):Unit{} // 有参数
+}
+// 都有receiver
+val val2:Student.()->Unit = Student::func2
+val val2_2:(Student)->Unit = Student::func2 // Student可以自由进入
+val val2_3 = Student::func2 // KFunction1<Student, Unit> // 1 = 实际数量2 - 1
+// 都有receiver
+val val3:Student.(String) -> Unit = Student::func3
+val val3_2:(Student, String) -> Unit = Student::func3
+val val3_3 = Student::func3 // KFunction2<Student, String, Unit>
+// 函数，携带参数
+fun func4(name:String):Unit{}
+val val4:(String)->Unit = ::func4
+val val4_2 = ::func4 // KFunction1(String, Unit) 2 - 1 = 1
+```
+7、Java中不存在函数，只有方法
+1. Java和Kotlin的本质区别
+2. Java对象中的方法，都有this = Kotlin中receiver
+
+8、Java中类方法/静态方法是函数吗？
+1. 是方法，Receiver是class对象
+2. 不是函数，没有函数这个概念
+
+9、函数本身是对象吗？
+1. 函数引用就是函数对象
+2. 函数是一等公民
+
+### KFunction
+1、KFunction是什么？
+1. 是函数的抽象表示。
+2. Kotlin 反射库的一部分，用于在运行时操作和访问函数的信息。
+3. 通过 KFunction 类型，可以使用反射来调用函数、获取函数的签名信息等操作。
+4. KFunction 类型是泛型的，具体取决于函数的参数和返回类型。例如，KFunction1 表示具有一个参数的函数，KFunction2 表示具有两个参数的函数，以此类推。
+
+2、KFuncton的使用
+```kotlin
+fun greet(name: String) {
+    println("Hello, $name!")
+}
+fun main() {
+    val function: KFunction<Unit> = ::greet
+    function.call("John")
+}
+```
+## 属性和变量
+
+1、属性和变量也有Receiver之分
+```kotlin
+// 变量
+var name = "Derry"
+// 属性
+class Student{
+    var name = "Derry"
+}
+//
+fun main() {
+    // 变量，无receiver
+    ::name.set("John")
+    ::name.get()
+    // 属性，有receiver
+    Student::name.set(Student(), "John")
+    Student::name.get(Student())
+}
+```
+
+2、::代表引用，invoke代表()括号
+
+
 ## 编译时常量
 
 1、const val PI = 45 编译时常量不可以用于局部变量,为什么？

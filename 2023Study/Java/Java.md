@@ -14,6 +14,76 @@ HashMap（散列表-哈希算法、ArrayMap、SparseMap、HashTable、HashSet）
 
 [TOC]
 
+## OOP ==> Profile
+1、面向对象思想在实战中的体现是什么？
+1. 每个页面都需要的功能，抽取为抽象类
+2. 不是每个页面都需要的功能，提取为接口
+
+2、抽象类和接口的选用
+1. 能用抽象类就不要用接口
+2. 接口是对抽象类的补充
+3. 抽象类：对类属性和行为的抽象
+4. 接口：对类行为的抽象
+
+3、依赖倒置原则是什么？
+1. 上层和下层，都依赖于抽象接口
+2. 面向接口编程（这里接口指的是抽象）
+
+4、抽象类：具有属性、方法、抽象方法
+
+5、接口中已经有了默认方法，为什么还要用抽象类？
+> 接口中变量是public static final的，不符合一些场景
+
+## 序列化
+1、什么是序列化？
+1. 序列化就是一个流程，不是简单地接口
+2. 数据转为二进制数据(序列化) -> 传输 -> 反序列化
+3. 最重要的就是打标记，帮助反序列化(Serializable)
+4. 序列化方案有很多：JSON、xml、protobuf
+
+### Serializable
+2、Serializable
+1. 打上标记，数据才可以写入流，不然报错
+2. ObjectOutputStream可以writeObject，通过反射实现，性能不好
+3. 适合IO：网络、硬盘
+4. 性能：性能差，会创建大量临时对象，导致频繁GC =====> GC
+
+3、Serializable为什么性能不好？
+1. 底层用反射实现 ====> 反射性能优化 ====> getMethods ===> Lifecycle对反射Map缓存
+
+### Parcelable
+1、Parcelable的特点
+1. 没办法持久化，不保存类的信息，没办法从IO设备上反序列化出来
+2. 内存层面的序列化，适合IO以外一切场景
+3. 实现原理：int写入是4个byte，直接传输，按照顺序取出。反序列化需要调用目标类方法。
+4. 举例：存的是时候是4,8,8.读取的时候是4,8,8 =====> JNI/NDK ===> 共享内存
+
+### Kotlinx Serialization
+1、Kotlinx Serialization是什么？
+1. 支持多种格式，包括 JSON 和二进制
+2. 更高效：根据 Kotlin 类型信息进行编解码，避免了使用反射
+3. 性能对比：对于复杂的数据结构和大型对象，性能更好
+
+2、Kotlinx Serialization的使用
+```kotlin
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+@Serializable
+data class Person(val name: String, val age: Int)
+fun main() {
+    val person = Person("John", 30)
+    // 1、序列化
+    val json = Json.encodeToString(Person.serializer(), person)
+    println(json) // Output: {"name":"John","age":30}
+    // 2、反序列化
+    val restoredPerson = Json.decodeFromString(Person.serializer(), json)
+    println(restoredPerson) // Output: Person(name=John, age=30)
+}
+```
+3、Kotlinx Serialization是如何提升性能的？底层是怎么实现的？
+1. 在编译时生成序列化和反序列化的代码，避免了运行时的反射操作
+
+
 ## 对象创建
 分配内存
 地址空间初始化
@@ -202,6 +272,7 @@ HashSet
 5. Cleaner机制，也不推荐，无法及时执行
 
 ## 动态代理
+1、特点：
 1. 语言类型 => 动态、静态、强、弱
 2. 反射 => setAccessible
 3. 场景：AOP、框架
@@ -209,6 +280,13 @@ HashSet
    2. Dagger2：动态代理来生成依赖注入的代码
    3. EventBus：生成订阅者的代理类，事件发生时，通过代理类调用其方法
 4. 实现：cglib和JDK，JDK在重构后不再采用反射实现，ASM实现，性能一致
+
+2、使用：Proxy.newInstance
+3、代理模式是什么？优点和缺点
+4、动态代理是什么？
+5、动态代理场景
+> Hook
+
 
 ## 接口
 1. 设计原则：接口隔离、依赖倒置
