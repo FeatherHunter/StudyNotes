@@ -1,8 +1,3 @@
-委托
-委托 == 代理
-方法内的成员永远拿不到thisRef：官方委托和自定义委托-》方法里面没办法使用反射
-委托只能类委托和属性委托
-
 # Kotlin委托
 
 本文链接：https://blog.csdn.net/feather_wch/article/details/132095759
@@ -96,6 +91,17 @@ fun main(){
     println(responseData)
     println(responseData)
 }
+```
+
+4、属性委托监控旧值变换为新值的过程
+```kotlin
+var name:String by Delegates.observable("Test"){
+    prop, old, new ->
+    println("old = $old ---> new = $new")
+}
+val mykt = MyKt()
+mykt.name = "Update1" // 默认值"Test", 更新为Update1
+mykt.name = "Update2" // Update1 更新为 Update2
 ```
 
 ## 自定义属性委托
@@ -274,7 +280,10 @@ private fun MainActivity.viewModels() : ReadOnlyProperty<MainActivity?, MyViewMo
 
 #### 委托TextView：类似DataBinding
 
-```kotlin ==> 注入JS
+**方法内的成员永远拿不到thisRef**
+==> 注入JS
+
+```kotlin
 //  
 operator fun TextView.provideDelegate(value: Any?, property: KProperty<*>) =
     object: ReadWriteProperty<Any?, String?>{

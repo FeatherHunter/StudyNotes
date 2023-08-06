@@ -81,6 +81,17 @@ fun main() {
     function.call("John")
 }
 ```
+
+### 匿名函数
+
+1、匿名函数
+```kotlin
+    // 匿名函数
+    val mx1 = fun(str:String):Int{
+        return str.length
+    }
+```
+
 ## 属性和变量
 
 1、属性和变量也有Receiver之分
@@ -118,6 +129,8 @@ fun main() {
 
 ## 基本类型
 3、Kotlin基本类型也是引用类型，会不会耗费性能？不会，都转为基本类型了
+1. Int Double 引用类型 ，反编译后，Java的基本类型 int double
+1. Int? Double? = null，反编译后，Java的包装类型 Integer Double
 
 ## range
 4、range表达式
