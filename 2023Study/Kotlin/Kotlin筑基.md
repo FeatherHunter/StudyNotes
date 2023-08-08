@@ -194,6 +194,84 @@ inline fun login(name:String, lambda:(String)->Unit){
 }
 ```
 
+### noinline
+
+1、noinline的作用
+1. 内联会导致参数不再是对象，要当做对象使用，使用noinline避免参与内联
+1. 可以作为对象返回
+```kotlin
+inline fun fun01(noinline lambda:(Int)->Unit):(Int)->Unit{
+    return lambda
+}
+```
+
+### crossinline
+
+1、return难题，不内联的函数不允许直接return
+```kotlin
+fun method(lambda:(Int)->Unit){
+    lambda(123)
+}
+
+fun main() {
+    method { 
+        return // 不可以
+        return@method // return method
+    }
+}
+```
+
+2、内联函数的return，因为平铺会直接return外层的方法
+1. 可以直接return，会导致外层的main直接结束
+```kotlin
+inline fun method(lambda:(Int)->Unit){
+    lambda(123)
+}
+fun main() {
+    method {
+        return@method // return method
+        return // 会return main()
+    }
+}
+```
+
+3、内联函数调用函数，无法保证内部都是内联函数，增加crossinline
+1. 告诉IDE强制检查，有没有return，有return会直接不让编译
+```kotlin
+fun main() {
+    method {
+        return // 会return main()
+    }
+}
+inline fun method(lambda:(Int)->Unit){
+    methodNoInline{
+//        lambda(123) // 无法确保。methodNoInline是内联函数。
+    }
+}
+
+fun methodNoInline(lambda:(Int)->Unit){
+    lambda(456)
+}
+```
+1. 增加corssinline，不允许调用return
+```kotlin
+fun main() {
+    method {
+//        return // xxxxxxxx会报错：无法这里调用return
+    }
+}
+
+inline fun method(crossinline lambda:(Int)->Unit){
+    methodNoInline{
+        lambda(123) // 无法确保。methodNoInline是内联函数。
+    }
+}
+
+fun methodNoInline(lambda:(Int)->Unit){
+    lambda(456)
+}
+```
+
 ## 函数引用
 12、函数引用的例子
 ```kotlin
@@ -1535,4 +1613,13 @@ mode属性：
 
 **LazyThreadSafetyMode.PUBLICATION不适合单例模式，可能创建更多的实例**
 
-## 函数和方法
+## actual
+
+
+===> Compsoe mutableStateOf()
+
+当在多个平台上使用 Kotlin 编写代码时，可以在共享模块中声明一个 "expect" 函数，然后在各个平台的实际模块中使用 "actual" 关键字来提供该函数的具体实现。
+1. 关键字 "actual" 用于在类、接口或函数中标记一个实际的实现。
+1. 与 "expect" 关键字搭配使用，用于实现多平台共享代码的功能。
+1. "expect" 关键字用于声明一个预期的抽象类、接口或函数，而 "actual" 关键字则用于提供该预期实体的实际实现。
+

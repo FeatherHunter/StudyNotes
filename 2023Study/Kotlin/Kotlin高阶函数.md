@@ -1,4 +1,13 @@
+
+
+Lambda和高阶函数
+---
+
+[toc]
+
+
 # lambda
+
 
 1、lambda的由来
 1. 单词"lambda"源于希腊字母λ（小写lambda）
@@ -206,6 +215,88 @@ val method3:Function1<String, Unit> = { println(it) }
     println(k01("AAA")(true)(45)(67.89f))
 ```
 
+7、下面的study02()返回的类型是什么？
+```kotlin
+fun study02() = {lambda:(Int, Int) -> String, studyInfo: String ->
+    lambda(1, 99)
+}
+// 答案：((Int, Int) -> String, String) -> Unit 
+
+// 使用：
+study02()({n1, n2-> "$n1 + $n2 = ${n1 + n2}" }, "wch")
+```
+8、下面study04()返回的类型是什么？
+```kotlin
+fun study04() = {str:String, num:Int, lambda1:(String)->Unit, lambda2:(Int)->Boolean->
+    lambda1(str)
+    lambda2(num)
+}
+// 答案：(String,Int,(String)->Unit,(Int)->Unit)->Boolean
+
+// 使用：
+println(study04()("wch", 123, { println("$it lambda1") }, { it > 99}))
+```
+
+### 泛型
+
+9、下面返回的类型是什么？
+```kotlin
+fun <T1, T2, R1, R2> study05() = {str:T1, num:T2, lambda1:(T1)->R1, lambda2:(T2)->R2 ->
+    lambda1(str)
+    lambda2(num)
+}
+// (T1, T2, (T1)->R1, (T2)->R2) -> R2
+
+// 使用：
+study05<String, Int, Boolean, Float>()("wch", 22, {it.isEmpty()}, {it.toFloat()})
+```
+
+10、下面的study06不是lambda，是函数。他们的类型是什么？
+```kotlin
+fun study05() = {Str:String, num: Int, lambda:(Int)->Boolean ->
+    lambda(num)
+}
+// (String, Int, (Int)->Boolean)->Boolean
+
+fun study06() = fun(Str:String, num: Int, lambda:(Int)->Boolean):Boolean{
+    return lambda(num)
+}
+// (String, Int, (Int)->Boolean)->Boolean
+```
+1. Lambda表达式，最后一行作为返回值
+1. 函数，最后一行不能作为返回值
+  1. 必须显式return
+  2. 必须显式指定
+
+**函数有隐式的Unit类型返回值**
+
+## inline原理探究
+
+1、Lambda为什么要内联？
+1. 不使用内联，会构造出Function0对象，作为参数传入
+1. 代码内联，减少方法调用开销，不再需要创建Function0对象 ===> 内存抖动
+```kotlin
+fun main() {
+    show{
+        println("Hello Kotlin!")
+    }
+}
+fun show(lambda:()->Unit){
+    lambda()
+}
+// 不使用内联生成代码：
+show((Function0)null.INSTANCE);
+public static final void show(@NotNull Function0 lambda) {
+    Intrinsics.checkNotNullParameter(lambda, "lambda");
+    lambda.invoke();
+}
+// 使用内联：
+int $i$f$show = false;
+int var1 = false;
+String var2 = "Hello Kotlin!";
+System.out.println(var2);
+```
+
 
 # 高阶函数
 
@@ -319,7 +410,7 @@ var r2:(String)->Unit = ::lambdaImpl
 var r3:String.()->Unit = ::lambdaImpl // (String)等价于String.()
 ```
 
-### 集合、泛型
+## 集合、泛型
 
 1、**Lambda+集合+泛型**
 ```kotlin
@@ -385,6 +476,55 @@ fun<T> method(value: T?):Unit{
     // 具体类型也可以
     val m2:(Int)->Unit = ::method
     m2(123)
+```
+
+## 自己实现Kotlin内置函数
+
+1、forEach
+```kotlin
+// 定义
+inline fun<E> Iterable<E>.mForEach(lambda:(E)->Unit){
+    for(item in this)lambda(item)
+}
+
+// 使用
+listOf("AAA", "BBB", "CCC")
+    .mForEach{
+        println(it)
+    }
+```
+
+2、let和run，为什么会有this，为什么会有it
+1. this，it
+1. T.()->R, this是对T的匿名扩展函数，拥有this
+1. (T)->R，it是参数类型，SAM单一抽象接口，函数式接口，it
+```kotlin
+public inline fun <T, R> T.run(block: T.() -> R): R {
+    return block()
+}
+public inline fun <T, R> T.let(block: (T) -> R): R {
+    return block(this)
+}
+```
+
+3、thread
+1. 注意点: corssinline
+```kotlin
+// 自己实现thread，特定lambda不能inline
+inline fun thread(start:Boolean = true,
+                  name:String?=null,
+                  crossinline runAction:()->Unit // 限制不能inline，会copy大量代码
+):Thread{
+    val thread = object:Thread(){
+        override fun run() {
+            super.run()
+            runAction()
+        }
+    }
+    if(start) thread.start() // 
+    name?.let { thread.name = it } // kotlin形式
+    return thread
+}
 ```
 
 # 扩展函数原理
@@ -461,3 +601,10 @@ public final class MyKt {
 MyKt.Companion.show();
 MyKt.Companion.getName();
 ```
+
+# 函数式编程
+
+Kotlin函数式编程
+1. 链式调用
+1. 非常丰富的函数库
+1. 模仿RxJava的响应式编程
