@@ -2,6 +2,8 @@
 
 本文链接：https://blog.csdn.net/feather_wch/article/details/132139415
 
+14/29
+
 ## Compose项目配置开关
 
 [TOC]
@@ -675,6 +677,8 @@ fun MyApp() {
 
 # 动画
 
+[官方指南](https://developer.android.com/jetpack/compose/animation?hl=zh-cn#overview)
+
 ![picture 2](../../../images/304414158f94f27876222113b1083439627933b84262712dfb45766c7c537319.png)  
 
 
@@ -685,13 +689,31 @@ animSizeDemo
 
 
 `The label parameter should be set so this animate*AsState can be better inspected in the Animation Preview. `
-> 
 
-## 动画效果基于状态 && 在组合期间呈现动画效果
+## = remember 和 by remember的区别
 
-### animate*AsState
+1. `remember` 是一个函数，用于在 Composable 函数内部创建可记忆的对象，
+1. `by remember` 是一个属性委托，用于在 Composable 函数的参数列表中声明一个可记忆的属性。
 
-#### animateSizeAsState
+示例：
+
+```kotlin
+val count = remember { mutableStateOf(0) }
+```
+
+示例：
+
+```kotlin
+val count by remember { mutableStateOf(0) }
+```
+1. 使用方式上略有不同
+1. 实现相同的目的：在 Composable 函数的生命周期中保存和管理对象的状态。
+
+## 低级动画
+
+### animate*AsState：动画效果基于状态
+
+#### animateSizeAsState：大小变化
 1. 动画效果基于状态
 
 ```kotlin
@@ -726,7 +748,7 @@ fun animSizeDemo() {
 ```
 
 
-####  animateColorAsState
+####  animateColorAsState：颜色变化
 
 ```kotlin
 @Composable
@@ -760,9 +782,71 @@ fun animColorDemo() {
     }
 }
 ```
+#### animateIntAsState + AnimationSpec = 弹性动画
+```kotlin
+@Composable
+@Preview
+fun SpringDemo() {
+    val state = remember {
+        mutableStateOf(true)
+    }
+
+    val value = animateIntAsState(
+        targetValue = if (state.value) 300 else 100,//会根据 state.value 的值从当前值（可能是 300）动画地过渡到目标值（可能是 100）
+        animationSpec = spring( // 用于指定动画的特定效果和属性，例如弹性、阻尼比、刚度等
+            dampingRatio = Spring.DampingRatioHighBouncy, // 阻尼比:高反弹阻尼比
+            stiffness = Spring.StiffnessVeryLow // 刚度:非常低的刚度
+        ), label = ""
+    )
+
+    Box(
+        modifier = Modifier
+            .height(value.value.dp)
+            .width(80.dp)
+            .background(color = Color.Blue)
+            .clickable {
+                state.value = !state.value
+            }
+    )
+}
+```
+
+#### animateFloatAsState：控件平滑的显示和隐藏
+
+```kotlin
+@Composable
+@Preview
+fun TweenShowHideDemo() {
+    var isVisible by remember { mutableStateOf(true) }
+
+    val size by animateFloatAsState(
+        targetValue = if (isVisible) 200f else 0f,
+        animationSpec = tween(durationMillis = 500), label = ""
+    )
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size.dp)
+                .background(color = Color.Blue)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Button(onClick = { isVisible = !isVisible }) {
+            Text(text = if (isVisible) "Hide" else "Show")
+        }
+    }
+}
+```
 
 
-### updateTransition：同时为多个值添加动画效果
+
+### updateTransition：颜色、大小同时改变
 
 ```kotlin
 @Composable
@@ -813,11 +897,13 @@ fun BoxStateChange() {
 @Preview
 fun InfiniteDemo() {
     val infiniteTransition = rememberInfiniteTransition()
+
 //    fun rememberInfiniteTransition(): InfiniteTransition {
 //        val infiniteTransition = remember { InfiniteTransition() }
 //        infiniteTransition.run() // 里面是协程 // 处于调度前，里面协程代码在调度后才执行
 //        return infiniteTransition
 //    }
+
     // 用协程，while(true)一直去循环
     val color by infiniteTransition.animateColor(
         initialValue = Color.Red,
@@ -847,10 +933,19 @@ fun InfiniteDemo() {
 
 AnimationSpec<T>: 处理动画的效果，相当于估值器
 
+### Animation：对动画播放时间进行精细控制
+#### TargetBasedAnimation：起始值到目标值
+1. 是一种基于目标值的动画类型。
+1. 允许您指定动画的起始值和目标值，并使用动画规格（如 `tween`、`keyframes` 等）来定义动画的持续时间、缓动函数和其他属性。
+1. `TargetBasedAnimation` 的动画将逐渐从起始值过渡到目标值。
 
-## 动画是唯一可信来源
+#### DecayAnimation：起始速度，按照衰减系数，到阈值
 
-### Animatable
+
+1. 是一种基于衰减的动画类型。它模拟了物理世界中的衰减运动效果，例如物体在施加力后逐渐减速直到停止。
+1. 允许您指定动画的起始速度、衰减系数和阈值，其中阈值指定动画停止的阈值。当动画的速度小于阈值时，动画将停止。
+
+### Animatable：颜色线性转变
 
 实现颜色转变动画：从初始值到目标值。
 ```kotlin
@@ -879,19 +974,182 @@ fun animColorDemo() {
 }
 ```
 
-## AnimatedVisibility
+## 高级动画（布局）
+### AnimatedVisibility:布局淡入淡出
 
-## = remember 和 by remember的区别
+```
+@Composable
+@Preview
+fun AnimatedVisibilityDemo() {
+    var editable by remember {
+        mutableStateOf(true)
+    }
 
-1. `remember` 是一个函数，用于在 Composable 函数内部创建可记忆的对象，
-1. `by remember` 是一个属性委托，用于在 Composable 函数的参数列表中声明一个可记忆的属性。
-示例：
-```kotlin
-val count = remember { mutableStateOf(0) }
+    Column {
+        Box(modifier = Modifier.height(100.dp).width(80.dp).background(color = Color.Blue)
+                .clickable { editable = !editable })
+
+        AnimatedVisibility(visible = editable,
+            enter = fadeIn(),
+            exit = fadeOut()
+        ) {
+            Column(modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .background(Color.Yellow),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center){
+                Text(text = "Edit",
+                    Modifier
+                        .size(100.dp)
+                        .background(Color.Blue))
+
+            }
+        }
+    }
+}
 ```
-示例：
+
+### Crossfade：布局转换，A->B
+
+### AnimatedContent: 内容淡入淡出
+
 ```kotlin
-val count by remember { mutableStateOf(0) }
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+@Preview
+fun AnimatedContentDemo() {
+    val items = remember { mutableStateListOf("Item 1", "Item 2", "Item 3") }
+    var currentIndex by remember { mutableStateOf(0) }
+
+    Column {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            Button(onClick = { currentIndex = 0 }) {
+                Text("Item 1")
+            }
+            Button(onClick = { currentIndex = 1 }) {
+                Text("Item 2")
+            }
+            Button(onClick = { currentIndex = 2 }) {
+                Text("Item 3")
+            }
+        }
+
+        AnimatedContent(
+            targetState = currentIndex,
+            transitionSpec = {
+                fadeIn(animationSpec = tween(220, delayMillis = 90)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 90)) with fadeOut(animationSpec = tween(90))
+            }
+        ) { index ->
+            Text(
+                text = items[index],
+                modifier = Modifier.padding(16.dp).size(100.dp).background(Color.Magenta)
+            )
+        }
+    }
+}
+
 ```
-1. 使用方式上略有不同
-1. 实现相同的目的：在 Composable 函数的生命周期中保存和管理对象的状态。
+
+#### AnimatedContent和AnimatedVisibility区别
+
+AnimatedContent：主要用于在 UI 内容之间创建平滑的过渡效果。它可以在内容更改时自动应用动画，以提供更流畅的用户体验。例如，在列表中添加或删除Item时，可以使用 `AnimatedContent` 来实现Item的渐变出现或消失的动画效果。
+
+AnimatedVisibility：则用于控制单个 UI 元素的可见性动画。它可以根据一些条件值（如布尔值）来控制元素是否可见，并在可见性发生变化时应用动画效果。例如，可以使用 `AnimatedVisibility` 来实现一个元素的淡入淡出动画效果。
+
+#### transitionSpec
+```kotlin
+
+transitionSpec = {
+    fadeIn(animationSpec = tween(220, delayMillis = 90)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 90)) with fadeOut(animationSpec = tween(90))
+}
+// 进入的效果
+fadeIn(animationSpec = tween(220, delayMillis = 90)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220, delayMillis = 90))
+// with 推出的效果
+xxx with fadeOut(animationSpec = tween(90))
+```
+
+### Modifier.animateContentSize:折叠效果
+* 注意：animateContentSize 在修饰符链中的位置顺序很重要。为了确保流畅的动画，请务必将其放置在任何大小修饰符（如 size 或 defaultMinSize）前面，以确保 animateContentSize 会将带动画效果的值的变化报告给布局。
+```kotlin
+@Composable
+@Preview
+fun animateContentSizeDemo() {
+    var expand by remember {
+        mutableStateOf(true)
+    }
+
+    Column {
+        Box(modifier = Modifier
+        // 第一个效率最高
+            .animateContentSize { initialValue, targetValue -> print("initialValue:$initialValue targetValue:$targetValue") }
+            .fillMaxWidth()
+            .width(80.dp)
+            .background(color = Color.Blue)
+            .clickable { expand = !expand }
+            ) {
+
+            Text(text = "Jetpack Compose 提供了一些功能强大且可扩展的 API，可用于在应用界面中轻松实现各种动画效果。本文档将介绍如何使用这些 API，以及根据您的动画场景应使用哪种 API。",
+                maxLines = if(expand) 100 else 1,
+                lineHeight = 20.sp,
+                fontSize = 15.sp,
+                overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+```
+
+## 自定义动画
+
+### AnimationSpec:插值器、估值器
+
+#### keyframes: 关键帧
+
+```kotlin
+@Composable
+@Preview
+fun SpringDemo() {
+    val state = remember {
+        mutableStateOf(true)
+    }
+
+    val value = animateIntAsState(
+        // 目标值
+        targetValue = if (state.value) 300 else 100,
+        // 关键帧的时候，数值为多少
+        animationSpec = keyframes {
+            durationMillis = 2100
+            delayMillis = 200
+            // 700ms时候将属性过渡到0
+            0 at 700 with LinearOutSlowInEasing
+            // 1400ms的时候将属性过渡到300
+            200 at 1400 with FastOutSlowInEasing
+        }, label = ""
+    )
+    // 总结：目标值300，第700ms时=0，第1400ms时=200,2100ms时=300
+
+    Box(
+        modifier = Modifier
+            .height(value.value.dp)
+            .width(80.dp)
+            .background(color = Color.Blue)
+            .clickable {
+                state.value = !state.value
+            }
+    )
+}
+```
+
+### Easing
+
+### AnimaitonVector
+
+## 高级-手势和动画
+
+# 开源库
+
+## Lottie => Compose形式
+AE导出JSON，用API即可。
