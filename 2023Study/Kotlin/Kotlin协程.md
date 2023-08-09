@@ -263,11 +263,7 @@ public inline fun measureTimeMillis(block: () -> Unit): Long {
     return System.currentTimeMillis() - start
 }
 ```
-### 调度前
-1. 在遇到挂起方法前的代码都属于调度前
-2. 调度前代码一定在协程体内代码执行前执行
-```kotlin
-```
+
 
 ## 协程：线程选择
 
@@ -280,7 +276,24 @@ IO：为磁盘和网络IO处理。核心线程数x2
 
 
 ## 协程：启动模式
-1、默认有启动模式：DEFAULT
+
+### 调度中心
+
+
+1、调度前
+1. 在遇到挂起方法前的代码都属于调度前
+2. 调度前代码一定在协程体内代码执行前执行
+
+
+### 启动模式
+
+1、协程有哪些启动模式？
+1. CoroutineStart.DEFAULT
+1. CoroutineStart.ATOMIC
+1. CoroutineStart.UNDISPATCHED
+1. CoroutineStart.LAZY
+
+2、默认有启动模式：DEFAULT
 ```kotlin
 launch(/*start = CoroutineStart.DEFAULT*/) {  // 默认参数
     delay(200)
@@ -288,7 +301,170 @@ launch(/*start = CoroutineStart.DEFAULT*/) {  // 默认参数
 // 调度时
 DEFAULT -> block.startCoroutineCancellable(completion)
 ```
-1. 可以取消
+
+3、执行顺序(1)
+```kotlin
+    println("main start thread:${Thread.currentThread().name}")
+
+    // TODO 画图 让大家理解 调度中心 的 图概念 脑海里面有自己图
+    launch /*(start = CoroutineStart.DEFAULT)*/ { // 子协程
+        println("launch start thread:${Thread.currentThread().name}")
+        withContext(Dispatchers.Default) {
+            println("withContext start thread:${Thread.currentThread().name}")
+            delay(10000)
+        }
+        println("launch end thread:${Thread.currentThread().name}")
+    }
+
+```
+```
+main start thread:main
+launch start thread:main
+withContext start thread:DefaultDispatcher-worker-1
+======等待10000ms=========
+launch end thread:main
+```
+
+#### 默认模式和取消协程
+
+1、执行顺序(2)
+1. 调度前取消：进入“协程取消响应状态”，协程不会再调度执行
+1. 调度后取消：进入“协程取消响应状态”，在下个挂起点，结束协程（不到一定不结束）
+```kotlin
+    // TODO Default启动模式：协程体被创建后，协程立即开始调度，在调度前 协程被取消，协程会进入"协程取消响应状态" 然后才会取消协程
+    val job = launch (start = CoroutineStart.DEFAULT) {
+        // 再调度后（协程执行阶段）
+        println("launch 再调度后（协程执行阶段）>>>1") // 后输出
+        println("launch 再调度后（协程执行阶段）>>>2")
+        println("launch 再调度后（协程执行阶段）>>>3")
+        println("launch 再调度后（协程执行阶段）>>>4")
+        println("launch 再调度后（协程执行阶段）>>>5")
+
+        delay(1000 * 10)
+        println("launch 再调度后（协程执行阶段）全部结束<<<<")
+    }
+
+    // 调度前（先有调度的准备阶段）
+    println("协程立即开始调度中.") // 先输出
+    println("协程立即开始调度中..")
+    println("协程立即开始调度中...")
+    println("协程立即开始调度中....")
+    println("协程立即开始调度中.....")
+    // println("协程立即开始调度中...... 取消协程:${job.cancel()}")
+    delay(0) // 调度前结束，1调度后结束
+    println("协程立即开始调度中...... 取消协程:${job.cancel()}")
+```
+
+#### ATOMIC
+
+
+1、执行顺序
+1. 调度前被取消，在协程第一个挂起点才会取消
+1. 适合做必须做的工作，比如网络埋点、业务埋点
+```kotlin
+    // TODO ATOMIC启动模式：协程体被创建后，协程立即开始调度，在调度前 协程被取消， 协程体里面会不响应取消的状态(不理你) 直到第一个挂起点（才理你）才能取消
+    val job = launch (start = CoroutineStart.ATOMIC) {
+        // 再调度后（协程执行阶段）
+        println("launch 再调度后（协程执行阶段）>>>1") // 后输出
+        println("launch 再调度后（协程执行阶段）>>>2")
+        println("launch 再调度后（协程执行阶段）>>>3")
+        println("launch 再调度后（协程执行阶段）>>>4")
+        println("launch 再调度后（协程执行阶段）>>>5")
+        println("launch 再调度后（协程执行阶段）>>>6")
+        println("launch 再调度后（协程执行阶段）>>>7")
+        println("launch 再调度后（协程执行阶段）>>>8")
+        println("launch 再调度后（协程执行阶段）>>>9")
+        println("网络请求 必须做的工作，哪怕是被取消cancel，也要做的工作，请求的网络埋点，笔记埋点请求的信息 上报给服务器 ...")
+        // ... 不管你 cancel 不 cancel，这个工作一定会执行
+
+        // 打个比方：下面代码是 网络请求 耗时
+        delay(1000 * 10) // 第一个挂起点，才是取消状态响应中，然后取消，所以下面不会输出
+        println("launch 再调度后（协程执行阶段）全部结束<<<<")
+    }
+
+    // 调度前（先有调度的准备阶段）
+    println("协程立即开始调度中.") // 先输出
+    println("协程立即开始调度中..")
+    println("协程立即开始调度中...")
+    println("协程立即开始调度中....")
+    println("协程立即开始调度中.....")
+    println("协程立即开始调度中...... 取消协程:${job.cancel()}")
+```
+
+#### Lazy
+
+1. LAZY需要手动调度：job.start()-非挂起，手动调度
+1. job.join()-会挂起，手动调度
+1. async的用await-会挂起，手动调度
+```kotlin
+    // TODO LAZY启动模式：协程体被创建后，不会调度，会一直等 我们来手动调度（start非挂起，join挂起，await挂起），才开始调度，
+    //  在调度前 协程被取消，协程会进入"协程取消响应状态" 然后才会取消协程 == Default模式
+    val job = launch (start = CoroutineStart.LAZY) {
+        // 再调度后（协程执行阶段）
+        println("launch 再调度后（协程执行阶段）>>>1") // 后输出
+        println("launch 再调度后（协程执行阶段）>>>2")
+        println("launch 再调度后（协程执行阶段）>>>3")
+        println("launch 再调度后（协程执行阶段）>>>4")
+        println("launch 再调度后（协程执行阶段）>>>5")
+        println("launch 再调度后（协程执行阶段）>>>6")
+        println("launch 再调度后（协程执行阶段）>>>7")
+        println("launch 再调度后（协程执行阶段）>>>8")
+        println("launch 再调度后（协程执行阶段）>>>9")
+
+        delay(1000 * 10)
+        println("launch 再调度后（协程执行阶段）全部结束<<<<")
+    }
+
+    job.start()    // 最常用的 （非挂起）  【手动调度】
+    // job.join() // 【手动调度】
+    // async{}.await // 【手动调度】
+
+    // 调度前（先有调度的准备阶段）
+    println("协程立即开始调度中.") // 先输出
+    println("协程立即开始调度中..")
+    println("协程立即开始调度中...")
+    println("协程立即开始调度中....")
+    println("协程立即开始调度中.....")
+    delay(0)
+    println("协程立即开始调度中...... 取消协程:${job.cancel()}")
+```
+
+#### UNDISPATCHED
+
+1、执行流程
+1. 立即执行，没有调度，也就没有调度前
+1. job.cancel(): 可以取消delay
+```kotlin
+    // TODO UNDISPATCHED启动模式：协程体被创建后，（立即 在当前调用栈线程中 执行），没有调度，  协程体里面{一直执行到  第一个挂起点， 然后再执行 父协程的代码}
+    // 此模式，协程体被创建后，立即执行，没有调度，既然这么快，请问这个协程是依附在哪个线程呢？
+    val job = launch (context = Dispatchers.IO, start = CoroutineStart.UNDISPATCHED) {
+        println("launch UNDISPATCHED 立即执行，没有调度 （协程执行阶段）>>>1") // 后输出
+        println("launch UNDISPATCHED 立即执行，没有调度（协程执行阶段）>>>2 thread:${Thread.currentThread().name}")
+        println("launch UNDISPATCHED 立即执行，没有调度（协程执行阶段）>>>3")
+        println("launch UNDISPATCHED 立即执行，没有调度（协程执行阶段）>>>4")
+        println("launch UNDISPATCHED 立即执行，没有调度（协程执行阶段）>>>5")
+        println("launch UNDISPATCHED 立即执行，没有调度（协程执行阶段）>>>6")
+        println("launch UNDISPATCHED 立即执行，没有调度（协程执行阶段）>>>7")
+        println("launch UNDISPATCHED 立即执行，没有调度（协程执行阶段）>>>8")
+        println("launch UNDISPATCHED 立即执行，没有调度（协程执行阶段）>>>9")
+
+        // 这个就是第一个挂起点
+        delay(1000 * 10)
+        println("launch 再调度后（协程执行阶段）全部结束<<<<")
+    }
+
+    // UNDISPATCHED 没有调度前
+    println("UNDISPATCHED 没有调度前.") // 先输出
+    println("UNDISPATCHED 没有调度前..")
+    println("UNDISPATCHED 没有调度前...")
+    println("UNDISPATCHED 没有调度前....")
+    println("UNDISPATCHED 没有调度前.....")
+    println("UNDISPATCHED 没有调度前...... 取消协程:${job.cancel()}") // 只能取消 delay(1000 * 10)
+
+```
+
+
+
 ## 协程：异常
 ### exceptionhandler
 1、为什么exceptionhandler只能给顶级协程，子协程不可以
@@ -546,6 +722,14 @@ ViewModel管理所有的LiveData数据的状态的稳定性
 横竖屏切换等操作，数据会消失
 
 LiveData关联布局，产生DataBinding
+
+## 启动模式
+
+面试题：协程中 Dispatchers.IO，但是我却想让他在 main线程跑协程，有没有办法？
+答：CoroutineStart.UNDISPATCHED
+
+特点：由于没有调度中心调度，所以拿不到 Dispatchers.IO 干脆就用 在当前调用栈线程中执行协程，所以是main线程跑协程
+
 
 
 
