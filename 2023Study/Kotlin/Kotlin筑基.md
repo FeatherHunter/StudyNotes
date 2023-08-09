@@ -7,7 +7,8 @@
 
 [TOC]
 
-## 函数和方法
+## 函数
+### 函数和方法
 1、inline fun是什么？
 > 内联函数
 
@@ -92,6 +93,309 @@ fun main() {
     }
 ```
 
+### 函数引用
+12、函数引用的例子
+```kotlin
+fun main(args: Array<String>) {
+    var method = ::login
+    method("wch"){
+        println(it)
+    }
+}
+
+inline fun login(name:String, lambda:(String)->Unit){
+    lambda(name)
+}
+```
+
+13、函数可以作为返回值，有什么用？
+1. **延迟计算**：
+```kotlin
+fun calculateResult(): () -> Int {
+    val result = 10 // 假设这是一个复杂的计算过程
+    return { result }
+}
+
+val delayedResult = calculateResult()
+val result = delayedResult() // 只有在需要时才执行计算
+```
+2. **策略模式**：
+```kotlin
+enum class SortOrder {
+    ASCENDING, DESCENDING
+}
+
+fun getSortComparator(order: SortOrder): (List<Int>) -> List<Int> {
+    return when (order) {
+        SortOrder.ASCENDING -> { list -> list.sorted() }
+        SortOrder.DESCENDING -> { list -> list.sortedDescending() }
+    }
+}
+
+val numbers = listOf(4, 2, 7, 1, 5)
+val sortOrder = SortOrder.ASCENDING
+val sortedNumbers = getSortComparator(sortOrder)(numbers) // 根据排序顺序返回不同的函数实现
+```
+3. **装饰器模式**：
+```kotlin
+fun performOperation(): () -> Unit {
+    return {
+        // 执行原始操作
+        println("Performing the original operation")
+    }
+}
+
+fun withLogging(originalFunction: () -> Unit): () -> Unit {
+    return {
+        println("Logging before operation")
+        originalFunction()
+        println("Logging after operation")
+    }
+}
+
+val operation = performOperation()
+val decoratedOperation = withLogging(operation) // 包装原始函数，添加日志记录的功能
+decoratedOperation() // 执行装饰后的操作，会在控制台输出相关日志
+```
+
+### 具名函数
+14、具名函数有什么用？
+```kotlin
+fun printResult(result:String){
+    println(result)
+}
+login("wch", ::printResult) //用符号引用调用具名函数
+```
+
+### 内置函数
+
+#### apply
+
+```kotlin
+"feather".apply{
+    // 直接this拿到 feather，可以直接调用 String的方法
+    toLowerCase()
+    this[length - 1]
+}
+```
+适合链式调用: 例如文件解析
+```kotlin
+file.apply{
+    setExecutable(true)
+}.apply{
+    setReadable(true)
+}.apply{
+    // xxx
+}
+```
+apply设置对象的成员变量，run也可以这么做（都有this）
+```kotlin
+class Configuration {
+    var host: String = ""
+    var port: Int = 0
+    var timeout: Int = 0
+}
+
+val config = Configuration().apply {
+    host = "example.com"
+    port = 8080
+    timeout = 5000
+}
+
+```
+apply源码：T.() 拥有this
+```kotlin
+public inline fun <T> T.apply(block: T.() -> Unit): T {
+    block()
+    return this // return this，用于链式调用
+}
+```
+
+#### let
+let源码： (T) 拥有it
+```kotlin
+public inline fun <T, R> T.let(block: (T) -> R): R {
+    return block(this)
+}
+```
+使用：
+```kotlin
+val r = a?.let {
+     // 能执行到这里it一定不为null
+    if(it.isBlank()){
+        "DEFAULT"
+    }else{
+        it
+    }
+}
+```
+
+#### run
+```kotlin
+info.run{ // this
+    "hello" // 最后一行返回
+}
+```
+run的源码: T.() 拥有this
+```kotlin
+@kotlin.internal.InlineOnly
+public inline fun <T, R> T.run(block: T.() -> R): R {
+    return block()
+}
+```
+
+#### with
+with和run的使用方法不同，其他一模一样
+```kotlin
+with("wch"){      
+}
+// T.() 拥有this
+public inline fun <T, R> with(receiver: T, block: T.() -> R): R {
+    return receiver.block()
+}
+```
+
+##### run和with区别
+
+1. with适用于在特定上下文对对象进行操作
+1. run适合链式操作
+
+
+#### also
+also源码：(T) 拥有it
+```kotlin
+public inline fun <T> T.also(block: (T) -> Unit): T {
+    block(this)
+    return this
+}
+```
+
+#### takeif
+true时，返回对象本身，否则返回null
+```kotlin
+public inline fun <T> T.takeIf(predicate: (T) -> Boolean): T? {
+    return if (predicate(this)) this else null
+}
+```
+
+
+#### takeUnless
+false时，返回对象本身，否则返回null
+```kotlin
+public inline fun <T> T.takeUnless(predicate: (T) -> Boolean): T? {
+    return if (!predicate(this)) this else null
+}
+```
+
+#### 总结
+```kotlin
+let = block(this) // it
+apply block() = this   // this // 返回自身，链式
+also block(this) = this // it // 返回自身，链式
+with = receiver(this)  // this
+run = block() // this
+takeIf = precidate(this) // it
+takeUnless = !precidate(this) // it
+```
+
+### 函数内联
+11、函数内联 - 有lambda作为参数就需要内联inline
+1. 不内联，在调用端会生成函数对象（Function2等）来调用
+1. 使用内联，不会有额外性能损耗，但是代码量很大的函数复制多处会导致代码体积增大
+1. 内联相当于C++的#define 宏替换
+```kotlin
+fun main(args: Array<String>) {
+    login("wch"){
+        println(it)
+    }
+}
+
+// 此处lambda是一个参数，因此生成Function1的对象
+// （String,String）-> Unit 会生成Function2
+inline fun login(name:String, lambda:(String)->Unit){
+    lambda(name)
+}
+```
+
+#### noinline
+
+1、noinline的作用
+1. 内联会导致参数不再是对象，要当做对象使用，使用noinline避免参与内联
+1. 可以作为对象返回
+```kotlin
+inline fun fun01(noinline lambda:(Int)->Unit):(Int)->Unit{
+    return lambda
+}
+```
+
+#### crossinline
+
+1、return难题，不内联的函数不允许直接return
+```kotlin
+fun method(lambda:(Int)->Unit){
+    lambda(123)
+}
+
+fun main() {
+    method { 
+        return // 不可以
+        return@method // return method
+    }
+}
+```
+
+2、内联函数的return，因为平铺会直接return外层的方法
+1. 可以直接return，会导致外层的main直接结束
+```kotlin
+inline fun method(lambda:(Int)->Unit){
+    lambda(123)
+}
+fun main() {
+    method {
+        return@method // return method
+        return // 会return main()
+    }
+}
+```
+
+3、内联函数调用函数，无法保证内部都是内联函数，增加crossinline
+1. 告诉IDE强制检查，有没有return，有return会直接不让编译
+```kotlin
+fun main() {
+    method {
+        return // 会return main()
+    }
+}
+inline fun method(lambda:(Int)->Unit){
+    methodNoInline{
+//        lambda(123) // 无法确保。methodNoInline是内联函数。
+    }
+}
+
+fun methodNoInline(lambda:(Int)->Unit){
+    lambda(456)
+}
+```
+1. 增加corssinline，不允许调用return
+```kotlin
+fun main() {
+    method {
+//        return // xxxxxxxx会报错：无法这里调用return
+    }
+}
+
+inline fun method(crossinline lambda:(Int)->Unit){
+    methodNoInline{
+        lambda(123) // 无法确保。methodNoInline是内联函数。
+    }
+}
+
+fun methodNoInline(lambda:(Int)->Unit){
+    lambda(456)
+}
+```
+
+
 ## 属性和变量
 
 1、属性和变量也有Receiver之分
@@ -175,176 +479,8 @@ private fun `9867693746293234`(name:String){
 }
 ```
 
-## 函数内联
-11、函数内联 - 有lambda作为参数就需要内联inline
-1. 不内联，在调用端会生成函数对象（Function2等）来调用
-1. 使用内联，不会有额外性能损耗，但是代码量很大的函数复制多处会导致代码体积增大
-1. 内联相当于C++的#define 宏替换
-```kotlin
-fun main(args: Array<String>) {
-    login("wch"){
-        println(it)
-    }
-}
 
-// 此处lambda是一个参数，因此生成Function1的对象
-// （String,String）-> Unit 会生成Function2
-inline fun login(name:String, lambda:(String)->Unit){
-    lambda(name)
-}
-```
 
-### noinline
-
-1、noinline的作用
-1. 内联会导致参数不再是对象，要当做对象使用，使用noinline避免参与内联
-1. 可以作为对象返回
-```kotlin
-inline fun fun01(noinline lambda:(Int)->Unit):(Int)->Unit{
-    return lambda
-}
-```
-
-### crossinline
-
-1、return难题，不内联的函数不允许直接return
-```kotlin
-fun method(lambda:(Int)->Unit){
-    lambda(123)
-}
-
-fun main() {
-    method { 
-        return // 不可以
-        return@method // return method
-    }
-}
-```
-
-2、内联函数的return，因为平铺会直接return外层的方法
-1. 可以直接return，会导致外层的main直接结束
-```kotlin
-inline fun method(lambda:(Int)->Unit){
-    lambda(123)
-}
-fun main() {
-    method {
-        return@method // return method
-        return // 会return main()
-    }
-}
-```
-
-3、内联函数调用函数，无法保证内部都是内联函数，增加crossinline
-1. 告诉IDE强制检查，有没有return，有return会直接不让编译
-```kotlin
-fun main() {
-    method {
-        return // 会return main()
-    }
-}
-inline fun method(lambda:(Int)->Unit){
-    methodNoInline{
-//        lambda(123) // 无法确保。methodNoInline是内联函数。
-    }
-}
-
-fun methodNoInline(lambda:(Int)->Unit){
-    lambda(456)
-}
-```
-1. 增加corssinline，不允许调用return
-```kotlin
-fun main() {
-    method {
-//        return // xxxxxxxx会报错：无法这里调用return
-    }
-}
-
-inline fun method(crossinline lambda:(Int)->Unit){
-    methodNoInline{
-        lambda(123) // 无法确保。methodNoInline是内联函数。
-    }
-}
-
-fun methodNoInline(lambda:(Int)->Unit){
-    lambda(456)
-}
-```
-
-## 函数引用
-12、函数引用的例子
-```kotlin
-fun main(args: Array<String>) {
-    var method = ::login
-    method("wch"){
-        println(it)
-    }
-}
-
-inline fun login(name:String, lambda:(String)->Unit){
-    lambda(name)
-}
-```
-
-13、函数可以作为返回值，有什么用？
-1. **延迟计算**：
-```kotlin
-fun calculateResult(): () -> Int {
-    val result = 10 // 假设这是一个复杂的计算过程
-    return { result }
-}
-
-val delayedResult = calculateResult()
-val result = delayedResult() // 只有在需要时才执行计算
-```
-2. **策略模式**：
-```kotlin
-enum class SortOrder {
-    ASCENDING, DESCENDING
-}
-
-fun getSortComparator(order: SortOrder): (List<Int>) -> List<Int> {
-    return when (order) {
-        SortOrder.ASCENDING -> { list -> list.sorted() }
-        SortOrder.DESCENDING -> { list -> list.sortedDescending() }
-    }
-}
-
-val numbers = listOf(4, 2, 7, 1, 5)
-val sortOrder = SortOrder.ASCENDING
-val sortedNumbers = getSortComparator(sortOrder)(numbers) // 根据排序顺序返回不同的函数实现
-```
-3. **装饰器模式**：
-```kotlin
-fun performOperation(): () -> Unit {
-    return {
-        // 执行原始操作
-        println("Performing the original operation")
-    }
-}
-
-fun withLogging(originalFunction: () -> Unit): () -> Unit {
-    return {
-        println("Logging before operation")
-        originalFunction()
-        println("Logging after operation")
-    }
-}
-
-val operation = performOperation()
-val decoratedOperation = withLogging(operation) // 包装原始函数，添加日志记录的功能
-decoratedOperation() // 执行装饰后的操作，会在控制台输出相关日志
-```
-
-## 具名函数
-14、具名函数有什么用？
-```kotlin
-fun printResult(result:String){
-    println(result)
-}
-login("wch", ::printResult) //用符号引用调用具名函数
-```
 
 ## 判空和安全调用
 15、安全调用操作符
@@ -413,14 +549,16 @@ var value = false
 require(value) // false 会抛出异常
 ```
 
-## subString
+## String
+
+### subString
 ```kotlin
 subString(0, index)
 subString(0 until 10)
 // 两者等价
 ```
 
-## split
+### split
 ```kotlin
 val list = text.split(",") // 分割成List
 println(list)
@@ -431,7 +569,7 @@ val (v1, v2, v3, v4) = list
 val (_, v2, v3, v4) = list
 ```
 
-### 解构
+#### 解构
 在 Kotlin 中，解构（Destructuring）是一种将复合数据结构（如类、数据类、数组、集合等）的多个成员拆分为单个变量的技术。：
 1. **解构声明**：解构一个数据类的属性：
 ```kotlin
@@ -461,7 +599,7 @@ val (fruit1, fruit2) = list // 解构列表元素为单独的变量
 println("Fruit 1: $fruit1, Fruit 2: $fruit2") // 输出 Fruit 1: apple, Fruit 2: banana
 ```
 
-#### 高级技巧
+##### 高级技巧
 
 1. **解构 lambda 参数**：我们可以在 lambda 表达式中使用解构来获取函数参数的多个部分。例如：
 
@@ -504,7 +642,7 @@ println("Name: $name")
 println("Street: $street, City: $city")
 ```
 
-#### partition
+##### partition
 
 `partition` 是用于将集合元素拆分为满足某个条件和不满足该条件的两个集合的函数。它返回一个包含两个集合的 `Pair` 对象，其中一个集合包含满足条件的元素，另一个集合包含不满足条件的元素。
 ```kotlin
@@ -520,7 +658,7 @@ Even Numbers: [2, 4, 6, 8, 10]
 Odd Numbers: [1, 3, 5, 7, 9]
 ```
 
-## replace
+### replace
 ```kotlin
 val r1 = sourcePwd.replace(Regex("[AKMNO]")){ //Regex 中 写正则表达式
     it.value // 啥也没做
@@ -570,137 +708,6 @@ val number:Int? = "666.6f".toIntOrNull() // 不会报错为Null
 
 // 保留小数点
 "%.3f".format(65.742355) // %是格式化字符串的标志，%.3f小数点后三位
-```
-
-## 内置函数
-
-### apply
-
-```kotlin
-"feather".apply{
-    // 直接this拿到 feather，可以直接调用 String的方法
-    toLowerCase()
-    this[length - 1]
-}
-```
-适合链式调用: 例如文件解析
-```kotlin
-file.apply{
-    setExecutable(true)
-}.apply{
-    setReadable(true)
-}.apply{
-    // xxx
-}
-```
-apply设置对象的成员变量，run也可以这么做（都有this）
-```kotlin
-class Configuration {
-    var host: String = ""
-    var port: Int = 0
-    var timeout: Int = 0
-}
-
-val config = Configuration().apply {
-    host = "example.com"
-    port = 8080
-    timeout = 5000
-}
-
-```
-apply源码：T.() 拥有this
-```kotlin
-public inline fun <T> T.apply(block: T.() -> Unit): T {
-    block()
-    return this // return this，用于链式调用
-}
-```
-
-## let
-let源码： (T) 拥有it
-```kotlin
-public inline fun <T, R> T.let(block: (T) -> R): R {
-    return block(this)
-}
-```
-使用：
-```kotlin
-val r = a?.let {
-     // 能执行到这里it一定不为null
-    if(it.isBlank()){
-        "DEFAULT"
-    }else{
-        it
-    }
-}
-```
-
-### run
-```kotlin
-info.run{ // this
-    "hello" // 最后一行返回
-}
-```
-run的源码: T.() 拥有this
-```kotlin
-@kotlin.internal.InlineOnly
-public inline fun <T, R> T.run(block: T.() -> R): R {
-    return block()
-}
-```
-
-### with
-with和run的使用方法不同，其他一模一样
-```kotlin
-with("wch"){      
-}
-// T.() 拥有this
-public inline fun <T, R> with(receiver: T, block: T.() -> R): R {
-    return receiver.block()
-}
-```
-
-#### run和with区别
-
-1. with适用于在特定上下文对对象进行操作
-1. run适合链式操作
-
-
-### also
-also源码：(T) 拥有it
-```kotlin
-public inline fun <T> T.also(block: (T) -> Unit): T {
-    block(this)
-    return this
-}
-```
-
-### takeif
-true时，返回对象本身，否则返回null
-```kotlin
-public inline fun <T> T.takeIf(predicate: (T) -> Boolean): T? {
-    return if (predicate(this)) this else null
-}
-```
-
-
-### takeUnless
-false时，返回对象本身，否则返回null
-```kotlin
-public inline fun <T> T.takeUnless(predicate: (T) -> Boolean): T? {
-    return if (!predicate(this)) this else null
-}
-```
-
-### 总结
-```kotlin
-let = block(this) // it
-apply block() = this   // this // 返回自身，链式
-also block(this) = this // it // 返回自身，链式
-with = receiver(this)  // this
-run = block() // this
-takeIf = precidate(this) // it
-takeUnless = !precidate(this) // it
 ```
 
 ## 集合
@@ -1078,7 +1085,7 @@ class MyKt{
 ```
 ## 数据类
 1、数据类的定义，和普通类的区别是什么？
-1. 数据类内部会增加：set、get、构造、解构函数、copy、toString、hashCode
+1. 数据类内部会增加：set、get、构造函数、解构函数、copy、toString、hashCode、equals
 1. 普通类 == ，内容一样会认为是两个对象。数据类 == 可以正确判断。
 ```kotlin
 // 普通类 只要get、set

@@ -582,7 +582,7 @@ fun MyTextField() {
 
 ## 其他
 
-### &#x20;stringResources
+### stringResources
 
 stringResource是一个用于获取字符串资源的函数。它允许你通过资源ID来访问字符串资源，并在Compose中使用这些字符串。
 
@@ -671,3 +671,227 @@ fun MyApp() {
 ```
 
 使用`typography`属性，您可以轻松地在应用程序中应用一致的字体样式，以确保应用程序的视觉一致性。
+
+
+# 动画
+
+![picture 2](../../../images/304414158f94f27876222113b1083439627933b84262712dfb45766c7c537319.png)  
+
+
+动画库：
+```groovy
+animSizeDemo
+```
+
+
+`The label parameter should be set so this animate*AsState can be better inspected in the Animation Preview. `
+> 
+
+## 动画效果基于状态 && 在组合期间呈现动画效果
+
+### animate*AsState
+
+#### animateSizeAsState
+1. 动画效果基于状态
+
+```kotlin
+@Composable
+@Preview
+fun animSizeDemo() {
+    val enable = remember {
+        mutableStateOf(true)
+    }
+    val size =
+        animateSizeAsState(targetValue = if (enable.value) Size(200f, 200f) else Size(400f, 400f),
+            label = "inspection label"
+        )
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Image(
+            modifier = Modifier
+                .size(size.value.width.dp, size.value.height.dp)
+                .clickable {
+                    enable.value = !enable.value
+                },
+            painter = painterResource(id = R.drawable.student),
+            contentDescription = ""
+        )
+
+    }
+}
+```
+
+
+####  animateColorAsState
+
+```kotlin
+@Composable
+@Preview
+fun animColorDemo() {
+    val enable = remember {
+        mutableStateOf(true)
+    }
+    val color =
+        animateColorAsState(targetValue = if (enable.value)  Color.Blue else Color.Yellow,
+            label = "inspection label"
+        )
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+
+        Box(
+            modifier = Modifier
+                .size(400.dp)
+                .background(
+                    color = color.value,
+                    shape = if (enable.value) CircleShape else RectangleShape
+                )
+                .clickable {
+                    enable.value = !enable.value
+                })
+
+    }
+}
+```
+
+
+### updateTransition：同时为多个值添加动画效果
+
+```kotlin
+@Composable
+@Preview
+fun BoxStateChange() {
+    var state by remember{
+        mutableStateOf(BoxState.Collapes)
+    }
+    val updateTransition = updateTransition(targetState = state, label = "")  // label区分动画
+    val size = updateTransition.animateDp(label = "") {
+        when(it){
+            BoxState.Collapes -> 100.dp
+            BoxState.Expanded -> 200.dp
+        }
+    }
+
+    val color = updateTransition.animateColor(label = "") {
+        when(it){
+            BoxState.Collapes -> Color.Red
+            BoxState.Expanded -> Color.Blue
+        }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(size.value)
+                .background(
+                    color = color.value
+                )
+                .clickable {
+                    if(state == BoxState.Expanded) state = BoxState.Collapes
+                    else state = BoxState.Expanded
+                })
+
+    }
+}
+```
+
+### rememberInfiniteTransition 动画效果无限循环
+
+```kotlin
+@Composable
+@Preview
+fun InfiniteDemo() {
+    val infiniteTransition = rememberInfiniteTransition()
+//    fun rememberInfiniteTransition(): InfiniteTransition {
+//        val infiniteTransition = remember { InfiniteTransition() }
+//        infiniteTransition.run() // 里面是协程 // 处于调度前，里面协程代码在调度后才执行
+//        return infiniteTransition
+//    }
+    // 用协程，while(true)一直去循环
+    val color by infiniteTransition.animateColor(
+        initialValue = Color.Red,
+        targetValue = Color.Green,
+        animationSpec = infiniteRepeatable(
+            // "tween" 一种通过插值计算在起始和结束状态之间平滑过渡的动画效果。
+            animation = tween(1000, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        )
+    )
+
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(300.dp)
+                .background(
+                    color = color
+                )
+        )
+    }
+}
+```
+
+AnimationSpec<T>: 处理动画的效果，相当于估值器
+
+
+## 动画是唯一可信来源
+
+### Animatable
+
+实现颜色转变动画：从初始值到目标值。
+```kotlin
+@Composable
+@Preview
+fun animColorDemo() {
+
+    val enable = remember {
+        mutableStateOf(true)
+    }
+    val color = remember{
+        Animatable(Color.Gray)
+    }
+    LaunchedEffect(enable.value){
+        color.animateTo(if(enable.value) Color.Green else Color.Red)
+    }
+
+    Box(
+        modifier = Modifier.size(400.dp)
+            .background(
+                color = color.value
+            )
+            .clickable {
+                enable.value = !enable.value
+            })
+}
+```
+
+## AnimatedVisibility
+
+## = remember 和 by remember的区别
+
+1. `remember` 是一个函数，用于在 Composable 函数内部创建可记忆的对象，
+1. `by remember` 是一个属性委托，用于在 Composable 函数的参数列表中声明一个可记忆的属性。
+示例：
+```kotlin
+val count = remember { mutableStateOf(0) }
+```
+示例：
+```kotlin
+val count by remember { mutableStateOf(0) }
+```
+1. 使用方式上略有不同
+1. 实现相同的目的：在 Composable 函数的生命周期中保存和管理对象的状态。
