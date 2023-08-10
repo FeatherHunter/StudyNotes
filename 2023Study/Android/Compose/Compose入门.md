@@ -433,6 +433,21 @@ fun MyScreen() {
 
 ## Spacer
 
+## lazyColumn
+
+### LazyColumn + AutoService
+不仅仅项目可以模块化，列表也可以模块化 ===> OOP ===> ARouter
+只需要增加View加上AutoService：AutoService编译时就指定全类名，性能也好  ===> ARouter
+META-INF生成IComposableService服务：
+```
+里面写明了所有实现了该接口的类名
+```
+注意点：反射创建，不能有实例
+AutoService：
+1. 减少了findClass的时间
+2. 直接反射创建。
+
+
 ## ClickableText
 
 1. 用于在文本中创建可点击的部分，并对点击事件进行处理。

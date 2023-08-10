@@ -11,6 +11,10 @@ org.ow2.asm\:asm
 
 项目路径：<https://github.com/FeatherHunter/StudyNotes/blob/master/assets/DemoProjects/ASMInject.zip>
 
+https://juejin.cn/post/6970614836434731021
+transform增量编译
+
+
 ## Trasnform
 
 1、Gradle Transform是什么。😊
@@ -27,7 +31,7 @@ org.ow2.asm\:asm
 *   **DEX阶段**：radle会调用DX工具将.class文件转换成DEX文件，以适应Android平台的运行环境。
 *   **打包阶段**：Gradle会调用APK打包器将DEX文件和已编译资源合并成单个APK文件，并对其进行签名和对齐等操作。
 *   **安装和运行阶段**：Gradle会将APK文件安装到目标设备或模拟器上，并启动应用程序。
-*
+
 
 3、Transform阶段的资源来自于
 
@@ -339,4 +343,22 @@ class MethodAdapterVisitor extends AdviceAdapter { // extends MethodVisitor
 
     ==========>MainActivity execute a: 2001ms.
     ==========>MainActivity execute onCreate: 2067ms.
+
+### Android 实战
+
+背景：第三方Jar中API需要在Service中调用，但是内部会调用Dialog，出现问题。
+解决办法：
+1. 需要弹出Dialog：给Window加标记，允许在Service中弹出
+1. 不需要弹出Dialog：直接根据方法名+方法描述找到show方法，直接屏蔽掉
+1. Activity弹出、Service不需要：增加条件判断
+
+### 卡顿监控
+
+#### 为什么不能在Handler插桩？===> 双亲委派
+
+SDK的Class文件只是给我们自己用的，最终用的是系统的Handler。
+
+双亲委派导致插桩也没用。
+
+
 

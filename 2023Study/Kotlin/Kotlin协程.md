@@ -733,6 +733,171 @@ LiveData关联布局，产生DataBinding
 
 
 
+========================
+
+
+## 作用域构建器
+结构化并发的实战：作用域构建器
+### runBlocking
+1、runBlocking
+```kotlin
+// 线程变协程
+fun main() = runBlocking<Unit> {
+    // this持有了CoroutineScope
+    // 就可以执行launch和aysnc
+}
+```
+1. runBlocking不是挂起函数，为什么有协程效果？
+2. lambda是挂起函数
+```kotlin
+@Throws(InterruptedException::class)
+public fun <T> runBlocking(context: CoroutineContext = EmptyCoroutineContext, block: suspend CoroutineScope.() -> T): T {
+    val currentThread = Thread.currentThread()
+    val contextInterceptor = context[ContinuationInterceptor]
+    val eventLoop: EventLoop?
+    val newContext: CoroutineContext
+    if (contextInterceptor == null) {
+        eventLoop = ThreadLocalEventLoop.eventLoop
+        newContext = GlobalScope.newCoroutineContext(context + eventLoop)
+    } else {
+        eventLoop = (contextInterceptor as? EventLoop)?.takeIf { it.shouldBeProcessedFromContext() }?: ThreadLocalEventLoop.currentOrNull()
+        newContext = GlobalScope.newCoroutineContext(context)
+    }
+    val coroutine = BlockingCoroutine<T>(newContext, currentThread, eventLoop)
+    coroutine.start(CoroutineStart.DEFAULT, coroutine, block)
+    return coroutine.joinBlocking()
+}
+```
+2、结构化并发好处=>解决协程不可控
+1. 可以取消
+2. 可以监控追踪
+### coroutineScope()函数：一个失败全部失败
+1、coroutineScope和runBlocking区别
+```kotlin
+fun main() = runBlocking<Unit> {
+    coroutineScope { 
+        
+    }
+}
+```
+1. 相同：都会等待协程体内任务全部执行完，才会结束
+2. runBlocking：阻塞主线程来等待
+3. coroutineScope：挂起函数
+2、coroutineScope：一个失败全部失败
+```kotlin
+fun main() = runBlocking<Unit> {
+    coroutineScope {
+        launch {}
+        launch {}
+        launch {
+            throw KotlinNullPointerException()
+        }
+        // 一个失败，全部失败
+    }
+}
+```
+### supervisorScope：一个失败不会影响其他
+## Job生命周期
+1、Job六大生命周期
+```kotlin
+New:        协程体被创建
+Active:     存活状态、活跃中
+Canceling:  取消响应状态 => job.cancel()
+->Cancelled:    已取消
+Completing: 完成中
+Completed:  已完成
+```
+2、查看job状态
+```
+    val job = launch {
+        delay(1000)
+    }
+    // true false false // Active
+    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
+    delay(1)
+    job.cancel()
+    // false true false // Cancelled
+    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
+    delay(1)
+    // false true true // Completed
+    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
+```
+* 如果没有cancel，最后完成后的状态应该是 false false true
+3、job生命周期有什么用呢？
+## 协程作用域
+1. 子协程会用父协程的作用域
+2. 父协程中cancel会取消所有子协程，并且抛出JobCancellationException
+### CoroutineScope()函数
+1、CoroutineScope()和coroutineScope()区别
+1. 前者：返回CoroutineScope，大写函数名首字母：简单的工厂设计模式
+2. 前者：提供了可控的结构化并发
+3. 后者suspend函数：返回Unit
+2、CoroutineScope构造作用域
+1. 第二行日志不会打印，两个协程作用域互相独立，不会等待
+2. 父协程，只会等待子协程
+```kotlin
+fun main() = runBlocking<Unit> {
+    val scope = CoroutineScope(context = Dispatchers.Default)
+    scope.launch {
+        println("scope.launch")
+        delay(1000)
+        println("scope.launch2") // 这一行不会打印
+    }
+}
+```
+#### 统一取消协程
+3、CoroutineScope构造作用域和cancel的执行顺序：cancel统一管理，统一退出
+```kotlin
+fun main() = runBlocking<Unit> {
+    val scope = CoroutineScope(context = Dispatchers.Default)
+    // 调度前
+    scope.launch {
+        println("scope.launch") // 调度后, 一定会执行
+        delay(1000)
+        println("scope.launch2") // 这一行不会打印
+    }
+    scope.cancel() // 调度后执行cancel
+}
+```
+#### 取消兄弟协程
+```kotlin
+    // 调度前
+    val loginJob = scope.launch {
+        // 登录请求
+    }
+    loginJob.cancel()
+```
+
+xxx
+## 协程：异常
+### 取消异常
+
+1. 取消异常不捕获会静默处理
+```kotlin
+fun main() = runBlocking<Unit> {
+    val loginJob = GlobalScope.launch {
+        delay(2000)// 捕获异常 CancellationException
+    }
+    loginJob.cancel() // 会抛出异常
+    // 不捕获异常，会静默处理
+    loginJob.join() // 等待结果
+}
+```
+
+2. 取消异常有什么用？后续要暴露问题，进行处理。
+## EmptyCoroutineContext
+## ThreadLocalEventLoop
+## EventLoop
+## ContinuationInterceptor
+## BlockingCoroutine
+### joinBlocking()
+### Question
+
+
+
+
+
+
 
 
 
