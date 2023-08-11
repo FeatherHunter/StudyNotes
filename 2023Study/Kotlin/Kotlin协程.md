@@ -156,6 +156,24 @@ Retrofit可以线程切换，就是发现suspend关键字后，会调用
 > 1. Select选择器
 > 1. async()+await()
 
+### 打印协程名称
+VMOptions：
+```
+-Dkotlinx.coroutines.debug=on
+```
+```kotlin
+println("${Thread.currentThread().name}")
+```
+```
+main的第一行代码 main @coroutine#1
+launch main @coroutine#2
+async main @coroutine#3
+launch2 main @coroutine#2
+async2 main @coroutine#3
+获取到网络数据JSON
+main的第二行代码 main @coroutine#1
+```
+
 ## 协程：启动
 ### launch
 ```kotlin
@@ -325,6 +343,10 @@ withContext start thread:DefaultDispatcher-worker-1
 launch end thread:main
 ```
 
+**下面关于原理的讨论源于：context: CoroutineContext = EmptyCoroutineContext**
+
+* Dispatchers.IO、DEFAULT等异步情况下，不适用
+
 #### 默认模式和取消协程
 
 1、执行顺序(2)
@@ -464,10 +486,6 @@ launch end thread:main
 ```
 
 
-
-## 协程：异常
-### exceptionhandler
-1、为什么exceptionhandler只能给顶级协程，子协程不可以
 ## 协程：操作符
 ### map
 ### flatmap
@@ -576,31 +594,9 @@ funType3.invoke("feather", object:Continuation<Int>{
         get() = MainScope().coroutineContext
 })
 ```
-## 协程核心类和Api
-CoroutineContext
--EmptyCoroutineContext
-Continuation
--SafeContinuation
-CoroutineScope
--GlobalScope
--MainScope
--lifecycleScope
--viewmodelScope
-runBlocking
-delay
-launch
-async
-Job
-```kotlin
-public interface Job : CoroutineContext.Element
-public interface Element : CoroutineContext
-```
--Deferred
-```kotlin
-public interface Deferred<out T> : Job
-```
-架构：
-结构化并发
+
+## 协程：结构化并发
+
 ### CoroutineScope
 
 1、协程会面临的问题：
@@ -664,81 +660,256 @@ public enum class CoroutineStart {
     public val isLazy: Boolean get() = this === LAZY
 }
 ```
-## 测试：runBlocking
-适合学习和测试
+
+
+### Job生命周期
+1、Job六大生命周期
+```kotlin
+New:        协程体被创建
+Active:     存活状态、活跃中
+Canceling:  取消响应状态 => job.cancel()
+->Cancelled:    已取消
+Completing: 完成中
+Completed:  已完成
 ```
-fun main = runBlocking<Unit>{
+2、查看job状态
+```
+    val job = launch {
+        delay(1000)
+    }
+    // true false false // Active
+    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
+    delay(1)
+    job.cancel()
+    // false true false // Cancelled
+    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
+    delay(1)
+    // false true true // Completed
+    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
+```
+* 如果没有cancel，最后完成后的状态应该是 false false true
+3、job生命周期有什么用呢？
+
+### 取消
+
+#### cancelAndJoin
+
+```kotlin
+//取消和挂起join合并
+
+```
+
+#### CPU密集型运算
+
+##### isActive
+
+1. CPU密集型运算，遇到调度后取消，需要用isActive进行判断
+1. 因为没有delay等挂起操作，不会响应Cancel事件
+1. 即使调度前取消，CPU运算还是会进行一部分。
+```kotlin
+    var item = 0
+
+    // Default == 每循环一次计算一次 = CPU密集型运算 = 很密集的运算工作
+    val job1 = launch (context = Dispatchers.Default) {
+        val start = System.currentTimeMillis()
+        while (item <= Int.MAX_VALUE && isActive) {
+            if (System.currentTimeMillis() > start) {
+                println("while item:${item++}")
+            }
+        }
+    }
+
+    // 调度前 - 协程体 准备工作期
+    // job1.cancel()
+
+    // 调度后 - 协程体 执行期
+    delay(50)
+    job1.cancel()
+```
+
+##### ensureActive
+
+* 对isActive()进行了封装
+```kotlin
+fun main() = runBlocking <Unit> {
+    var item = 0
+
+    // Default == 每循环一次计算一次 = CPU密集型运算 = 很密集的运算工作
+    val job1 = launch (context = Dispatchers.Default) {
+        val start = System.currentTimeMillis()
+        while (item <= Int.MAX_VALUE) {
+            ensureActive()
+            if (System.currentTimeMillis() > start) {
+                println("while item:${item++}")
+            }
+        }
+    }
+
+    // 调度前 - 协程体 准备工作期
+    // job1.cancel()
+
+    // 调度后 - 协程体 执行期
+    delay(50)
+    /*job1.cancel()
+    job1.join()*/
+    job1.cancelAndJoin()
+
+    println("最后的值 最后打印是 多少呢:$item")
 }
 ```
-1、runBlocking是阻塞的，协程是非阻塞的不冲突吗？
-1. runBlocking阻塞的是主线程：需要等待所有子协程完成后，才会继续
-2. 协程是非阻塞的
-### 打印协程名称
-VMOptions：
-```
--Dkotlinx.coroutines.debug=on
-```
 ```kotlin
-println("${Thread.currentThread().name}")
-```
-```
-main的第一行代码 main @coroutine#1
-launch main @coroutine#2
-async main @coroutine#3
-launch2 main @coroutine#2
-async2 main @coroutine#3
-获取到网络数据JSON
-main的第二行代码 main @coroutine#1
+public fun Job.ensureActive(): Unit {
+    if (!isActive) throw getCancellationException()
+}
 ```
 
+##### yield
 
-## 协程：面试题
+1、yield  =================> Java yield
+1. 让出CPU资源，本质核心和Java Yield不同
+    1. 先ensureActive() 检查是否已经取消了，会抛出异常`CancellactionException`
+    1. 让其他协程有调度机会
+1. 协程 yield，是挂起函数。 ======> 状态机，给调度的机会
+```kotlin
+fun main() = runBlocking <Unit> {
+    var item = 0
 
-### 你的APP网络模型是什么？
+    // Default == 每循环一次计算一次 = CPU密集型运算 = 很密集的运算工作
+    val job1 = launch (context = Dispatchers.Default) {
+        val start = System.currentTimeMillis()
+        while (item <= Int.MAX_VALUE) {
+            yield() ///// 让出资源
+            if (System.currentTimeMillis() > start) {
+                println("while item:${item++}")
+            }
+        }
+    }
 
-各个企业主流：Retrofit+OkHttp+RxJava+Glide
+    delay(50)
+    // job1.cancelAndJoin()
+    job1.cancel()
 
-主流框架：
-
-一些框架都是：协程+JetPack全家桶+mvvm
-
-理想：协程+JetPack全家桶+mvvm+Retrofit+OkHttp+Glide
-
-xxx未来五年 mvi + compose
-
-```mermaid
-flowchart TD
-Activity/Fragment --> ViewModel_LiveData --> Repository
-Repository -->Model_Room-->SQLite
-Repository -->RemoteDataSource_Retrofit-->Webservice
+    println("最后的值 最后打印是 多少呢:$item")
+}
 ```
 
-### 为什么要有ViewModel层
+#### 资源泄露
 
-为什么不直接View->Model层？
+##### 命令式
+1、文件、数据库等操作的时候，直接cancel会导致，资源没办法正确关闭
+> try-catch-finally中捕获
 
-ViewModel管理所有的LiveData数据的状态的稳定性
+##### use
 
-横竖屏切换等操作，数据会消失
+作用：出现异常时，关闭资源
+```kotlin
+    val job = launch {
+        BufferedReader(FileReader("D:\\Derry.txt"))
+            .use {
+                var lineContent: String?
+                while (true) {
+                    delay(1000)
+                    lineContent = it.readLine()
+                    lineContent ?: break // 如果读取的内容是空的，就跳出循环循环
+                    println(lineContent)
+                }
+            }
+    }
+    // 调度后
+    delay(2000)
+    job.cancel()
+```
+源码分析：
+1. 对T扩展
+1. T : Closeable?
+1. 调用Close方法
+```kotlin
+public inline fun <T : Closeable?, R> T.use(block: (T) -> R): R {
+    // 省略
+    try {
+        return block(this)
+    } catch (e: Throwable) {
+        throw e
+    } finally {
+        // 省略
+        close()
+    }
+}
+```
 
-LiveData关联布局，产生DataBinding
+#### 无法取消
 
-## 启动模式
+##### finally ===> Java
 
-面试题：协程中 Dispatchers.IO，但是我却想让他在 main线程跑协程，有没有办法？
-答：CoroutineStart.UNDISPATCHED
+1、finally中的代码一定执行吗？
+1. finallt中代码也会被取消 // 需要有delay()等挂起操作, 不然一直执行
+```kotlin
+// 需要有delay()等挂起操作
+finally {
+    for (i in 1..Int.MAX_VALUE) {
+        println("finally i:$i")
+        delay(1000L)
+    }
+}
+```
 
-特点：由于没有调度中心调度，所以拿不到 Dispatchers.IO 干脆就用 在当前调用栈线程中执行协程，所以是main线程跑协程
+##### NonCancellable
 
+1. 任何不取消的代码都可以用withContext(NonCancellable)
+```kotlin
+// finnally中
+    try {
+        //
+    } finally {
+        withContext(NonCancellable) {
+            for (i in 1..Int.MAX_VALUE) {
+                println("finally i:$i")
+                delay(1000L)
+            }
+        }
+    }
 
+// 其他地方
+    val job = launch {
+        withContext(NonCancellable) {
+            for (i in 1..Int.MAX_VALUE) {
+                println("item i:$i")
+                delay(1000L)
+            }
+        }
+    }
+```
 
+#### 超时取消
 
-========================
+##### withTimeout
+```kotlin
+withTimeout(1000){
+    // 超时抛出异常
+}
+```
 
+##### withTimeoutOrNull
+1. 超时返回最后一行String或者Null
+```kotlin
+    val r = withTimeoutOrNull(6000) {
+        for (i in 1 .. 6) {
+            println("for i:$i")
+            delay(500)
+        }
+        "执行完成"
+    }
+    println("成果是: ${r ?: "执行出现问题"}")
+```
 
-## 作用域构建器
+## 协程：协程作用域
+
+1. 子协程会用父协程的作用域
+2. 父协程中cancel会取消所有子协程，并且抛出JobCancellationException
+
+### 作用域构建器
 结构化并发的实战：作用域构建器
-### runBlocking
+#### runBlocking
 1、runBlocking
 ```kotlin
 // 线程变协程
@@ -768,10 +939,16 @@ public fun <T> runBlocking(context: CoroutineContext = EmptyCoroutineContext, bl
     return coroutine.joinBlocking()
 }
 ```
-2、结构化并发好处=>解决协程不可控
+
+2、runBlocking是阻塞的，协程是非阻塞的不冲突吗？
+1. runBlocking阻塞的是主线程：需要等待所有子协程完成后，才会继续
+2. 协程是非阻塞的
+
+3、结构化并发好处=>解决协程不可控
 1. 可以取消
 2. 可以监控追踪
-### coroutineScope()函数：一个失败全部失败
+
+#### coroutineScope()函数：一个失败全部失败
 1、coroutineScope和runBlocking区别
 ```kotlin
 fun main() = runBlocking<Unit> {
@@ -796,37 +973,8 @@ fun main() = runBlocking<Unit> {
     }
 }
 ```
-### supervisorScope：一个失败不会影响其他
-## Job生命周期
-1、Job六大生命周期
-```kotlin
-New:        协程体被创建
-Active:     存活状态、活跃中
-Canceling:  取消响应状态 => job.cancel()
-->Cancelled:    已取消
-Completing: 完成中
-Completed:  已完成
-```
-2、查看job状态
-```
-    val job = launch {
-        delay(1000)
-    }
-    // true false false // Active
-    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
-    delay(1)
-    job.cancel()
-    // false true false // Cancelled
-    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
-    delay(1)
-    // false true true // Completed
-    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
-```
-* 如果没有cancel，最后完成后的状态应该是 false false true
-3、job生命周期有什么用呢？
-## 协程作用域
-1. 子协程会用父协程的作用域
-2. 父协程中cancel会取消所有子协程，并且抛出JobCancellationException
+#### supervisorScope：一个失败不会影响其他
+
 ### CoroutineScope()函数
 1、CoroutineScope()和coroutineScope()区别
 1. 前者：返回CoroutineScope，大写函数名首字母：简单的工厂设计模式
@@ -868,7 +1016,47 @@ fun main() = runBlocking<Unit> {
     loginJob.cancel()
 ```
 
-xxx
+## 协程：上下文
+
+### CoroutineContext
+
+**CoroutineContext的内部元素**
+
+Job: 控制协程的生命周期  协程协程行为的元素
+CoroutineDispatcher:向合适的线程分发协程任务
+CoroutineName:协程的名称，测试调试的时候，非常有用
+CoroutineExceptionHandler:处理未被捕捉的异常
+
+
+- CoroutineScope靠的是内部的CoroutineContext
+- CoroutineContext本身功能很少，只是作为容器去保存和传递
+- CoroutineContetx的强大功能源于各种子类
+
+### 组合构建CoroutineContext
+```kotlin
+    val job = launch(context = Dispatchers.Default + CoroutineName("我是Derry协程") + CoroutineExceptionHandler{
+        coroutineContext, throwable ->
+            println("CoroutineContext:$coroutineContext Throwable:$throwable")
+    } + Job()) {
+        println("launch this thread:${Thread.currentThread().name}")
+    }
+// CoroutineContext = CoroutineDispatcher+CoroutineName+CoroutineExceptionHandler+Job
+```
+
+### 继承
+
+1. 子协程会用父类Dispatcher和CoroutineName
+1. 子协程的Job自己的实例
+```kotlin
+
+```
+
+
+### EmptyCoroutineContext
+
+作用是什么？
+> 默认是 EmptyCoroutineContext
+
 ## 协程：异常
 ### 取消异常
 
@@ -876,7 +1064,11 @@ xxx
 ```kotlin
 fun main() = runBlocking<Unit> {
     val loginJob = GlobalScope.launch {
-        delay(2000)// 捕获异常 CancellationException
+        try {
+            delay(2000)// 捕获异常 CancellationException
+        } catch (e: CancellationException) {
+            println("协程被取消了 异常是:$e")
+        }
     }
     loginJob.cancel() // 会抛出异常
     // 不捕获异常，会静默处理
@@ -885,13 +1077,83 @@ fun main() = runBlocking<Unit> {
 ```
 
 2. 取消异常有什么用？后续要暴露问题，进行处理。
-## EmptyCoroutineContext
-## ThreadLocalEventLoop
-## EventLoop
-## ContinuationInterceptor
-## BlockingCoroutine
-### joinBlocking()
-### Question
+
+### exceptionhandler
+1、为什么exceptionhandler只能给顶级协程，子协程不可以
+
+## 协程：面试题
+
+### 你的APP网络模型是什么？
+
+各个企业主流：Retrofit+OkHttp+RxJava+Glide
+
+主流框架：
+
+一些框架都是：协程+JetPack全家桶+mvvm
+
+理想：协程+JetPack全家桶+mvvm+Retrofit+OkHttp+Glide
+
+xxx未来五年 mvi + compose
+
+```mermaid
+flowchart TD
+Activity/Fragment --> ViewModel_LiveData --> Repository
+Repository -->Model_Room-->SQLite
+Repository -->RemoteDataSource_Retrofit-->Webservice
+```
+
+### 为什么要有ViewModel层
+
+为什么不直接View->Model层？
+
+ViewModel管理所有的LiveData数据的状态的稳定性
+
+横竖屏切换等操作，数据会消失
+
+LiveData关联布局，产生DataBinding
+
+### 启动模式
+
+面试题：协程中 Dispatchers.IO，但是我却想让他在 main线程跑协程，有没有办法？
+答：CoroutineStart.UNDISPATCHED
+
+特点：由于没有调度中心调度，所以拿不到 Dispatchers.IO 干脆就用 在当前调用栈线程中执行协程，所以是main线程跑协程
+
+
+
+## 协程核心类和Api：结构和源码剖析
+CoroutineContext
+-EmptyCoroutineContext
+Continuation
+-SafeContinuation
+CoroutineScope
+-GlobalScope
+-MainScope
+-lifecycleScope
+-viewmodelScope
+runBlocking
+delay
+launch
+async
+Job
+```kotlin
+public interface Job : CoroutineContext.Element
+public interface Element : CoroutineContext
+```
+-Deferred
+```kotlin
+public interface Deferred<out T> : Job
+```
+架构：
+结构化并发
+
+EmptyCoroutineContext
+ThreadLocalEventLoop
+EventLoop
+ContinuationInterceptor
+BlockingCoroutine
+
+joinBlocking()
 
 
 
