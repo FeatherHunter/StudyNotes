@@ -281,3 +281,102 @@ onTrimMemory(int level){
 3、大图加载
 > gradle的缓存缩放后的图片。
 
+## 基本数据类型
+1、内存小
+2、数组快
+3、CPU缓存机制
+## 类加载
+## Android N 运行机制
+1、运行机制
+1. 运行时解释执行
+2. 将热点代码，JIT即时编译，编译的方法会记录到Profile配置文件中。位于/data/misc/profiles
+3. 设备空闲、充电时，根据Profile进行AOT。下次运行时可以直接运行。=>BackgroundDexOptService
+2、相关目录
+1. /data/app
+   1. base.odex 优化后的odex文件
+   2. base.art AOT：编译成机器码放入
+2. /data/misc/profiles
+   1. cur
+   2. ref
+3、AOT和BackgroundDexOptService 后台服务
+1. dex2oat，会处理，编译好后生成base.art文件放入到/data/app
+## 双亲委派机制
+1、双亲委派机制-mParent变量：
+会将所有的加载请求交给父类处理，父类加载class失败，会调用自己的findClass，没找到会抛出ClassNotFoundException异常
+2、BootClassLoader - Framework class文件
+3、PathClassLoader - BaseDexClassLoader（pathlis: DexPathList）
+1. 加载应用class文件
+2. 需要传入so位置
+4、DexClassLoader
+1. 额外动态类加载器
+2. 需要传入Dex路径
+5、PathClassLoader和DexClassLoader的区别？
+1. 源码层面，唯一区别的参数在API 27已经废弃。（传入的是null，两者如今调用的是同一个父类构造方法）
+2. 没有区别，都可以加载sdcard上外置的Dex文件
+## 热修复
+1、修改后的class文件如何生成补丁dex文件？
+> dx.bat dx.jar用于生成
+2、热修复思路
+1. 将补丁dex和原有dex，放入到DexPathList中的dexElements数组中，反射实现，application中执行
+3、Application怎么热修复?
+1. 自定义ClassLoader去处理Application ===> Tinker方案
+## 文件IO
+文件IO分为：
+1. 字节流
+2. 字符流
+3. RandomAccessFile：适合断点续传
+4. FileChannel：NIO，大文件操作
+## 加固*
+1、加固方案
+1. 反虚拟机：发现虚拟机运行，停止运行。虚拟机可以自己编译并且加上一切日志
+1. 代码虚拟化：虚拟机之上套一层虚拟执行引擎，JVM之上的虚拟机
+2. 加密：【微信方案】代码分为核心代码和非核心代码，非核心代码做引导，核心代码加载时解密。
+2、免费加固方案没用，需要商业加固方案
+3、加密方案整体步骤和思路
+1. DEX分为壳Dex和源Dex
+2. Apk解压缩->源Dex AES等方法加密->生成Apk
+3. 加载时，壳Dex进行AES解密
+### dex文件结构
+1、dex文件的结构
+1. 文件头
+2. 索引区:字符串索引、类型索引、方法索引
+3. 数据区
+2、dex加密思路
+1. 对数据区加密，留下索引区
+2. 需要修改文件头：文件长度、签名
+## Apk打包流程
+1. 资源文件生成R.java文件(aapt工具)，aidl文件生成对应java文件(aidl工具)
+2. 编译：源代码.java .kt + R.java + aidl.java -> class文件
+3. 自己class文件 + 第三方class文件 -> Dex （DX工具）  =======> Transform/ AGP8.0 ACVF   ===> ASM
+4. dex文件 + 资源文件(自己) + 资源文件(第三方) -> apk (apkBuilder工具)
+5. 签名(keystore)
+6. 对齐(zipalign)
+## ZIP压缩
+Andorid提供压缩类：
+1. ZipEntry
+2. ZipFile
+3. ZipOutputStream
+
+
+======下面是问题=============
+# 数据结构
+1、HashMap的扩容原理，为什么2的指数幂，输入17会是多少？
+2、ConcurrentHashMap读写锁是如何实现的？
+3、List加锁怎么加？
+4、5G数据，如何在500MV的内存情况下排序？桶排序
+5、大文件传输中要考虑哪些问题？如何保证大文件的一致性。
+# 实战
+1、如何设计一个WX朋友圈首页的功能，UI、数据等方面
+2、如何设计一个无限数据的气泡聊天功能
+# 锁
+1、synchronized、Lock实现原理
+# 性能
+1、App性能优化：内存优化、cpu占用率(优化)、流畅性
+2、如何评价一款App的性能
+3、如何线上监控app的性能问题
+自己做过的APM的
+crash、anr、OOM内存监控、卡顿监控
+做过mmkv
+ 
+
+

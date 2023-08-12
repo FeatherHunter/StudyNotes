@@ -2,6 +2,8 @@
 
 [文本链接，点击这里↓](https://blog.csdn.net/feather_wch/article/details/132029690)
 
+[toc]
+
 |题号|题目|方法(同类型题目)||
 |---|---|---|---|
 |9|回文数|数学位运算、中间扩散、双指针||
@@ -32,3 +34,17 @@
 f(nums[i]) = nums[i] - 1
 举例：nums[i] = 2
 结果：f（2）= 2 - 1 = 1，下标为1
+
+
+## 剑指 Offer 09. 用两个栈实现队列
+### 栈的选择
+Deque来替代：
+```java
+Deque<Integer> deque = new LinkedList<>();
+Deque<Integer> deque = new ArrayDeque<>(); // 数组实现，性能更好
+```
+线程安全：
+```java
+ConcurrentLinkedDeque或者ArrayDeque
+```
+
