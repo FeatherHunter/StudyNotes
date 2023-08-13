@@ -484,20 +484,432 @@ ServiceManager(SystemServer进程)
 3、AMS和App通信的binder是阻塞的还是非阻塞的？
 1. 一般要等待结果的是阻塞的
 2. 部分是非阻塞oneway的
-### IPC
-4、IPC的场景
+
+## Linux IPC
+
+1、IPC方式介绍
+|方式|介绍|应用|
+|---|---|---|
+|管道|fd[1]读端 <br> fd[0]写端 <br> 基于特殊文件 <br> 1. 命名管道 <br> 2. 无名管道||
+|消息队列|类型和消息对应。约定好取哪个消息||
+|共享内存||1. WMS和SurfaceFlinger需要大量渲染 <br> 2. 图库|
+|文件|||
+|Sokcet|Local Socket|Zygote|
+|信号量|IPC同步手段|mmkv|
+|信号|||
+
+## Android IPC
+1、IPC的场景
 1. App之间需要IPC
 2. Framework之间需要IPC
 3. App和Framework需要IPC
 4. Framework和native层需要JNI+IPC
 5. Native层到Linux Kernel是SystemCall，系统调用
-5、多进程有哪些使用场景？
+
+2、多进程有哪些使用场景？
 1. 突破单进程限制，分配更多资源（浏览器+播放器，给更多“CPU”执行机会和“内存”）
 2. 图库（内存）
 3. 稳定、风险隔离， ===> WX消息push在独立进程
 4. 性能监控 ===> APM，fork子进程，dump信息
+
+
+
+
+## Binder概念
+
+1、Binder为什么需要第一时间创建？
+1. Activity等组件都需要Binder
+
+2、Zygote有自己的Binder吗？
+>没有，zygote主要任务是fork进程
+>1. ServiceManager会初始化系统Binder调用
+>1. 其他进程在fork后会在nativeZygoteInit中调用native方法，里面会在ProcesseState对象创建的时候，open driver，创建binder，并且mmap进行映射
+
+3、Binder是什么？
+1. 应用层面：Android IPC机制，在进程间提供跨进程通信的CS的架构
+1. Java层面：一个类，继承自IBinder接口，提供了跨进程能力
+1. 驱动层面：Binder Driver，虚拟物理设备驱动
+1. Linux层面：/dev/binder文件
+
+## Binder驱动初始化流程
+
+### ServiceManager的Binder
+
+1、ServiceManager是什么？
+1. 独立进程，init进程创建，比zygote更早
+1. Android10后有servicemanager.rc文件
+
+2、ServiceManager和SystemServer关系
+1. ServiceManager是服务的注册表，用于注册、查找、访问
+1. ServiceManager比zygote早(也就比SystemServer早)
+1. 会初始化Binder驱动，并将自己作为第一个服务注册
+1. 用于处理Binder事务，用Linux Looper Epoll机制 while
+
+3、SystemServer
+1. 运行了AMS、WMS等服务
+1. 会将服务注册到ServiceManager中
+
+2、ServiceManager的启动流程
+系统启动过程中的main()中会解析`init.rc`并且启动ServiceManager进程。执行main()
+main.cpp frameworks\native\cmds\servicemanager\main.cpp
+```c++
+int main(int argc, char** argv) {
+
+    //1. 初始化binder驱动 /dev/binder
+    sp<ProcessState> ps = ProcessState::initWithDriver(driver);
+    ps->setThreadPoolMaxThreadCount(0);
+    ps->setCallRestriction(ProcessState::CallRestriction::FATAL_IF_NOT_ONEWAY);
+
+    //2. 实例化ServiceManager，将自身作为服务addsevice注册
+    sp<ServiceManager> manager = new ServiceManager(std::make_unique<Access>());
+    if (!manager->addService("manager", manager, false /*allowIsolated*/, IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT).isOk()) {
+        LOG(ERROR) << "Could not self register servicemanager";
+    }
+    //设置服务端BBinder
+    IPCThreadState::self()->setTheContextObject(manager);
+    //设置自己为binder驱动的上下文管理者
+    ps->becomeContextManager(nullptr, nullptr);
+    //3. 利用Looper epoll机制处理Binder事务
+    sp<Looper> looper = Looper::prepare(false /*allowNonCallbacks*/);
+
+    BinderCallback::setupTo(looper);
+    ClientCallbackCallback::setupTo(looper, manager);
+
+    while(true) {
+        looper->pollAll(-1);
+    }
+
+}
+```
+
 ### SystemServer
-#### 启动流程
+在SystemServer启动流程中ZygoteInit.nativeZygoteInit()会进行Binder初始化
+```c++
+ZygoteInit.nativeZygoteInit()
+```
+对应于：AndroidRuntime.cpp ->目录frameworks\base\core\jni\AndroidRuntime.cpp
+```c++
+AndroidRuntime.cpp
+static void com_android_internal_os_ZygoteInit_nativeZygoteInit(JNIEnv* env, jobject clazz)
+{
+    //gCurRuntime 是app_main.cpp 中 AppRuntime 的一个对象
+    gCurRuntime->onZygoteInit();
+}
+```
+app_main.cpp ->目录frameworks\base\core\cmds\app_process\
+```c++
+    virtual void onZygoteInit()
+    {
+        sp<ProcessState> proc = ProcessState::self();
+        ALOGV("App process: starting thread pool.\n");
+        proc->startThreadPool();
+    }
+```
+ProcessState.cpp ->目录frameworks\native\lib\binder\ProcessState.cpp
+```c++
+ProcessState::ProcessState(const char *driver)
+    : mDriverName(String8(driver))
+    , mDriverFD(open_driver(driver))
+    , mVMStart(MAP_FAILED)
+    , mThreadCountLock(PTHREAD_MUTEX_INITIALIZER)
+    , mThreadCountDecrement(PTHREAD_COND_INITIALIZER)
+    , mExecutingThreadsCount(0)
+    , mMaxThreads(DEFAULT_MAX_BINDER_THREADS)
+    , mStarvationStartTimeMs(0)
+    , mBinderContextCheckFunc(nullptr)
+    , mBinderContextUserData(nullptr)
+    , mThreadPoolStarted(false)
+    , mThreadPoolSeq(1)
+    , mCallRestriction(CallRestriction::NONE)
+  {
+
+// TODO(b/139016109): enforce in build system
+#if defined(__ANDROID_APEX__)
+    LOG_ALWAYS_FATAL("Cannot use libbinder in APEX (only system.img libbinder) since it is not stable.");
+#endif
+
+    if (mDriverFD >= 0) {
+
+// Step2 重要函数
+        //调用mmap接口向Binder驱动中申请内核空间的内存
+        // mmap the binder, providing a chunk of virtual address space to receive transactions.
+        mVMStart = mmap(nullptr, BINDER_VM_SIZE, PROT_READ, MAP_PRIVATE | MAP_NORESERVE, mDriverFD, 0);
+        if (mVMStart == MAP_FAILED) {
+            // *sigh*
+            ALOGE("Using %s failed: unable to mmap transaction memory.\n", mDriverName.c_str());
+            close(mDriverFD);
+            mDriverFD = -1;
+            mDriverName.clear();
+        }
+    }
+
+#ifdef __ANDROID__
+    LOG_ALWAYS_FATAL_IF(mDriverFD < 0, "Binder driver '%s' could not be opened.  Terminating.", driver);
+#endif
+} 
+
+// Step1 重要函数
+static int open_driver(const char *driver)
+{
+
+    //打开binder驱动
+    int fd = open(driver, O_RDWR | O_CLOEXEC);
+    if (fd >= 0) {
+        int vers = 0;
+        //验证binder版本
+        status_t result = ioctl(fd, BINDER_VERSION, &vers);
+        if (result == -1) {
+            ALOGE("Binder ioctl to obtain version failed: %s", strerror(errno));
+            close(fd);
+            fd = -1;
+        }
+        if (result != 0 || vers != BINDER_CURRENT_PROTOCOL_VERSION) {
+          ALOGE("Binder driver protocol(%d) does not match user space protocol(%d)! ioctl() return value: %d",
+                vers, BINDER_CURRENT_PROTOCOL_VERSION, result);
+            close(fd);
+            fd = -1;
+        }
+        //设置binder最大线程数：DEFAULT_MAX_BINDER_THREADS 15
+        size_t maxThreads = DEFAULT_MAX_BINDER_THREADS;
+        result = ioctl(fd, BINDER_SET_MAX_THREADS, &maxThreads);
+        if (result == -1) {
+            ALOGE("Binder ioctl to set max threads failed: %s", strerror(errno));
+        }
+    } else {
+        ALOGW("Opening '%s' failed: %s\n", driver, strerror(errno));
+    }
+    return fd;
+}
+```
+
+## fork
+
+1、Linux中为什么不允许在多线程环境下fork？
+> 会死锁
+
+2、zygote为什么用socket方式？
+1. binder底层针对每次请求都会有独立的线程去完成任务>binder线程池  ====> 线程池
+2. zygote不允许有binder，会死锁，只能用socket
+
+## AIDL
+
+1. AIDL可以用aidl.exe生成cpp版本的文件
+1. 典型【代理模式】       ================> 代理模式
+
+### 通信流程
+
+1、Client发起服务请求
+1. BinderProxy nativeTransact()
+1. android_util_binder BinderPorxy_transact
+1. BpBinder.transact
+1. IPCThreadState.transact
+    1. write数据到Parcel mOut中，不会立即发起请求
+    1. waitForResponse()->talkWithDriver()拿出mOut中数据放到bwr中(binder_write_read)
+
+
+2、获取到ServiceManager的Binder的流程
+1. IServiceManager.getXXX
+1. BinderInternel.getTheContextObject->ProcessState::getContextObject // 会拿到ServiceManager
+    1. 从0位置拿到Binder，没有拿到就新建BpBinder
+    1. 将native BpBinder用反射构造出BinderProxy
+
+## mmap
+内存读写，代替IO读写。
+
+# Android系统启动流程
+
+## JNI注册
+
+AndroidRuntime.cpp中注册了所有JNI
+```c++
+    if (register_jni_procs(gRegJNI, NELEM(gRegJNI), env) < 0) {
+        env->PopLocalFrame(NULL);
+        return -1;
+    }
+
+// 数组存放了所有JNI对应关系
+RegJNIRec gRegJNI[] = {....}
+```
+
+## 源码：Zygote启动全流程
+1、app_main.cpp 启动Zygote或者正常app流程 ->目录frameworks\base\cmds\app_process\
+```c++
+main(){
+    //   启动zygote的java层调用
+    if (zygote) {
+        ////zygote 为true 表示正在启动的进程为zygote进程
+        //由此可知app_main.cpp在zygote启动其他进程的时候都会通过main()方法
+        //这里启动的是zygote进程调用runtime start()方法 传入参数
+        runtime.start("com.android.internal.os.ZygoteInit", args, zygote);
+    } else if (className) {  //这个地方是用于启动app的
+        runtime.start("com.android.internal.os.RuntimeInit", args, zygote);
+    } 
+}
+```
+
+2、AndroidRuntime.cpp ->目录frameworks\base\core\jni\
+```c++
+void AndroidRuntime::start(const char* className, const Vector<String8>& options, bool zygote)
+{
+
+    // 创建虚拟机
+    if (startVm(&mJavaVM, &env, zygote, primary_zygote) != 0) { 
+        return;
+    }    
+    // 注册JNI
+    if (startReg(env) < 0) {
+        return;
+    }
+    // 进入zygoteInit.main,将zygoteinit带入java世界
+    char* slashClassName = toSlashClassName(className != NULL ? className : "");
+    jclass startClass = env->FindClass(slashClassName);
+
+    jmethodID startMeth = env->GetStaticMethodID(startClass, "main",
+"([Ljava/lang/String;)V");
+
+    env->CallStaticVoidMethod(startClass, startMeth, strArray);
+}
+```
+
+3、ZygoteInit.java ->目录frameworks\base\cor\java\com\android\internal\os\
+```c++
+
+public static void main(String argv[]) {
+    //step1 重要的函数 preload
+    preload(bootTimingsTraceLog);
+    //Step2 重要函数 创建socket服务
+    zygoteServer = new ZygoteServer(isPrimaryZygote);  
+
+   if (startSystemServer) {
+        //Step3 重要函数 Zygote Fork出的第一个进程 system_server
+        Runnable r = forkSystemServer(abiList, zygoteSocketName, zygoteServer);
+        r.run(); // r: ZygoteInit.zygoteInit
+        return;
+   }
+   //Step4 重要函数 循环等待fork出其他的应用进程，比如Launcher，比如app
+   caller = zygoteServer.runSelectLoop(abiList);
+   //执行返回的Runnable对象，进入子进程
+   caller.run();
+      
+}
+```
+
+### preload
+```c++
+    static void preload(TimingsTraceLog bootTimingsTraceLog) {
+        preloadClasses();// 加载系统类
+        preloadResources();// 加载系统资源
+        nativePreloadAppProcessHALs();
+        maybePreloadGraphicsDriver();
+        preloadSharedLibraries();// 加载一些共享so库，其实就三个：android、compiler_rt、jnigraphics
+        preloadTextResources();// 加载字体资源
+        WebViewFactory.prepareWebViewInZygote();// 加载webview相关资源
+        warmUpJcaProviders();// 初始化JCA安全相关的参数
+    }
+
+```
+
+### SystemServer
+
+1、fork出SystemServer
+ZygoteInit.java ->目录frameworks\base\core\java\com\android\internal\os\
+```c++
+    private static Runnable forkSystemServer(String abiList, String socketName,
+            ZygoteServer zygoteServer) {
+        int pid = Zygote.forkSystemServer(
+                    parsedArgs.mUid, parsedArgs.mGid,
+                    parsedArgs.mGids,
+                    parsedArgs.mRuntimeFlags,
+                    null,
+                    parsedArgs.mPermittedCapabilities,
+                    parsedArgs.mEffectiveCapabilities);
+
+        // 子进程继续处理
+        if (pid == 0) { 
+            if (hasSecondZygote(abiList)) {
+                waitForSecondaryZygote(socketName);
+            }
+            zygoteServer.closeServerSocket();
+            return handleSystemServerProcess(parsedArgs);
+        }
+        // 父进程什么也不做
+        return null;
+    }
+```
+
+2、Zygote.java frameworks\base\core\java\com\android\internal\os\Zygote.java
+```java
+    static int forkSystemServer(int uid, int gid, int[] gids, int runtimeFlags, int[][] rlimits, long permittedCapabilities, long effectiveCapabilities) {
+
+        int pid = nativeForkSystemServer(
+                uid, gid, gids, runtimeFlags, rlimits,
+                permittedCapabilities, effectiveCapabilities);
+
+        return pid;
+    }
+
+// 核心作用：调用底层fork()
+    private static native int nativeForkSystemServer(int uid, int gid, int[] gids, int runtimeFlags,
+            int[][] rlimits, long permittedCapabilities, long effectiveCapabilities);
+```
+
+3、ZygoteInit.java frameworks\base\core\java\com\android\internal\os\
+```java
+private static Runnable handleSystemServerProcess(ZygoteArguments parsedArgs) 
+    
+    ClassLoader cl = createPathClassLoader(systemServerClasspath, parsedArgs.mTargetSdkVersion); ===> PathClassLoader
+
+    return ZygoteInit.zygoteInit(parsedArgs.mTargetSdkVersion,
+                    parsedArgs.mDisabledCompatChanges,
+                    parsedArgs.mRemainingArgs, cl);
+}
+```
+
+4、ZygoteInit.java frameworks\base\core\java\com\android\internal\os\
+```c++
+    public static final Runnable zygoteInit(xxx) {
+        //1. 初始化运行环境
+        RuntimeInit.commonInit();//初始化运行环境 
+        //2. 启动Binder ，方法在 androidRuntime.cpp中注册       
+        ZygoteInit.nativeZygoteInit();
+        //3. 通过反射创建程序入口函数的 Method 对象，并返回 Runnable 对象
+        // ActivityThread.main
+        return RuntimeInit.applicationInit(targetSdkVersion, disabledCompatChanges, argv, classLoader);
+    }
+
+    protected static Runnable applicationInit(xxx, ClassLoader classLoader) {
+        // startClass: 如果AMS通过socket传递过来的是 ActivityThread
+        return findStaticMain(args.startClass, args.startArgs, classLoader);
+    }
+```
+
+#### RuntimeInit.commonInit
+
+framworks\base\core\java\com\android\internal\os\
+```java
+    protected static final void commonInit() {
+        if (DEBUG) Slog.d(TAG, "Entered RuntimeInit!");
+
+//1、设置异常处理器：
+// 1. 设置未捕获异常的预处理器（pre-handler）为 LoggingHandler，用于处理未捕获的异常日志。
+// 2. 设置默认的未捕获异常处理器为 KillApplicationHandler，用于处理应用程序崩溃并终止应用。 ===> ANR KillApplicationHandler
+        LoggingHandler loggingHandler = new LoggingHandler();
+        RuntimeHooks.setUncaughtExceptionPreHandler(loggingHandler);
+        Thread.setDefaultUncaughtExceptionHandler(new KillApplicationHandler(loggingHandler));
+
+//2、设置日志管理器
+        LogManager.getLogManager().reset();
+        new AndroidConfig();
+
+//3、关联套接字标记和流量统计：
+        NetworkManagementSocketTagger.install();
+// 省略
+        initialized = true;
+    }
+```
+
+## SystemServer
+### 创建Context
 1、SystemServer的启动流程
 ```
 run()
@@ -506,11 +918,11 @@ run()
     -> 把自己的ApplicationThread（binder对象）交给了AMS
   ->2. 创建ContextImpl并且设置
 ```
-2、
-## mmap
-内存读写，代替IO读写。
-## AMS
-### Service
+
+
+
+# AMS
+## Service
 1、bindService流程
 ```
 App:bindService()
