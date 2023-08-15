@@ -195,6 +195,10 @@ main的第二行代码 main @coroutine#1
     }
     println(deferred.await())
 ```
+
+3、launch和async都会立即调度
+1. await只是拿返回值
+
 ### withContext
 ## 协程：流程控制
 ### join
@@ -280,6 +284,40 @@ public inline fun measureTimeMillis(block: () -> Unit): Long {
     block() // 执行前后计算时间点
     return System.currentTimeMillis() - start
 }
+```
+
+### yield
+
+1、yield让出执行权
+```kotlin
+    // 子协程
+    val result = supervisorScope {
+        launch {
+            println("launch1 start ...")
+            delay(1000)
+            throw KotlinNullPointerException("协程1 一秒后 抛出异常")
+        }
+        println("supervisorScope run ")
+        yield()
+        delay(500) // or delay(1500)
+        println("supervisorScope run end")
+    }
+```
+1. 即使让出执行权，谁delay的时间最短，谁就会先恢复执行
+1. 时间都相等时，让执行权的协程，后执行
+```kotlin
+    // 子协程
+    val result = supervisorScope {
+        launch {
+            println("执行顺序2")
+            delay(1000)
+            println("执行顺序3")
+        }
+        println("执行顺序1")
+        yield()
+        delay(1000)
+        println("执行顺序4")
+    }
 ```
 
 
@@ -485,13 +523,6 @@ launch end thread:main
 
 ```
 
-
-## 协程：操作符
-### map
-### flatmap
-2、flatmap和map的区别？什么是展平？
-flatmap contact
-flatmap merge
 ## 协程：并发
 协程并发问题：
 1. 原子类
@@ -973,7 +1004,48 @@ fun main() = runBlocking<Unit> {
     }
 }
 ```
-#### supervisorScope：一个失败不会影响其他
+#### supervisorScope：一个失败不会影响其他 ===> SupervisorJob
+
+1、supervisorScope是什么？
+1. 挂起函数
+1. 子协程出现异常，不会影响其他子协程
+1. 但是本身作用域出现异常，所有子协程都不会执行
+
+2、返回值
+1. 最后一行‘男’为返回值，result
+```kotlin
+    val result = supervisorScope {
+        launch {
+            println("launch1 start ...")
+            delay(1000)
+            throw KotlinNullPointerException("协程1 一秒后 抛出异常")
+        }
+
+        launch {
+            println("launch5 start ...")
+            delay(2300)
+            println("launch5 end ...")
+        }
+
+        '男'
+    }
+```
+
+3、作用域出现异常，所有子协程都不会执行
+```kotlin
+    // 子协程
+    val result = supervisorScope {
+        launch {}
+        launch {}
+        launch {}
+        launch {}
+
+        // 你敢在 supervisorScope {} 里面抛出异常，这个作用域里面所有的协程都会被取消
+        throw KotlinNullPointerException("supervisorScope {} 里面抛出异常")
+        '男'
+    }
+```
+
 
 ### CoroutineScope()函数
 1、CoroutineScope()和coroutineScope()区别
@@ -1016,6 +1088,63 @@ fun main() = runBlocking<Unit> {
     loginJob.cancel()
 ```
 
+### SequenceScope
+
+1、SequenceScope是一个接口，它定义了创建序列的生成器函数（sequence builder function）的作用域。
+
+2、SequcenceScope包含以下方法：用于添加到生成的序列中
+1. `yield(value: T)`
+1. `yieldAll(elements: Sequence<T>)`
+1. `yieldAll(elements: Iterable<T>)`：将一个可迭代对象中的所有元素添加到生成的序列中。
+1. `yieldAll(elements: Iterator<T>)`：将一个迭代器中的所有元素添加到生成的序列中。
+1. `yieldAll(elements: Array<T>)`：将一个数组中的所有元素添加到生成的序列中。
+
+
+3、sequence是什么？作用是什么？
+1. 一个顶层函数，用于创建序列。它接受一个生成器函数作为参数，并返回一个延迟计算的序列对象。
+1. 在生成器函数内部，可以使用`yield`和`yieldAll`方法逐步生成序列的元素。
+1. 通过使用`sequence`函数，可以有效地使用惰性计算的方式处理大量数据，减少内存开销。
+1. 可以提高性能和减少内存使用，尤其处理大量数据时非常有用
+
+```kotlin
+fun fibonacciSequence(): Sequence<Int> = sequence {
+    var current = 0
+    var next = 1
+    while (true) {
+        yield(current)
+        val sum = current + next
+        current = next
+        next = sum
+    }
+}
+
+fun main() {
+    val fibonacci = fibonacciSequence()
+    val firstTen = fibonacci.take(10).toList()
+    println(firstTen) // 输出：[0, 1, 1, 2, 3, 5, 8, 13, 21, 34]
+}
+
+```
+
+4、不允许自己调用挂起函数，只允许yield等内置方法具有挂起能力
+```kotlin
+    fun getSequcence() = sequence{
+        for(item in 100..110){
+            // 不允许使用 delay
+            yield(item)
+        }
+    }
+// 源码：
+@RestrictsSuspension
+@SinceKotlin("1.3")
+public abstract class SequenceScope<in T> internal constructor() {
+    public abstract suspend fun yield(value: T)
+    // ...
+}
+```
+1. @RestrictsSuspension编译器会处理
+1. suspend fun yield()可以挂起
+
 ## 协程：上下文
 
 ### CoroutineContext
@@ -1045,11 +1174,37 @@ CoroutineExceptionHandler:处理未被捕捉的异常
 
 ### 继承
 
-1. 子协程会用父类Dispatcher和CoroutineName
+1、协程CoroutineContext的继承
+1. 子协程会用父类Dispatcher、CoroutineName、ExceptionHandler
 1. 子协程的Job自己的实例
-```kotlin
 
+2、CoroutineContext的子类有哪些
+1. Job
+1. CoroutineDispathcer
+1. CoroutineName
+1. CoroutineExceptionHandler
+
+
+3、下面代码中子协程所在的线程池是什么？
+```kotlin
+    val coroutineScope = CoroutineScope(Job() + exception + Dispatchers.Main + CoroutineName("coroutineD"))
+
+    coroutineScope.launch(Dispatchers.Default) {
+
+        launch {
+            println("launch1 从上下文获取协程:${coroutineContext[Job]} --- 当前线程与协程:${Thread.currentThread().name}")
+        }
+
+        launch {
+            println("launch2 从上下文获取协程:${coroutineContext[Job]} --- 当前线程与协程:${Thread.currentThread().name}")
+        }
+    }
 ```
+> 协程Default
+```kotlin
+coroutineScope.launch(Dispatchers.IO) {xxx}
+```
+> 协程Default：为什么改成IO还是Default？因为Default线程池很大，IO会复用Default可用的线程池。
 
 
 ### EmptyCoroutineContext
@@ -1057,10 +1212,279 @@ CoroutineExceptionHandler:处理未被捕捉的异常
 作用是什么？
 > 默认是 EmptyCoroutineContext
 
-## 协程：异常
-### 取消异常
 
-1. 取消异常不捕获会静默处理
+## 协程：异常
+
+### 异常捕获
+1、launch和async异常捕获
+```kotlin
+    launch {
+        try {
+            throw KotlinNullPointerException("is null")
+        } catch (e:Exception) {
+            println("launch catch exception:$e")
+        }
+    }
+
+    async {
+        try {
+            throw KotlinNullPointerException("is null")
+        } catch (e:Exception) {
+            println("async catch exception:$e")
+        }
+    }
+```
+
+### 自动传播异常
+```kotlin
+    val d = async {
+        throw KotlinNullPointerException("is null")
+    }
+
+    // 协程自动传播异常 TODO >>>>>>>>>>>>>>>>>>>>>>>
+```
+捕获到了异常，但还是会直接退出，抛出异常
+```
+async 返回值 catch exception:kotlin.KotlinNullPointerException: is null // 捕获到了
+Exception in thread "main" kotlin.KotlinNullPointerException: is null
+```
+
+为什么会出错？
+1. 子协程还会抛给父协程
+1. 父协程会异退
+
+#### await
+
+1、异常返回可以捕获
+1. 在同一作用域会导致直接异常，不会执行到await
+1. 采用其他作用域（如全局），可以执行到await
+```kotlin
+    // 全局作用域就可以用了，不是子协程
+    val d = GlobalScope.async {
+        throw KotlinNullPointerException("is null")
+    }
+
+    // 协程自动传播异常 TODO >>>>>>>>>>>>>>>>>>>>>>>
+    try {
+        d.await()
+    }catch (e : Exception) {
+        println("async 返回值 catch exception:$e")
+    }
+```
+
+#### launch和async捕获异常区别
+
+TIPS:最顶层记得用async
+
+**在拥有ExceptionHandler的前提下**
+```kotlin
+    val exception = CoroutineExceptionHandler { _, e ->
+        println("你的协程发生了异常 e:$e")
+    }
+```
+
+1、launch的异常，调用join不会导致异退
+```kotlin
+    val job1 = GlobalScope.launch(exception) {
+        launch {
+            launch {
+                launch {
+                    launch {
+                        launch {
+                            launch {
+                                throw KotlinNullPointerException("launch 我错了")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // 注意这里JOIN
+    job1.join()
+    // 还是
+    try {
+        job1.join()
+    }catch (e: Exception) {
+        println(e)
+    }
+```
+2、外部是launch，内部async同理
+1. 最外层launch的join不会导致异退
+```kotlin
+    val job2 = GlobalScope.launch(exception) {
+        async {
+            async {
+                async {
+                    async {
+                        async {
+                            async { // async协程体被创建后，立即开始调度 执行
+                                throw KotlinNullPointerException("async1 我错了")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    job2.join()
+```
+
+3、最外层async，调用await不捕获会导致异退
+```kotlin
+    val d = GlobalScope.async (exception) {
+        async {
+            async {
+                async {
+                    async {
+                        async {
+                            async { // async协程体被创建后，立即开始调度 执行
+                                throw KotlinNullPointerException("async2 我错了")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // async 的 await 才能 得到返回值 与 异常处理
+    d.await()
+```
+
+4、为什么会有这个差别？
+1. launch返回job
+1. async返回的是：`Deferred<Defferred<Deferred<Nothing>>>`
+
+5、如果没有ExceptionHandler，launch的join是否捕获都没用，都会崩溃
+```
+```
+
+### 非根协程异常传播
+
+1. 异常会层层上交给父协程
+1. 没有捕获异常时会异退：
+    1. async需要调用await才会闪退  ===>async
+    1. launch直接回闪退 ===>launch
+```kotlin
+    val job = GlobalScope.async {
+        launch {
+            launch {
+                launch {
+                    throw KotlinNullPointerException("我错了")
+                }
+            }
+        }
+    }
+
+    // 开始捕获顶级协程的  GlobalScope.async
+    try {
+        job.await()
+    } catch (e: Exception) {
+        println("e:$e")
+    }
+```
+
+### supervisorJob
+
+1. 协程抛出异常，会影响兄弟协程
+```kotlin
+    val scope = CoroutineScope(SupervisorJob())
+
+    val j1 = scope.launch {
+        println("launch1 start ...")
+        delay(1000)
+        throw KotlinNullPointerException("is null")
+    }
+
+    val j2 = scope.launch {
+        println("launch2 start ...")
+        delay(1300)
+        println("launch2 end ...")
+    }
+
+    // joinAll(j1, j2) // 协程1抛出异常、协程2执行完成
+
+    // 2秒后的协程必须全部取消
+    delay(2000)
+    scope.cancel()
+    // 灵活搭配
+```
+
+1、应用场景
+1. 多个网络请求，一个网络请求失败不会影响兄弟协程
+
+### CoroutineExceptionHandler
+
+1、顶级协程设置CoroutineExceptionHandler，才有能力处理好异常的捕获
+```kotlin
+// 正常捕获异常版本
+    val job1 = GlobalScope.launch(exception) {
+        launch {
+            launch {
+                launch {
+                    launch {
+                        launch {
+                            launch {
+                                throw KotlinNullPointerException("launch 我错了")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    job1.join()
+// 一定会闪退版本
+// 需要调用join()，不调用不会闪退
+    val job1 = GlobalScope.launch{
+        launch {
+            launch {
+                launch {
+                    launch(exception)  {
+                        launch {
+                            launch {
+                                throw KotlinNullPointerException("launch 我错了")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    job1.join()
+```
+
+### 全局异常
+
+1、全局异常捕获  =====> APM 协程 Crash
+1. java同级目录创建`resources`目录
+1. 创建目录`META-INT`,再创建目录`services`
+1. 在目录下创建文件`kotlinx.coroutines.CoroutineExceptionHandler`
+1. 文件中协商自定义的类`com.personal.tax.study.AllCoroutineExceptionHandler`(包名+类名)
+1. 自定义全局ExceptionHandler
+```kotlin
+class AllCoroutineExceptionHandler : CoroutineExceptionHandler{
+    override val key: CoroutineContext.Key<*>
+        get() = CoroutineExceptionHandler
+
+    override fun handleException(context: CoroutineContext, exception: Throwable) {
+        // 上报异常给服务器
+        Log.d("Derry", "全局异常捕获 handleException e:$exception")
+    }
+
+}
+```
+
+2、全局异常捕获有什么用？
+1. 还是会崩溃
+1. 用于捕获上报异常
+
+### 取消异常：JobCancellationException
+
+1、取消异常不捕获会静默处理
 ```kotlin
 fun main() = runBlocking<Unit> {
     val loginJob = GlobalScope.launch {
@@ -1075,11 +1499,425 @@ fun main() = runBlocking<Unit> {
     loginJob.join() // 等待结果
 }
 ```
+1. 取消子协程，会有取消异常，但是该异常不会crash父协程（静默处理）
 
-2. 取消异常有什么用？后续要暴露问题，进行处理。
+2、取消异常有什么用？后续要暴露问题，进行处理。
 
-### exceptionhandler
-1、为什么exceptionhandler只能给顶级协程，子协程不可以
+3、子协程非JobCancellationException会影响兄弟协程吗？
+1. 异常会上报给父协程，层层到顶级协程
+1. 顶级协程处理前会取消所有子协程，再取消自己
+1. 顶级协程最后处理异常（若没有处理，崩溃）
+
+### 异常的聚合
+
+1、如何处理多个异常
+1. e.suppressed.contentToString(): 显示被压制的异常
+1. cancel会导致所有的delay都抛出cancel异常
+1. launch3用自己的CoroutineContext：Job()，打乱了结构化并发。异常也不会上报给顶级协程
+```kotlin
+    val exception = CoroutineExceptionHandler { _, e ->
+        println("你错了:$e  多个异常:${e.suppressed.contentToString()}")
+    }
+
+    // 顶级协程
+    val job = GlobalScope.launch(exception) {
+
+        launch {
+            delay(3000)
+            throw KotlinNullPointerException("launch1 异常")
+        }
+
+        launch {
+            try {
+                delay(20000000)
+            } finally {
+                throw KotlinNullPointerException("launch2 异常")
+            }
+        }
+
+        // 不属于 子协程
+        // 父子协程的 结构化并发被你打乱了
+        launch(Job()) {
+            try {
+                delay(20000000)
+            } finally {
+                throw KotlinNullPointerException("launch3 异常")
+            }
+        }
+
+        launch {
+            try {
+                delay(20000000)
+            } finally {
+                throw KotlinNullPointerException("launch4 异常")
+            }
+        }
+
+        launch {
+            try {
+                delay(20000000)
+            } finally {
+                throw KotlinNullPointerException("launch5 异常")
+            }
+        }
+
+        launch {
+            try {
+                delay(20000000)
+            } finally {
+                throw KotlinNullPointerException("launch6 异常")
+            }
+        }
+    }
+
+    job.join()
+```
+
+## 协程：Flow
+
+1、Flow是什么？
+1. 处理异步事件流
+1. 可取消：通过取消协程取消Flow
+1. 组合操作符：复杂逻辑处理
+1. 缓冲和背压：发送和接收时用不同速度处理，实现流量控制、避免数据丢失
+
+2、传统事件处理方案：同步、sequence、异步delay
+```kotlin
+    // 1、同步:
+    fun getList() = listOf(100, 200, 300, 400, 500, 600)
+    val job = GlobalScope.launch {
+        getList().forEach{println(it)}
+    }
+    job.join()
+
+    // 2、异步: 在SequenceScope中，禁止自己调用挂起，除了库内部的函数yield可以挂起
+    fun getSequcence() = sequence{
+        for(item in 0..1000){
+            // 不允许使用 delay
+            yield(item) // 可以做到协程间切换
+        }
+    }
+    val job2 = GlobalScope.launch {
+        getSequcence().forEach {
+            println(it)
+        }
+    }
+    job2.join()
+
+    // 3、异步: 挂起，但没有协作
+    suspend fun getSuspendSequcence(): List<Int> {
+        delay(1000)
+        return listOf(100, 200, 300, 400, 500, 600)
+    }
+    val job3 = GlobalScope.launch {
+        getSuspendSequcence().forEach {
+            println(it)
+        }
+    }
+    job3.join()
+```
+
+### flow
+
+1、flow的作用
+1. RxJava和Flow完全一样
+2. 替代LiveData
+```kotlin
+
+
+    // 1、类似Observable
+    suspend fun getFlow() = flow{
+        for(item in 1..8){
+            // 发射
+            emit(item)
+        }
+    }
+    val job = GlobalScope.launch {
+        // 2、类似RxJava消费，subscribe === Observer消费
+        getFlow().collect{
+            println(it)
+        }
+    }
+    job.join()
+```
+
+2、getFlow()可以不用suspend修饰，更自由
+```kotlin
+    fun getFlow() = flow{
+        for(item in 1..8){
+            // 发射
+            emit(item)
+        }
+    }
+```
+
+#### 替换LiveData ===> LiveData
+
+1、Flow可以完全替换LiveData
+```kotlin
+// Step 1 : 网络请求
+fun fetchData() = flow{
+    for(item in 1..100){
+        emit("get Json String = $item")
+    }
+}
+// Step 2 ： ViewModel抛弃LiveData使用flow
+class MyViewModel: ViewModel(){
+    val dataFlow: Flow<String> = fetchData()
+}
+
+// Step 3 ： 订阅，并且collect返回数据
+class MyFragment: Fragment(){
+
+    val viewModel: MyViewModel by viewModels()
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        lifecycleScope.launch {
+            viewModel.dataFlow.collect{
+                // 在Lifecycle的CoroutineScope中，订阅冷流
+                println(it)
+            }
+        }
+    }
+}
+```
+
+### flowOn ====> RxJava
+
+1、Kotlin的flowOn替代了subscribeOn, 对上游进行了切换
+1. 不再需要observeOn，在需要的线程collect即可
+```kotlin
+fun main() = runBlocking<Unit> { // 顶级协程
+    launch(Dispatchers.Default) {
+        NetworkRequest.uploadRequestAction()
+            .flowOn(Dispatchers.IO) // flow运行在IO线程池，默认是main。替换了subscribeOn
+//            .observeOn(Dispatchers.Default) // 不再需要observeOn，在需要的线程collect即可
+            .collect {
+                println("$it%") // 显示下载进度
+            }
+    }
+    // flowOn是给上游还是下游切换？
+    // 都是给上游
+}
+
+
+object NetworkRequest {
+    fun uploadRequestAction() = flow {
+        println("uploadRequestAction thread:${Thread.currentThread().name}")
+        for (item in 1..100) {
+            delay(100)
+            emit(item) // 反馈文件上传进度
+        }
+    }
+}
+```
+
+### 冷流
+
+1、flow和RxJava都是冷流
+
+### 发射源简化 ===> 高阶函数
+
+1、简化发射源
+1. 一切对象、函数都可以`toFlow`转换为flow
+```kotlin
+// 1、无参非挂起函数 toFlow
+private fun<T> (()->T).toFlow() = flow{
+    emit(invoke())
+}
+    // 使用：
+    val r: () -> String = ::getFlowValue
+    r.toFlow().collect { println(it) }
+
+// 2、String toFlow
+//private fun String.toFlow() = flow{
+//    emit(this@toFlow) // this@toFlow有markdown错误
+//}
+    // 使用：
+    "String".toFlow().collect { println(it) }
+
+// 3、无参挂起函数
+private fun <OUTPUT> (suspend () -> OUTPUT).toFlow() = flow {
+    emit(invoke())
+}
+    // 使用：
+    ::getFlowValueSuspend.toFlow().collect { println(it) }
+
+// 4、所有集合toFlow
+private fun <E> Iterable<E>.toFlow() = flow {
+    this@toFlow.forEach { emit(it) }
+}
+    // 使用：
+    listOf(1, 2, 3, 4, 5, 6).toFlow().collect { println(it) }
+    setOf(100, 200, 300, 400, 500, 600).toFlow().collect { println(it) }
+
+// 5、sequence的toFlow
+private fun <T> Sequence<T>.toFlow() = flow {
+    this@toFlow.forEach { emit(it) }
+}
+    // 使用
+    sequence {
+        yield("Derry1")
+        yield("Derry2")
+        yield("Derry3")
+    }.toFlow().collect { println(it) }
+
+// 6、Array系列处理
+//private fun <T> Array<T>.toFlow() = flow {
+//    // this@toFlow.forEach { emit(it) }
+//    repeat(this@toFlow.size) {
+//        emit(this@toFlow[it])
+//    }
+//}
+//
+//private fun IntArray.toFlow() = flow {
+//    for (i in this@toFlow) {
+//        emit(i)
+//    }
+//}
+//
+//private fun LongArray.toFlow() = flow {
+//    for (i in this@toFlow) {
+//        emit(i)
+//    }
+//}
+
+// 7、Range
+// 注意第4步，就已经覆盖Range的情况
+private fun IntRange.toFlow() = flow {
+    this@toFlow.forEach { emit(it) }
+}
+
+private fun LongRange.toFlow() = flow {
+    this@toFlow.forEach { emit(it) }
+}
+```
+
+#### vararg和flowOf
+
+1、可变参数实现单个数据或者多个数据都可以转为flow
+```kotlin
+private fun <T> flows(vararg value: T) = flow{
+    value.forEach {
+        emit(it)
+    }
+}
+```
+使用
+```kotlin
+    flows("Hello").collect{ println(it) }
+    flows(1,2,3,4,5).collect{ println(it) }
+```
+
+2、使用官方的flowOf
+```kotlin
+    flowOf("Hello").collect{ println(it) }
+    flowOf(1,2,3,4,5).collect{ println(it) }
+```
+
+### withContext
+
+1、协程中上游不可以使用withContext，只能使用flowOn
+1. 上下文保存机制
+1. 使用withContext会报错
+
+### launchIn
+
+1、launchIn的作用
+1. 发射区域flowOn
+1. 收集区域launchIn：选择下游协程，需要用onEach打印数据
+```kotlin
+// 发射源区域
+fun getFlowValue() =
+    listOf(100, 200, 300, 400, 500, 600)
+        .asFlow()
+        .onEach { delay(2000) }
+        .flowOn(Dispatchers.Default)
+// 收集消费区域
+    val job = getFlowValue()
+        .onEach { println("thread:${Thread.currentThread().name}   $it")  }
+        .launchIn(CoroutineScope(Dispatchers.IO + CoroutineName("自定义协程"))) // 打开水龙头
+    job.join() // 需要等待执行完成，不然外面main执行结束了。
+```
+输出结果
+```kotlin
+thread:DefaultDispatcher-worker-3 @自定义协程#2   100
+thread:DefaultDispatcher-worker-1 @自定义协程#2   200
+thread:DefaultDispatcher-worker-1 @自定义协程#2   300
+thread:DefaultDispatcher-worker-1 @自定义协程#2   400
+thread:DefaultDispatcher-worker-1 @自定义协程#2   500
+thread:DefaultDispatcher-worker-1 @自定义协程#2   600
+```
+
+### cancellable
+
+1、协程取消，会导致Flow管道流也会取消。每次都delay 1000，可以正确检测异常
+```kotlin
+fun getFlow() = flow {
+    (1..10).forEach { emit(it) }
+}.onEach { delay(1000) }
+```
+```kotlin
+    getFlow().collect {
+        println(it)
+        if (it == 5) cancel()
+    }
+```
+输出结果
+```
+1
+2
+3
+4
+5
+Exception in thread "main" kotlinx.coroutines.JobCancellationException
+```
+
+#### 检测
+2、cancellable：取消不及时，速度太快了，增加监测机制
+```kotlin
+    (1..10).asFlow().collect {
+        println(it)
+        if (it == 5) cancel()
+    }// 会输出1~10，才抛出异常
+
+    (1..10).asFlow().cancellable().collect {
+        println(it)
+        if (it == 5) cancel()
+    }// 可以正确捕获到
+```
+
+## 协程：操作符
+
+
+### fliter：过滤
+```kotlin
+    (100..200).toFlow().filter { it % 50 == 0 }.map { "map result:$it" }.collect{ println(it) }
+```
+
+### map
+
+转换
+
+### flatmap
+2、flatmap和map的区别？什么是展平？
+flatmap contact
+flatmap merge
+
+### repeat
+it <= 0 <= times，回调action
+```kotlin
+public inline fun repeat(times: Int, action: (Int) -> Unit) {
+    contract { callsInPlace(action) }
+
+    for (index in 0 until times) {
+        action(index)
+    }
+}
+```
+
 
 ## 协程：面试题
 
