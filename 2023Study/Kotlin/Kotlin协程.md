@@ -4,6 +4,12 @@
 
 本文链接：https://blog.csdn.net/feather_wch/article/details/132200864
 
+[toc]
+
+----
+总结：启动、流程、现成选择、启动模式、并发
+、原理、结构化并发、掉地中心协程作用域、上下文、异常、Flow（背压）、热流
+
 ## 协程：基本概念
 
 ### 线程和协程
@@ -521,109 +527,6 @@ launch end thread:main
     println("UNDISPATCHED 没有调度前.....")
     println("UNDISPATCHED 没有调度前...... 取消协程:${job.cancel()}") // 只能取消 delay(1000 * 10)
 
-```
-
-## 协程：并发
-协程并发问题：
-1. 原子类
-2. channel
-3. mutex
-4. semaphore 参数0关闭 参数1等于mutex
-如何不出现并发安全问题？
-> 保证变量的不变性即可
-```kotlin
-    var i = 0
-    val r = i + List(10000) {// List<Deffered>
-        GlobalScope.async {
-            delay(1000) // 每个操作耗时1000ms
-            1
-        }
-    }
-        .map { it.await() } // 转为List<Int>
-        .sum()
-    println(r) // 总共1000ms后，获取所有的综合结果。并发安全的
-```
-如何知道协程执行结束1-2-3
-invokeOnCompletion
-## 协程：原理
-
-
-协程挂起和恢复
-
-1.  一行代码两个线程
-2.  左UI，右IO
-3.  Kotlin：suspend
-4.  UI线程切换到IO异步线程：挂起
-5.  IO到UI：恢复当前作用域的UI线程
-
-suspend关键字会被kotlin处理成Continuation， Continuation == Callback，里面都是成功和失败的回调
-
-Continuation：保证后续代码的恢复功能
-
-协程为什么不会阻塞任何线程？
-
-> 代码和变量会拷贝出去，然后原有地方remove掉。方便恢复
-
-为什么suspend方法外面需要suspend代码块包裹？
-
-*   suspend方法参数有隐藏的continuation
-*   suspend代码块等于构建了一个隐藏的continuation对象
-
-### 状态机
-状态模式解决回调地狱
-拦截器包裹Continuation返回Continuation
-三个状态：
-suspend
-resumed
-undecided
-源码实现核心机制：
-invokeSuspend循环一次代表一次回调地狱
-核心：
-协程本质 = continuation + 状态机
-外层方法如f0，内部三个suspend f1 f2 f3
-f0是初始化状态机，后续反复三次进入f0
-每次进入switch跳转到不同分支，执行不同方法
-requestLoadUser(completion:Continuaiton)
-completion.invokeSuspend【状态扭转】 ====> 是什么？
-状态扭转什么意思？
-### 非阻塞
-核心：主线程发现是挂起函数直接return，子线程定时后重新执行相关方法。
-状态机里面，根据状态，对应流程会执行
-每次执行状态都会更新
-startCoroutine不需要safeContinuation包裹，为什么？
-> 已经明确了resume只会执行一次
-### 挂起函数类型探究
-```kotlin
-suspend fun getLength(str:String):Int{
-    delay(1000)
-    return str.length
-}
-// 1、常规类型
-var funType1:suspend (String)->Int = ::getLength
-// 2、编译后的类型
-//var funType2:suspend (String, Continuation<Int>)->Any? = ::getLength
-println(funType1.invoke("feather"))
-```
-#### suspendCoroutine
-该例子的as类型转换会报错，还要深入研究
-```kotlin
-suspend fun getLength(str:String):Int = suspendCoroutine<Int>{
-    object :Thread(){
-        override fun run() {
-            super.run()
-            it.resume(str.length)
-        }
-    }.start()
-}
-// 3、使用编译后类型，运行OK，证明无问题
-var funType3:suspend (String, Continuation<Int>)->Any? = ::getLength as suspend(String, Continuation<Int>)->Any?
-funType3.invoke("feather", object:Continuation<Int>{
-    override fun resumeWith(result: Result<Int>) {
-        println(result.getOrNull())
-    }
-    override val context: CoroutineContext
-        get() = MainScope().coroutineContext
-})
 ```
 
 ## 协程：结构化并发
@@ -1651,9 +1554,9 @@ fun main() = runBlocking<Unit> {
     }
 ```
 
-#### 替换LiveData ===> LiveData
+#### 替换LiveData 
 
-1、Flow可以完全替换LiveData
+1、Flow可以完全替换LiveData ===> LiveData
 ```kotlin
 // Step 1 : 网络请求
 fun fetchData() = flow{
@@ -1684,9 +1587,9 @@ class MyFragment: Fragment(){
 }
 ```
 
-### flowOn ====> RxJava
+### flowOn 
 
-1、Kotlin的flowOn替代了subscribeOn, 对上游进行了切换
+1、Kotlin的flowOn替代了subscribeOn, 对上游进行了切换 ====> RxJava
 1. 不再需要observeOn，在需要的线程collect即可
 ```kotlin
 fun main() = runBlocking<Unit> { // 顶级协程
@@ -1718,9 +1621,9 @@ object NetworkRequest {
 
 1、flow和RxJava都是冷流
 
-### 发射源简化 ===> 高阶函数
+### 发射源简化
 
-1、简化发射源
+1、简化发射源 ===> 高阶函数
 1. 一切对象、函数都可以`toFlow`转换为flow
 ```kotlin
 // 1、无参非挂起函数 toFlow
@@ -1889,12 +1792,181 @@ Exception in thread "main" kotlinx.coroutines.JobCancellationException
     }// 可以正确捕获到
 ```
 
-## 协程：操作符
+### 背压
 
+#### buffer
+
+1、背压是什么？
+1. 数据产生速度 >>> 数据消费速度，消耗过多时间
+1. 可能OOM
+```kotlin
+// 数据过多，会导致消费不来
+fun getFlow() = flow {
+    (1..10).forEach {
+        delay(500L)
+        emit(it) // 一秒钟发射一个 一秒钟发射一个 ....
+        println("生成了:$it thread:${Thread.currentThread().name}")
+    }
+}
+
+// 消费慢
+    val t = measureTimeMillis {
+        getFlow().collect {
+            delay(1000L)
+            println("消费了:$it thread:${Thread.currentThread().name}")
+        }
+    }
+    println("上游 下游 共 消耗:$t 时间")
+
+
+// 共消耗15495ms
+// 都在一个线程处理，按顺序，放一个取一个
+```
+
+2、buffer：设立缓冲区，减少背压的数量【解决办法一】
+```kotlin
+fun getFlow() = flow {
+    (1..10).forEach {
+        delay(500L)
+        emit(it) // 一秒钟发射一个 一秒钟发射一个 ....
+        println("生成了:$it thread:${Thread.currentThread().name}")
+    }
+}
+    .buffer(100) // 设置缓冲区，减少 背压
+
+// 共消耗11272ms
+```
+
+3、flowOn(Dispatchers.IO)：另一个线程处理【解决办法二】
+1. 可以和buffer一起使用
+```kotlin
+fun getFlow() = flow {
+    (1..10).forEach {
+        delay(500L)
+        emit(it) // 一秒钟发射一个 一秒钟发射一个 ....
+        println("生成了:$it thread:${Thread.currentThread().name}")
+    }
+}
+    .buffer(100) // 设置缓冲区，减少 背压
+    .flowOn(Dispatchers.IO)
+// 共消耗11001ms
+```
+
+#### conflate
+
+1、conflate作用：只消费当前认为最新的值，会丢失部分信息
+```kotlin
+    val t = measureTimeMillis {
+        getFlow().conflate().collect{
+            delay(1000L)
+            println("消费了:$it thread:${Thread.currentThread().name}")
+        }
+    }
+    println("上游 下游 共 消耗:$t 时间")
+// 共消耗7303ms
+```
+
+#### collectLatest
+
+1、collectLatest：只收集最新值，速度大幅度提升
+```kotlin
+    val t = measureTimeMillis {
+        getFlow().collectLatest {
+            delay(1000L)
+            println("消费了:$it thread:${Thread.currentThread().name}")
+        }
+    }
+    println("上游 下游 共 消耗:$t 时间")
+// 共消耗6869ms
+```
+
+#### transform
+
+1、transform将上游数据转换后交给下游 ====> LiveData
+```kotlin
+    listOf(100, 200, 300, 400, 500, 600)
+        .asFlow()
+        .transform {
+            this.emit("你好啊数字$it")
+        }.collect { println(it) }
+```
+
+#### take
+
+1、take限制发送的长度，只要前面几个
+```kotlin
+    listOf(100, 200, 300, 400, 500, 600)
+        .asFlow()
+        .take(4)
+        .collect { println(it) }
+```
+2、自定义take
+1. 对Flow扩展，调用collect收集结果
+1. 用结果构造出flow
+```kotlin
+fun <INPUT> Flow<INPUT>.myTake(number:Int):Flow<INPUT>{
+    require(number > 0){"Request element count 0 show be positive"}
+    return flow {
+        var i = 0
+        collect{// collect收集的n个数据，构造了flow{}
+            if(i++ < number){
+                return@collect emit(it)
+            }
+        }
+    }
+}
+```
+
+
+### reduce
+
+末端操作符：适合累加
+1. reduce参数p1 = 上一次运算返回的最后一行
+1. 下面代码实现：1+2+3+4+...+100 = 5050
+```kotlin
+    val r = (1..100)
+        .asFlow()
+        .reduce { p1, p2 ->
+            val result = p1 + p2
+            result
+        }
+    println(r)
+```
 
 ### fliter：过滤
 ```kotlin
     (100..200).toFlow().filter { it % 50 == 0 }.map { "map result:$it" }.collect{ println(it) }
+```
+
+### zip
+
+1、zip合并Flow
+```kotlin
+fun getNames() = listOf("杜子腾", "史珍香", "刘奋").asFlow().onEach { delay(1000) }
+fun getAges() = arrayOf(30, 40, 50).asFlow().onEach { delay(2000) }
+
+    // 合并 组合 操作符 zip
+    getNames().zip(getAges()) { p1, p2 ->
+        "name:$p1, age:$p2"
+    }.collect {
+        println(it)
+    }
+
+输出：
+name:杜子腾, age:30
+name:史珍香, age:40
+name:刘奋, age:50 
+```
+
+2、zip合并的两个Flow数据长度不一样会怎么办？
+```kotlin
+fun getNames() = listOf("杜子腾", "史珍香", "刘奋").asFlow().onEach { delay(1000) }
+fun getAges() = arrayOf(30, 40, 50, 60, 70).asFlow().onEach { delay(2000) }
+
+zip之后输出结果：会抛弃不匹配的信息60、70
+name:杜子腾, age:30
+name:史珍香, age:40
+name:刘奋, age:50 
 ```
 
 ### map
@@ -1902,9 +1974,493 @@ Exception in thread "main" kotlinx.coroutines.JobCancellationException
 转换
 
 ### flatmap
-2、flatmap和map的区别？什么是展平？
-flatmap contact
-flatmap merge
+
+1、flatMapxxx作用是展平
+1. 不展平相当于 Flow嵌套，如：`Flow<Flow<String>> `
+1. 需要两次收集：`collect { it.collect { a -> println(a)} }`手动展平
+```kotlin
+// 不展平相当于 Flow嵌套，如：Flow<Flow<String>> 
+// 这里发送两次事件，属于Flow
+fun runWork(inputValue:Int) = flow {
+    emit("$inputValue 号员工开始工作了")
+    delay(1000L)
+    emit("$inputValue 号员工结束工作了")
+}
+    (1..6).asFlow()
+        .onEach { delay(1000L)}
+        .map { runWork(it) } // Flow<Flow<String>> // Flow嵌套
+        .collect { it.collect { a -> println(a)} }
+```
+```kotlin
+    // 展平 操作符 flatMap
+    getNumbers()
+        .onEach { delay(1000L)}
+//        .flatMap {  } // 已经废弃
+        .flatMapConcat { runWork(it) }
+        // .flatMapMerge { runWork(it) }
+        // .flatMapLatest { runWork(it) }
+        .collect { println(it) }
+```
+
+2、flatMapConcat：拼接，常用
+3、flatMapMerge
+4、flatMapLatest
+
+### merge
+
+1、flow合并，执行，并且获得结果
+1. 数据请求函数
+```kotlin
+data class Home(val info1: String, val info2: String)
+
+data class HomeRequestResponseResultData(val code: Int, val msg: String, val home: Home)
+
+// 请求本地加载首页数据
+fun CoroutineScope.getHomeLocalData(userName: String) = async (Dispatchers.IO) {
+    delay(3000)
+    Home("数据1...", "数据1...")
+}
+
+// 请求网络服务器加载首页数据
+fun CoroutineScope.getHomeRemoteData(userName: String) = async (Dispatchers.IO) {
+    delay(6000)
+    Home("数据3...", "数据4...")
+}
+```
+2. map + merge，合并Flow，collect触发冷流
+```kotlin
+// 流程
+    // 1.把多个函数 拿过来
+    // 2.组装成协程
+    // 3.包装成FLow
+    // 4.Flow合并 得到 结果
+    coroutineScope {
+        val r = listOf(::getHomeLocalData, ::getHomeRemoteData) // 1.把多个函数 拿过来
+            .map {
+                it("Derry用户") //it.call("Derry用户") 需要引入Kotlin反射 2.组装成协程,调用
+            }.map {
+                flow { emit(it.await()) }// 3.包装成FLow
+            }
+        val r2 = r.merge() // 4.Flow合并 得到 结果
+        r2.collect { println(it) }
+    }
+```
+
+### 异常
+
+#### catch
+
+捕获上游的异常
+1. 用声明式
+```kotlin
+    flow {
+        listOf(100).forEach { value ->
+            emit(value)
+            throw KotlinNullPointerException("上游抛出了异常")
+        }
+    }
+        .catch {
+             println("e:$it")
+             emit(200)
+        }
+        .onEach { delay(1000L) }
+        .collect { println(it) }
+```
+
+2. Flow是流式的，catch不能捕获下游的异常
+
+#### onCompletion
+
+1、Flow正常结束，声明式
+```kotlin
+getNumbers().onCompletion { println("协程Flow结束了") }.collect{println(it)}
+```
+
+2、onCompletion来捕获异常结束:上游和下游都可以
+```kotlin
+// 上游
+    getNumbers2().onCompletion {
+            if (it != null) { // 非正常结束  是异常结束
+                println("上游 发生了异常 $it")
+            }
+        }
+        .catch { println("被catch到了 上游 发生了异常 $it") }  // .catch是能 捕获到 上游 抛出的异常， 异常的传递过程
+        .collect { println(it) }
+```
+
+3、异常总结
+1. 上游的异常抛出，可以使用 声明式
+1. 下游的异常抛出，可以使用 命令式
+1. onCompletion（声明式） 上游 与 下游 的异常信息，都能够知道 能够得到
+1. onCompletion（声明式） 正常的结束 还是 异常的结束，都能知道
+1. finally 能够知道正常的结束（命令式）
+
+## 协程：Channel 热流
+
+1、Channel是什么？
+1. 生产者：多个协程
+1. 消费者：多个协程
+1. 中间：Channel 管道 并发安全队列
+1. 发送send
+1. 接收recv
+
+### 协程间通信
+
+1、Channel可以用于协程间通信
+```kotlin
+    // 通道Channel
+    val channel = Channel<Int>()
+
+    // 生产者
+    launch{
+        (1..6).forEach {
+            delay(1000L)
+            println("我生产了一个:$it")
+            channel.send(it)
+        }
+    }
+
+    // 消费者
+    launch{
+        (1..6).forEach {
+            val r=  channel.receive()
+            println("消费了一个:$r")
+        }
+    }
+```
+
+### capacity
+
+1、生产速度>消费速度
+1. 如果缓冲区满了，send会挂起，消费完后再生产
+2. capacity，默认容量，0
+
+### UNLIMITED：send不再挂起
+1. 容量接近于无限
+1. 容量不满就不会挂起
+```kotlin
+    // 通道Channel
+    val channel = Channel<Int>(Channel.UNLIMITED)
+```
+
+### 消费方式
+
+```kotlin
+        // 第一种发方式 消费
+        (1..8).forEach {
+            delay(2000L)
+            val r=  channel.receive()
+            println("消费了一个:$r")
+        }
+```
+
+#### iterator
+```kotlin
+        // 第二种发方式 消费
+        val it = channel.iterator()
+        while (it.hasNext()) {
+            val item = it.next()
+            delay(2000L)
+            println("消费了一个:$item")
+        }
+```
+
+#### item in channel
+```kotlin
+        // 第三种发方式 消费
+        for (item in channel) {
+            delay(2000L)
+            println("消费了一个:$item")
+        }
+```
+
+### 快捷方式
+
+#### produce
+
+1. produce快速构建消费者
+```kotlin
+// 生产者的快捷方式
+    val produce = produce {
+        (1..20).forEach { delay(2000L) ; send(it) }
+    }
+
+    // 普通的消费
+    launch {
+        for (item in produce) {
+            println("消费了一个:$item")
+        }
+    }
+```
+
+#### actor
+
+1. actor快速构建消费者
+```kotlin
+    // 消费者的快捷方式
+    val consumer = actor<Int> {
+        (1..20).forEach {
+            println("消费了一个:${receive()}")
+        }
+    }
+
+    // 普通的生成
+    launch {
+        (1..20).forEach { delay(2000L) ; consumer.send(it) }
+    }
+```
+
+### close
+
+1、channel.close
+1. 关闭
+1. 一般是生产者去close
+
+#### isClosedForSend
+
+channel.close() 之前 isClosedForSend == false
+channel.close() 之后 isClosedForSend == true
+```kotlin
+    // 生产者
+    launch {
+        (1..6).forEach {
+            if (!channel.isClosedForSend) {
+                channel.send(it)
+                println("我生产了一个$it")
+
+                // if (it == 3) channel.close() // 大部分情况下，是生产者 去close
+            }
+        }
+        println("close前 isClosedForSend:${channel.isClosedForSend} " +
+                " isClosedForReceive:${channel.isClosedForReceive}")
+        channel.close()
+        println("close后 isClosedForSend:${channel.isClosedForSend} " +
+                " isClosedForReceive:${channel.isClosedForReceive}")
+    }
+```
+
+#### isClosedForReceive
+
+如果消费完了 isClosedForReceive == true，   否则就是false
+如果缓冲区里面还有内容，没有消费完 也是 false
+```kotlin
+    // 消费者
+    launch {
+        try {
+            for (i in channel) {
+                delay(2000L)
+                println("我消费了一个:$i")
+            }
+        }finally {
+            println("finally isClosedForSend:${channel.isClosedForSend} " +
+                    " isClosedForReceive:${channel.isClosedForReceive}")
+        }
+    }
+```
+
+
+### BroadcastChannel
+
+1、广播给所有消费者，多个地方可以接收到
+1. 创建
+```kotlin
+    val channel = Channel<Int>()
+    val broadcastChannel = channel.broadcast(Channel.BUFFERED)
+```
+2. 生产
+```kotlin
+    // 生产者
+    launch {
+        repeat(8) {
+            delay(1000L)
+            broadcastChannel.send(it + 100001) // 发送
+        }
+        broadcastChannel.close() // 关闭
+    }
+```
+
+#### openSubscription
+3. 消费
+```kotlin
+    repeat(8) {
+        // 消费者
+        launch {
+            val r = broadcastChannel.openSubscription()
+            for (i in r) {
+                println("协程$it ---- 消费者 ${i}")
+            }
+        }
+    }
+```
+
+### select
+
+1、select: 择优选择数据，谁先返回用谁的
+1. 加载首页数据，可以作缓存
+1. 缓存有用缓存，缓存不存在去请求
+1. "慢的不会再执行"会被cancel
+
+2、select 是一个用于多路选择的结构，可以同时等待多个挂起函数或通道的操作完成。它类似于 switch 或 if-else 的多路分支语句，但是它是用于协程的异步操作。
+```kotlin
+suspend fun selectExample() {
+    select<Unit> {
+        someChannel.onReceive { value ->
+            // 处理从通道接收到的值
+        }
+        someDeferred.onAwait { result ->
+            // 处理异步操作完成后的返回值
+        }
+        onTimeout(1000) {
+            // 在指定时间内没有任何操作完成时执行
+        }
+    }
+}
+
+```
+
+3、select可以用于上游，也可以用于下游
+
+#### onAwait
+
+1. async有onAwait
+```kotlin
+data class Home(val info1: String, val info2: String)
+
+data class HomeRequestResponseResultData(val code: Int, val msg: String, val home: Home)
+
+// 请求本地加载首页数据
+fun CoroutineScope.getHomeLocalData() = async (Dispatchers.IO) {
+    delay(3000)
+    Home("数据1...", "数据1...")
+}
+
+// 请求网络服务器加载首页数据
+fun CoroutineScope.getHomeRemoteData() = async (Dispatchers.IO) {
+    delay(6000)
+    Home("数据3...", "数据4...")
+}
+```
+```kotlin
+    launch {
+        val localRequestAction = getHomeLocalData()
+        val remoteRequestAction = getHomeRemoteData()
+
+        val resultResponse = select<HomeRequestResponseResultData> {
+            localRequestAction.onAwait {
+                // 做校验 工作
+                // ...
+                // 省略1000行代码
+                HomeRequestResponseResultData(200, "恭喜你，请求成功", it) // 最后一行作为返回值
+            }
+
+            remoteRequestAction.onAwait {
+                // 做校验 工作
+                // ...
+                // 省略1000行代码
+                HomeRequestResponseResultData(200, "恭喜你，请求成功", it) // 最后一行作为返回值
+            }
+        }
+        println("resultResponse:$resultResponse")
+    }
+```
+
+2、async需要在调用的CoroutineScope中执行
+```kotlin
+fun CoroutineScope.getHomeLocalData() = async (Dispatchers.IO) {
+    delay(3000)
+    Home("数据1...", "数据1...")
+}
+// 对CoroutineScope扩展
+```
+
+#### channel数组
+
+1. 哪个更快选择哪个Channel
+
+##### onReceive
+
+1. onReceive: 接收数据后的回调
+```kotlin
+    val channels = arrayOf(Channel<String?>(), Channel<String?>())
+
+    launch {
+        delay(6000)
+        channels[0].send("login successful")
+    }
+
+    launch {
+        delay(8000)
+        channels[1].send("register successful")
+    }
+
+    val receiveResult = select<String ?> {
+        for (channel in channels) {
+            channel.onReceive {
+                // 做校验 工作
+                // ...
+                // 省略1000行代码
+                "[$it]" // 最后一行作为返回值
+            }
+        }
+    }
+    println(receiveResult)
+```
+
+#### onJoin
+
+launch无返回值，但想看谁执行的最快
+```kotlin
+    val job1 = launch {println("launch1 run")} // 无返回值
+    val job2 = launch {println("launch2 run")} // 无返回值
+    select<Unit> {
+        job1.onJoin { println("launch1 执行完成了 很快") }
+        job2.onJoin { println("launch2 执行完成了 很快") }
+    }
+```
+
+#### onSend
+
+发送数据，并且显示回调的内容（上游）
+```kotlin
+    // 准备Channel数组
+    val channels = arrayOf(Channel<Char>(), Channel<Char>())
+
+    // 协程一：Channel 的 发射源
+    launch(Dispatchers.Default) {
+        select<Unit> {
+            // 并行干活，send
+            launch {
+                channels[0].onSend('女') {
+                    println("channels[0].onSend('女') { $it }")
+                }
+            }
+            // 并行干活，send
+            launch {
+                channels[1].onSend('男') {
+                    println("channels[1].onSend('男') { $it }")
+                }
+            }
+        }
+    }
+    // 协程二：下游 接收阶段
+    launch { println("channel1 下游接收 ${channels[0].receive()}") }
+    launch { println("channel2 下游接收 ${channels[1].receive()}") }
+
+输出：
+channel1 下游接收 女
+channels[0].onSend('女') { RendezvousChannel@34206005{EmptyQueue} }
+// 1. onSend先发送消息
+// 2. 下游接收到
+// 3. onSend回调打印消息
+```
+
+
+### await
+
+### 复用Channel
+
+## 协程：操作符
+
 
 ### repeat
 it <= 0 <= times，回调action
@@ -1917,7 +2473,195 @@ public inline fun repeat(times: Int, action: (Int) -> Unit) {
     }
 }
 ```
+## 协程：并发
 
+多个协程并发操作一个变量会出现安全问题
+```kotlin
+    var i = 0
+    List(10000) {
+        GlobalScope.launch {
+            i ++
+        }
+    }
+    println(i)
+```
+
+### JUC原子类
+
+```kotlin
+    // TODO 解决方案一：Java的API来解决
+    var i = AtomicInteger(0)
+    List(10000) {
+        GlobalScope.launch {
+            i.incrementAndGet()
+        }
+    }.joinAll()
+    println(i.get())
+```
+
+### KT: Channel
+
+Channel是并发安全队列
+
+### KT: Mutex ==> JUC Lock
+```kotlin
+    val m = Mutex()
+    var i = 0
+    List(10000) {
+        GlobalScope.launch {
+            m.withLock { // withLock会自己在finally里解锁
+                i++
+            }
+        }
+    }.joinAll()
+    println(i)
+```
+
+#### withLock
+加锁，并解锁
+```kotlin
+public suspend inline fun <T> Mutex.withLock(owner: Any? = null, action: () -> T): T {
+    lock(owner) // lock
+    try {
+        return action()
+    } finally { // unlock
+        unlock(owner)
+    }
+}
+```
+
+### Semaphore
+
+信号量:
+1. Semaphore(1) 等价于 Mutex
+1. Semaphore(0) 等价于 关闭
+```kotlin
+    // TODO 解决方案四：KT的API来解决 信号量控制
+    val s = Semaphore(1) //  Semaphore(1) 等价于 Mutex
+    var i = 0
+    List(10000) {
+        GlobalScope.launch {
+            s.withPermit { // acquire + release
+                i++
+            }
+        }
+    }.joinAll()
+    println(i)
+```
+#### withPermit
+```kotlin
+public suspend inline fun <T> Semaphore.withPermit(action: () -> T): T {
+    acquire()
+    try {
+        return action()
+    } finally {
+        release()
+    }
+}
+```
+
+### 不变性
+
+不出现并发安全问题才是最好的
+1. 下面都是协程并发进行，将可变的部分放到协程外部
+1. 内部10000个协程获取到1，转为Int List，sum求和
+```kotlin
+    //  不变性
+    var i = 0
+    val r = i + List(10000) {// List<Deffered>
+        GlobalScope.async {
+            delay(1000) // 每个操作耗时1000ms
+            1
+        }
+    }
+        .map { it.await() }// 转为List<Int>
+        .sum()
+    println(r) // 总共1000ms后，获取所有的综合结果。并发安全的
+```
+
+
+如何知道协程执行结束1-2-3
+invokeOnCompletion
+## 协程：原理
+
+
+协程挂起和恢复
+
+1.  一行代码两个线程
+2.  左UI，右IO
+3.  Kotlin：suspend
+4.  UI线程切换到IO异步线程：挂起
+5.  IO到UI：恢复当前作用域的UI线程
+
+suspend关键字会被kotlin处理成Continuation， Continuation == Callback，里面都是成功和失败的回调
+
+Continuation：保证后续代码的恢复功能
+
+协程为什么不会阻塞任何线程？
+
+> 代码和变量会拷贝出去，然后原有地方remove掉。方便恢复
+
+为什么suspend方法外面需要suspend代码块包裹？
+
+*   suspend方法参数有隐藏的continuation
+*   suspend代码块等于构建了一个隐藏的continuation对象
+
+### 状态机
+状态模式解决回调地狱
+拦截器包裹Continuation返回Continuation
+三个状态：
+suspend
+resumed
+undecided
+源码实现核心机制：
+invokeSuspend循环一次代表一次回调地狱
+核心：
+协程本质 = continuation + 状态机
+外层方法如f0，内部三个suspend f1 f2 f3
+f0是初始化状态机，后续反复三次进入f0
+每次进入switch跳转到不同分支，执行不同方法
+requestLoadUser(completion:Continuaiton)
+completion.invokeSuspend【状态扭转】 ====> 是什么？
+状态扭转什么意思？
+### 非阻塞
+核心：主线程发现是挂起函数直接return，子线程定时后重新执行相关方法。
+状态机里面，根据状态，对应流程会执行
+每次执行状态都会更新
+startCoroutine不需要safeContinuation包裹，为什么？
+> 已经明确了resume只会执行一次
+### 挂起函数类型探究
+```kotlin
+suspend fun getLength(str:String):Int{
+    delay(1000)
+    return str.length
+}
+// 1、常规类型
+var funType1:suspend (String)->Int = ::getLength
+// 2、编译后的类型
+//var funType2:suspend (String, Continuation<Int>)->Any? = ::getLength
+println(funType1.invoke("feather"))
+```
+#### suspendCoroutine
+该例子的as类型转换会报错，还要深入研究
+```kotlin
+suspend fun getLength(str:String):Int = suspendCoroutine<Int>{
+    object :Thread(){
+        override fun run() {
+            super.run()
+            it.resume(str.length)
+        }
+    }.start()
+}
+// 3、使用编译后类型，运行OK，证明无问题
+var funType3:suspend (String, Continuation<Int>)->Any? = ::getLength as suspend(String, Continuation<Int>)->Any?
+funType3.invoke("feather", object:Continuation<Int>{
+    override fun resumeWith(result: Result<Int>) {
+        println(result.getOrNull())
+    }
+    override val context: CoroutineContext
+        get() = MainScope().coroutineContext
+})
+```
 
 ## 协程：面试题
 
