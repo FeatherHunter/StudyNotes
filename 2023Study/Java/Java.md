@@ -532,6 +532,14 @@ classLoader.loadClass
 ## AQS
 AQS是CLH的变体：虚拟双向队列FIFO
 
+1、AQS唤醒为什么从后往前找？
+1. 新节点，pre节点指向之前的tail
+2. 之前的tail的next = null
+3. tail = 新节点
+4. 唤醒从前往后，极大可能，会丢失某节点。锁饥饿
+5. 节点插入、取消也都是先处理pre，再处理next。因此从后往前更好
+
+
 ## Condition
 await
 signal/signalAll

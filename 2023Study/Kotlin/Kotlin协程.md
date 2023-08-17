@@ -17,6 +17,8 @@
 1、线程和协程的区别关系
 1. 线程是操作系统调度的，涉及上下文切换
 1. 协程是语言层面的，可以在线程间自由切换
+1. 线程：资源有限，数量有限，线程池~200个线程，上下文切换损耗大
+1. 协程：一个几百byte到几KB，可以存在数十万个协程，切换损耗小。
 
 2、kotlin在不同语言中的区别
 1. 有的语言协程可以脱离线程执行
@@ -180,6 +182,23 @@ async2 main @coroutine#3
 main的第二行代码 main @coroutine#1
 ```
 
+### 再次！深入探究
+
+1、协程和协程框架的区别
+1. 协程：async、launch...创建的协程概念，使用的API
+1. 协程框架：基于协程的概念，研发的框架，kotlinx.coroutines(github十万行源码)
+1. 平台层：js、jvm、native，平台层用不同方式支持协程
+
+2、kotlinx.coroutines.android支持Android相关的操作
+
+3、协程，在JVM层面，是线程的封装框架。
+1. 广义上的协程，不依赖线程。
+1. kotlin的是依赖的
+
+4、协程没有Dispatchers的时候，默认使用当前线程。
+
+5、使用EmptyCoroutineContext，使用当前的线程的调度器`context: CoroutineContext = EmptyCoroutineContext`
+
 ## 协程：启动
 ### launch
 ```kotlin
@@ -206,6 +225,42 @@ main的第二行代码 main @coroutine#1
 1. await只是拿返回值
 
 ### withContext
+
+### Thread.sleep
+
+1. 会阻塞整个线程，使用launch也没用。
+1. 协程不要用Thread.sleep
+
+
+2、执行顺序
+1. GlobalScope.launch默认是Dispachers.DEFAULT 另一个线程
+1. Thread.sleep只能阻塞所属线程
+```kotlin
+fun main() = runBlocking <Unit> {
+    println("main 111") // 1     【执行顺序1】
+
+    // GlobalScope.launch默认是Dispachers.DEFAULT 另一个线程
+    val job = GlobalScope.launch {     // 协程体被创建【执行顺序2】
+        println("launch 1 start") // 3  【执行顺序5】
+        delay(1000L)   // 【执行顺序6】
+        println("launch 1 end")
+    }
+
+    println("main 222") // 2   【执行顺序3】
+    Thread.sleep(500L) // 阻塞当前runBlocking作用域所属的线程   【执行顺序4】
+}
+输出：
+main 111
+main 222
+launch 1 start
+```
+
+### delay
+
+1. 会挂起，不会阻塞外面的代码
+1. 并行执行的协程，打印的顺序无法决定执行的顺序，日志同时打印，也还是会按顺序打印的（随机，可前可后）
+
+
 ## 协程：流程控制
 ### join
 1. join会挂起当前协程体，并等待目标协程体执行完成
@@ -596,7 +651,10 @@ public enum class CoroutineStart {
 ```
 
 
-### Job生命周期
+### Job
+
+
+#### 生命周期
 1、Job六大生命周期
 ```kotlin
 New:        协程体被创建
@@ -606,6 +664,7 @@ Canceling:  取消响应状态 => job.cancel()
 Completing: 完成中
 Completed:  已完成
 ```
+
 2、查看job状态
 ```
     val job = launch {
@@ -622,7 +681,33 @@ Completed:  已完成
     println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
 ```
 * 如果没有cancel，最后完成后的状态应该是 false false true
+
 3、job生命周期有什么用呢？
+1. 结构化并发
+
+4、传入一个已经取消的Job到协程中，会导致协程不再执行
+
+#### invokeOnCompletion
+
+执行完成时回调，比在join下面打印信息更专业
+```kotlin
+    val job = launch {
+        delay(1000)
+        println("Hello")
+    }
+    job.invokeOnCompletion {
+        println("job 执行 完成")
+    }
+```
+
+#### 子Job children
+
+1、父协程Job的子协程Job列表
+```kotlin
+job.children
+```
+
+2、父协程会等待所有子协程执行完成
 
 ### 取消
 
@@ -1002,11 +1087,66 @@ fun main() = runBlocking<Unit> {
 1. `yieldAll(elements: Iterator<T>)`：将一个迭代器中的所有元素添加到生成的序列中。
 1. `yieldAll(elements: Array<T>)`：将一个数组中的所有元素添加到生成的序列中。
 
+#### Sequence
+
+1、Sequence是什么？
+1. 惰性计算的方式
+1. 需要时才会计算下一个数据元素，而不是一次性加载所有元素
+1. Sequence提供了一种惰性计算和转换数据流的方式
+
+2、Sequence应用场景
+1. 假设有一个非常大的文件，其中包含许多URL地址。想要筛选出以特定域名开头的URL，并计算其长度。如果一次性读取整个文件并加载到内存中，可能会导致内存不足或性能问题。
+1. 使用Sequence并使用filter和map操作逐行处理文件，只计算满足条件的URL的长度，我们就可以节省内存，并且是以惰性计算的方式进行处理。
+
+3、过滤和映射数据：
+```kotlin
+val numbers = sequenceOf(1, 2, 3, 4, 5)
+
+val filteredAndMapped = numbers
+    .filter { it % 2 == 0 } // 过滤出偶数
+    .map { it * it } // 将每个数平方
+
+for (result in filteredAndMapped) {
+    println(result) // 输出结果为：4 16
+}
+```
+
+4、惰性计算：
+```kotlin
+val infiniteSequence = generateSequence(0) { it + 1 } // 生成一个无限递增的序列 generateSequence是官方API 参数0是种子
+
+val firstTen = infiniteSequence
+    .take(10) // 只取序列的前十个元素
+
+for (number in firstTen) {
+    println(number) // 输出结果为：0 1 2 3 4 5 6 7 8 9
+}
+```
+
+4、链式操作：
+```kotlin
+val numbers = sequenceOf(1, 2, 3, 4, 5)
+
+val result = numbers
+    .filter { it % 2 == 0 } // 过滤出偶数
+    .map { it * it } // 将每个数平方
+    .reduce { acc, value -> acc + value } // 求和
+
+println(result) // 输出结果为：20
+```
+
+
+#### sequence
+
+1、SequenceScope
+1. 是一个协程的上下文接口
+1. 允许您在sequence构建器中使用协程。
+1. 通过使用yield函数，可以从SequenceScope中产生下一个数据元素。这使得在sequence中执行中间计算结果、暂停和恢复工作成为可能。
 
 3、sequence是什么？作用是什么？
-1. 一个顶层函数，用于创建序列。它接受一个生成器函数作为参数，并返回一个延迟计算的序列对象。
-1. 在生成器函数内部，可以使用`yield`和`yieldAll`方法逐步生成序列的元素。
-1. 通过使用`sequence`函数，可以有效地使用惰性计算的方式处理大量数据，减少内存开销。
+1. 可以利用协程和yield创建复杂灵活的Sequence序列
+1. 可以使用`yield`和`yieldAll`方法逐步生成序列的元素。
+1. 协程允许在集合处理期间：暂停、恢复、异步操作
 1. 可以提高性能和减少内存使用，尤其处理大量数据时非常有用
 
 ```kotlin
@@ -2176,7 +2316,7 @@ getNumbers().onCompletion { println("协程Flow结束了") }.collect{println(it)
 
 ### 快捷方式
 
-#### produce
+#### produce和ReceiveChannel
 
 1. produce快速构建消费者
 ```kotlin
@@ -2191,9 +2331,21 @@ getNumbers().onCompletion { println("协程Flow结束了") }.collect{println(it)
             println("消费了一个:$item")
         }
     }
-```
 
-#### actor
+    // receive()接收数据，有数据没有消费，send会一直阻塞
+    launch {
+        println("消费了一个:${produce.receive()}")
+        delay(2000)
+        println("消费了一个:${produce.receive()}")
+        println("消费了一个:${produce.receive()}")
+        println("消费了一个:${produce.receive()}")
+        println("消费了一个:${produce.receive()}")
+        println("消费了一个:${produce.receive()}")
+    }
+```
+> produce(capacity = 100)，会增加缓冲区，只要没有放满send不会再阻塞。
+
+#### actor和SendChannel
 
 1. actor快速构建消费者
 ```kotlin
@@ -2582,54 +2734,377 @@ public suspend inline fun <T> Semaphore.withPermit(action: () -> T): T {
 
 如何知道协程执行结束1-2-3
 invokeOnCompletion
+
+## 协程：协作概念
+
+
+1、任务同时进行，协作
+1. sequence序列的next，会驱动SequenceScope域中执行到yield()
+1. 顺序，一个一个驱动
+```kotlin
+// 生产手机
+fun createPhones() = sequence <String> {
+    println("开始生产 华为P10")
+    GlobalScope.launch { delay(2000000) } //这个阻塞，是另一个作用域，不影响。
+    yield("华为P10")
+
+    println("开始生产 华为P20")
+    GlobalScope.launch { delay(2000000) }
+    yield("华为P20")
+}
+
+// 消费手机
+fun getPhones(sequence : Sequence<String>)  {
+    val phones = sequence.iterator()
+
+    var r = phones.next()
+    println("消费了一台 $r")
+
+    r = phones.next()
+    println("消费了一台 $r")
+}
+
+// 开始协作
+getPhones(createPhones())
+```
+
 ## 协程：原理
 
 
-协程挂起和恢复
+### 挂起函数
 
-1.  一行代码两个线程
-2.  左UI，右IO
-3.  Kotlin：suspend
-4.  UI线程切换到IO异步线程：挂起
-5.  IO到UI：恢复当前作用域的UI线程
+1、挂起函数的类型和普通函数的类型，完全是两个完全不同的
+```
+(Double)->String
+suspend (Double)->String
+```
 
-suspend关键字会被kotlin处理成Continuation， Continuation == Callback，里面都是成功和失败的回调
+2、suspend关键字会被kotlin处理成Continuation， Continuation == Callback，里面都是成功和失败的回调
+```kotlin
+//编译前
+suspend fun query(id:Int):String{
+    withContext(Dispatchers.IO){
+        delay(1000)
+    }
+    return id.toString()
+}
+```
+> Java调用上面的挂起代码：并不会执行挂起逻辑，只会输出基本的状态
+```java
+        Object result = MyKtKt.query(1314, new Continuation<String>() {
+            @NonNull
+            @Override
+            public CoroutineContext getContext() {
+                return EmptyCoroutineContext.INSTANCE;
+            }
 
-Continuation：保证后续代码的恢复功能
+            @Override
+            public void resumeWith(@NonNull Object o) {
+                System.out.println("resumeWith:" + o);
+            }
+        });
+        System.out.println("result:" + result);
+输出：
+result:COROUTINE_SUSPENDED
+```
 
-协程为什么不会阻塞任何线程？
+3、Continuation：保证后续代码的恢复功能
 
+4、协程为什么不会阻塞任何线程？
 > 代码和变量会拷贝出去，然后原有地方remove掉。方便恢复
 
-为什么suspend方法外面需要suspend代码块包裹？
+5、为什么suspend方法外面需要suspend代码块包裹？
+*  suspend方法参数有隐藏的continuation
+*  suspend代码块等于构建了一个隐藏的continuation对象
 
-*   suspend方法参数有隐藏的continuation
-*   suspend代码块等于构建了一个隐藏的continuation对象
+6、为什么非挂起函数不能调用挂起函数？
+1. 非挂起函数没有continuation对象
 
 ### 状态机
-状态模式解决回调地狱
-拦截器包裹Continuation返回Continuation
-三个状态：
-suspend
-resumed
-undecided
-源码实现核心机制：
-invokeSuspend循环一次代表一次回调地狱
-核心：
+
+#### 源码剖析
+
+1、下面是kotlin挂起和恢复代码，后面是反编译Java层面代码
+```kotlin
+fun main() = runBlocking{
+    val r1 = query(123)
+    println(r1) // 更新UI代码1
+    val r2 = query(456)
+    println(r2) // 更新UI代码2
+    val r3 = query(789)
+    println(r3) // 更新UI代码3
+
+}
+
+suspend fun query(id:Int):String{
+    delay(1000)
+    return id.toString()
+}
+```
+```java
+// 简化
+public final class MyKtKt {
+
+   //1、调用main方法
+   public static void main(String[] var0) {
+      main();
+   }
+
+   // 2、main，在runBlockinng包裹中运行
+   public static final void main() {
+      BuildersKt.runBlocking$default((CoroutineContext)null, (Function2)(new Function2((Continuation)null) {
+        // 3、invoke会被调用
+         public final Object invoke(Object var1, Object var2) {
+            return ((<undefinedtype>)this.create(var1, (Continuation)var2)).invokeSuspend(Unit.INSTANCE);
+         }
+         // 构造Function2：runBlocing相关的
+         public final Continuation create(@Nullable Object value, @NotNull Continuation completion) {
+            Intrinsics.checkNotNullParameter(completion, "completion");
+            Function2 var3 = new <anonymous constructor>(completion);
+            return var3;
+         }
+
+        // 4、invokeSuspend触发状态机：
+        // label：状态
+        // =====================================
+        // 【非挂起流程】：
+        // 调用query(123,this), 执行println(r1) // 更新UI代码1
+        // 调用query(456,this), 执行println(r2) // 更新UI代码2
+        // 调用query(789,this), 执行println(r3) // 更新UI代码3
+        //=====================================
+        // 【挂起流程】：
+        // 第一轮：状态 = 0，调用query(123, this), 返回COROUTINE_SUSPENDED结果（因为query也是挂起函数）。调度一段时间后，通过continuation resume进入第二轮。
+        // 第二轮：状态 = 1，执行更新UI代码1，调用query(456, this), 同上
+        // 第三轮：状态 = 2，执行更新UI代码2，调用query(789, this), 同上
+        // 第四轮: 状态 = 3，执行更新UI代码3 => 结束
+        //=====================================
+         int label;
+         @Nullable
+         public final Object invokeSuspend(@NotNull Object $result) {
+            Object result;
+            label26: {
+               label25: {
+                  switch (this.label) {
+                     case 0: // 第一轮
+                        ResultKt.throwOnFailure($result);
+                        this.label = 1;
+                        result = MyKtKt.query(123, this); // query
+                        if (result == COROUTINE_SUSPENDED) {
+                           return COROUTINE_SUSPENDED; // COROUTINE_SUSPENDED 挂起标志
+                        }
+                        break;
+                     case 1: // 第二轮
+                        ResultKt.throwOnFailure($result);
+                        result = $result;
+                        break; // 恢复执行第一个挂起方法后面的代码
+                     case 2: // 第三轮
+                        ResultKt.throwOnFailure($result);
+                        result = $result;
+                        break label25; // 恢复执行第二个挂起方法后面的代码
+                     case 3:
+                        ResultKt.throwOnFailure($result);
+                        result = $result;
+                        break label26; // 恢复执行第三个挂起方法后面的代码
+                     default:
+                        throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
+                  }
+
+                  String r1 = (String)result;
+                  System.out.println(r1); // 恢复执行
+                  this.label = 2;
+                  result = MyKtKt.query(456, this); // 第三轮入口
+                  if (result ==  COROUTINE_SUSPENDED) {
+                     return  COROUTINE_SUSPENDED;
+                  }
+               } // label = 2时，跳转到这里
+
+               String r2 = (String)result;
+               System.out.println(r2); // 恢复
+               this.label = 3;
+               result = MyKtKt.query(789, this); // 第四轮入口
+               if (result ==  COROUTINE_SUSPENDED) {
+                  return  COROUTINE_SUSPENDED;
+               }
+            }
+
+            String r3 = (String)result; // 恢复
+            System.out.println(r3);
+            return Unit.INSTANCE;
+         }
+
+      }), 1, (Object)null);
+   }
+        // =====================================
+        // 5、query挂起函数解析
+        // 内部调用delay挂起函数。
+        // 1. 挂起函数外部为第一轮
+        // 2. delay为第二轮
+        //
+        // 流程：
+        // 1. 第一轮：进入初始化，并且执行挂起方法，传入continuation
+        // 2. 恢复：continuation恢复调用invokeSuspend，进入第二轮
+        // 3. 第二轮：执行业务逻辑，返回结果给上层
+        //=====================================
+   @Nullable
+   public static final Object query(int id, Continuation continutation) {// id = 入参123、456、789
+      Object $continuation;
+      label20: { // STEP 1: 第一轮：初始化
+         if (continutation instanceof <undefinedtype>) { // <undefinedtype> 内部包含label
+            $continuation = (<undefinedtype>)continutation;
+            if ((((<undefinedtype>)$continuation).label & Integer.MIN_VALUE) != 0) { // 0：初始化完成
+               ((<undefinedtype>)$continuation).label -= Integer.MIN_VALUE; // label = 0
+               break label20;
+            }
+         }
+
+         $continuation = new ContinuationImpl(var1) { 
+            Object result;
+            int label;
+            int I$0;
+
+            @Nullable
+            public final Object invokeSuspend(@NotNull Object $result) {
+               this.result = $result;
+               this.label |= Integer.MIN_VALUE;
+               return MyKtKt.query(0, this); // 第二轮进入
+            }
+         };
+      }
+
+      Object $result = ((<undefinedtype>)$continuation).result;
+      switch (((<undefinedtype>)$continuation).label) {
+         case 0: // STEP 2: 第一轮，
+            ResultKt.throwOnFailure($result);
+            ((<undefinedtype>)$continuation).I$0 = id; // id = 入参123、456、789
+            ((<undefinedtype>)$continuation).label = 1;
+            // 延迟1000ms，返回COROUTINE_SUSPENDED标记
+            if (DelayKt.delay(1000L, (Continuation)$continuation) == COROUTINE_SUSPENDED) {
+               return COROUTINE_SUSPENDED;
+            }
+            break;
+         case 1:
+            // STEP 3:第二轮进入，Continuaiton resume后，获取结果，并且返回
+            id = ((<undefinedtype>)$continuation).I$0;
+            ResultKt.throwOnFailure($result);
+            break;
+         default:
+            throw new IllegalStateException("call to 'resume' before 'invoke' with coroutine");
+      }
+
+      return String.valueOf(id);
+   }
+}
+
+```
+
+#### 剖析
+
+1、核心：
 协程本质 = continuation + 状态机
-外层方法如f0，内部三个suspend f1 f2 f3
-f0是初始化状态机，后续反复三次进入f0
-每次进入switch跳转到不同分支，执行不同方法
+
+2、Kotlin协程是如何实现挂起和恢复的？底层思想是什么？ ====> 状态
+1. 使用Continuaiton底层实现Callback回调
+1. 状态模式解决回调地狱
+1. 生成invokeSuspend(): invokeSuspend循环一次代表一次回调地狱
+
+3、源码实现核心机制：
+1. invokeSuspend循环一次代表一次回调地狱
+1. 外层方法f0，内部三个suspend f1 f2 f3
+1. f0是状态机第一轮，后续反复三次进入invokeSuspend
+1. 每次进入switch跳转到不同分支，执行不同方法（第一轮到第四轮）
+
+4、为什么不会阻塞主线程？
+1. 挂起方法下面的代码，可以理解为被移除了，调用异步任务后立即返回。
+1. 在异步做完任务之后，会回调Continuation
+1. Continuation的resume方法中会执行剩下的代码。
+
+5、Continuation的三个状态
+1. suspend
+1. resumed
+1. undecided
+
+6、挂起函数和非挂起函数在状态机里面的流程
+1. 主线程发现是挂起函数直接return，子线程定时后重新执行相关方法。
+1. 状态机里面，根据状态，对应流程会执行
+1. 每次执行状态都会更新
+1. **非挂起函数**直接用break走遍状态机
+
+
 requestLoadUser(completion:Continuaiton)
 completion.invokeSuspend【状态扭转】 ====> 是什么？
 状态扭转什么意思？
+
+### 拦截器
+
+1、协程拦截器是什么？
+1. 拦截切换到Dispatchers.IO、Main、Default等线程执行
+1. 实现方式：拦截器包裹Continuation返回Continuation =====> OkHttp拦截器
+```kotlin
+public fun <T> interceptContinuation(continuation: Continuation<T>): Continuation<T>
+```
+
+2、自定义实现和理解拦截器
+> 使用DispatcherContinuation作为Continuation就能拦截，并且切换线程，执行恢复后的代码。
+```kotlin
+// 拦截器接口
+public interface Dispatcher{
+    fun dispatch(run : ()->Unit)
+}
+// Andorid Handler
+object HandlerDispatcher : Dispatcher{
+    var handler = Handler(Looper.myLooper()!!)
+    override fun dispatch(run: () -> Unit) {
+        handler.post(run)
+    }
+}
+
+// 拦截器中转站
+class DispatcherContinuation<T>(val continuation:Continuation<T>, val dispatcher: Dispatcher):Continuation<T>{
+    override val context: CoroutineContext
+        get() = continuation.context
+
+    override fun resumeWith(result: Result<T>) {
+        dispatcher.dispatch {
+            continuation.resumeWith(result)
+        }
+    }
+
+}
+```
+> 使用处：
+```kotlin
+    query(123, DispatcherContinuation(object : Continuation<String> {
+        override val context: CoroutineContext
+            get() = EmptyCoroutineContext // 本来可以用来切换线程，模拟场景下报废了。
+
+        override fun resumeWith(result: Result<String>) {
+            println(result.getOrNull()) // 回调结果输出
+        }
+
+    }, HandlerDispatcher))
+```
+> 自己模拟实现的挂起函数：
+```kotlin
+// 子线程sleep 1000ms后，回调结果
+fun query(id: Int, continuation: Continuation<String>): Unit {
+    thread {
+        Thread.sleep(1000)
+        val result = id.toString()
+        continuation.resumeWith(Result.success(result))
+    }.start()
+}
+```
+
 ### 非阻塞
-核心：主线程发现是挂起函数直接return，子线程定时后重新执行相关方法。
-状态机里面，根据状态，对应流程会执行
-每次执行状态都会更新
+
+
 startCoroutine不需要safeContinuation包裹，为什么？
 > 已经明确了resume只会执行一次
-### 挂起函数类型探究
+
+### 挂起函数
+
+
+1、挂起函数类型
 ```kotlin
 suspend fun getLength(str:String):Int{
     delay(1000)
@@ -2641,8 +3116,10 @@ var funType1:suspend (String)->Int = ::getLength
 //var funType2:suspend (String, Continuation<Int>)->Any? = ::getLength
 println(funType1.invoke("feather"))
 ```
+
 #### suspendCoroutine
-该例子的as类型转换会报错，还要深入研究
+
+1、该例子的as类型转换会报错，还要深入研究
 ```kotlin
 suspend fun getLength(str:String):Int = suspendCoroutine<Int>{
     object :Thread(){
@@ -2662,6 +3139,71 @@ funType3.invoke("feather", object:Continuation<Int>{
         get() = MainScope().coroutineContext
 })
 ```
+
+2、suspendCoroutine是什么？
+1. 会挂起当前协程，并且将Continuaiton对象传给lambda表达式
+1. 可以在异步任务完成后，通过Continuaiton的resume或者resumeWith
+
+#### createCoroutine
+
+会返回一个Continuation，并且创建协程与之关联，调用resume进行恢复
+
+1、自己实现挂起函数：
+```kotlin
+    /**=====================================
+     * 底层原理剖析
+     *=====================================*/
+    // 手动创建suspend 方法
+    val suspendLambda : suspend ()->String = suspend {
+        "User Information"
+    }
+    // 2、获取结果的回调
+    val reusltContinuation = object:Continuation<String>{
+        override val context: CoroutineContext
+            get() = Dispatchers.IO // 会使用，suspendCoroutine的continuaiton，不会破坏结构，可以使用Dispatchers
+        // 会有内置拦截器：SafeContinuation(createCoroutineUnintercepted(completion).intercepted(), COROUTINE_SUSPENDED)
+        // 拦截器会正确使用CoroutineContext，并且使用Dispatchers
+
+        override fun resumeWith(result: Result<String>) {
+            println("get result = ${result.getOrNull()}")
+        }
+
+    }
+    // 3、创建协程本体，但还未执行
+    val continuation : Continuation<Unit> = suspendLambda.createCoroutine(reusltContinuation)
+    // 4、启动协程
+    continuation.resumeWith(Result.success(Unit))
+```
+
+2、suspend + Continuation + createCoroutine + resume 链式实现
+```kotlin
+        suspend {
+            getUserInfo("wch")
+        }.createCoroutine(object : Continuation<String>{
+            override val context: CoroutineContext
+                get() = EmptyCoroutineContext 
+                // 空的上下文
+                // 协程会在调用它的线程上执行
+
+            override fun resumeWith(result: Result<String>) {
+                println("Thread:${Thread.currentThread().name}")
+                // 输出结果
+                println("get result = ${result.getOrNull()}")
+            }
+
+        }).resume(Unit)
+```
+
+3、createCoroutine源码
+```kotlin
+public fun <T> (suspend () -> T).createCoroutine(completion: Continuation<T>): Continuation<Unit> =
+    SafeContinuation(createCoroutineUnintercepted(completion).intercepted(), COROUTINE_SUSPENDED)
+```
+1. 会使用拦截器`intercepted()`
+
+#### startCoroutine
+
+startCoroutine相比于createCoroutine会调用resume
 
 ## 协程：面试题
 
