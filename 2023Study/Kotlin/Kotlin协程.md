@@ -8,7 +8,7 @@
 
 ----
 总结：启动、流程、现成选择、启动模式、并发
-、原理、结构化并发、掉地中心协程作用域、上下文、异常、Flow（背压）、热流
+、原理、结构化并发、调度中心协程作用域、上下文、异常、Flow（背压）、热流
 
 ## 协程：基本概念
 
@@ -26,7 +26,7 @@
 
 3、协程真正的优点：(只是高效，轻量为什么不用Rxjava)？
 1. 最大程度简化异步并发任务，用同步的代码写出异步的效果
-1. 网络请求谁都能做，++++++++++++++++++++++
+1. 网络请求谁都能做
 
 ### 传统异步任务和协程对比
 
@@ -666,7 +666,7 @@ Completed:  已完成
 ```
 
 2、查看job状态
-```
+```kotlin
     val job = launch {
         delay(1000)
     }
@@ -1036,10 +1036,12 @@ fun main() = runBlocking<Unit> {
 
 
 ### CoroutineScope()函数
+
 1、CoroutineScope()和coroutineScope()区别
 1. 前者：返回CoroutineScope，大写函数名首字母：简单的工厂设计模式
 2. 前者：提供了可控的结构化并发
 3. 后者suspend函数：返回Unit
+
 2、CoroutineScope构造作用域
 1. 第二行日志不会打印，两个协程作用域互相独立，不会等待
 2. 父协程，只会等待子协程
@@ -1053,7 +1055,30 @@ fun main() = runBlocking<Unit> {
     }
 }
 ```
+
+3、CoroutineScope的作用是什么？为什么所有协程体，必须有CoroutineScope?
+1. 为了统一管理，可控性，结构化并发管理
+```kotlin
+    val derryScope = CoroutineScope(context = mDerryThread)
+
+    derryScope.launch {
+        println("launch 1 start")
+        delay(1000L)
+        println("launch 1 end")
+    }
+    derryScope.launch {
+        println("launch 2 start")
+        delay(1000L)
+        println("launch 2 end")
+    }
+    derryScope.cancel() //取消
+```
+
+![picture 0](../../images/646516685963cd35dcc862e0fc77cd34f3d4a6533bdaa43232ee3811fcf59472.png)  
+
+
 #### 统一取消协程
+
 3、CoroutineScope构造作用域和cancel的执行顺序：cancel统一管理，统一退出
 ```kotlin
 fun main() = runBlocking<Unit> {
@@ -1255,6 +1280,65 @@ coroutineScope.launch(Dispatchers.IO) {xxx}
 作用是什么？
 > 默认是 EmptyCoroutineContext
 
+### coroutineContext
+
+1、coroutineContext的作用
+1. 返回当前协程的上下文
+
+2、通过coroutineContext拿到上下文
+```kotlin
+// 1、suspend编译之后 剔除suspend 用 Continuation来代替
+// 2、Continuation包含了coroutineContext，所以可以拿到上下文
+suspend fun  requestAction() : CoroutineContext = coroutineContext
+
+fun main() {
+    GlobalScope.launch {
+        println(requestAction()) // [StandaloneCoroutine{Active}@21ccc917, Dispatchers.Default]
+    }
+    Thread.sleep(1000L)
+}
+```
+
+#### Continuation
+
+1、Continuation包含了coroutineContext
+
+### asCoroutineDispatcher ==> 线程池 ==> newSingleThreadExecutor
+
+#### Java ExecutorService
+
+1、ExecutorService
+1. 是Java中的一个接口
+1. 是线程池的高级抽象。
+1. 定义了一组用于管理线程池的方法，包括提交任务、关闭线程池等。它提供了更高层次的抽象，可以方便地管理多个线程。
+
+2、ExecutorService接口的常见实现类
+1. ThreadPoolExecutor：创建普通线程池
+1. ScheduledThreadPoolExecutor：创建定时任务线程池。
+
+#### 线程池调度器
+
+1、自定义线程池，将线程池转为调度器
+```kotlin
+val mDerryThread = Executors.newSingleThreadExecutor {
+    Thread(it, "DerryCustomThread") // 自定义
+    .apply { isDaemon = true } // 守护线程
+}.asCoroutineDispatcher()
+// 构造出ExecutorCoroutineDispatcher
+    GlobalScope.launch(context = mDerryThread) { //默认DEFAULT线程池，这里设置了新的Dispatchers
+        println("父协程 ${Thread.currentThread().name}")
+        launch {
+            println("子协程 1 ${Thread.currentThread().name}")
+        }
+
+        launch {
+            println("子协程 2 ${Thread.currentThread().name}")
+        }
+    }
+
+// FixedThreadPool
+val mDerryThread = Executors.newFixedThreadPool(32).asCoroutineDispatcher()
+```
 
 ## 协程：异常
 
@@ -1428,9 +1512,9 @@ TIPS:最顶层记得用async
     }
 ```
 
-### supervisorJob
+### SupervisorJob
 
-1. 协程抛出异常，会影响兄弟协程
+1. 协程抛出异常，不会影响兄弟协程
 ```kotlin
     val scope = CoroutineScope(SupervisorJob())
 
@@ -2606,11 +2690,6 @@ channels[0].onSend('女') { RendezvousChannel@34206005{EmptyQueue} }
 // 3. onSend回调打印消息
 ```
 
-
-### await
-
-### 复用Channel
-
 ## 协程：操作符
 
 
@@ -2820,9 +2899,81 @@ result:COROUTINE_SUSPENDED
 6、为什么非挂起函数不能调用挂起函数？
 1. 非挂起函数没有continuation对象
 
+#### 挂起函数和Callback回调版本
+
+1. 所有的挂起函数的同步效果，底层都被转为了回调方式
+2. 协程请求并更新UI
+```kotlin
+        GlobalScope.launch(context = Dispatchers.Main) { // 默认是Default异步线程
+            // TODO >>>>>>>>>>>>>>>>>>>>>>>>  t85：协程背后状态机原理 ① >>>>>>>>>>>>>>>>>>>>>>>>
+            // TODO 先执行 异步请求1
+            var serverResponseInfo = requestLoadUser()
+            tv?.text = serverResponseInfo // 更新UI
+            tv?.setTextColor(Color.GREEN) // 更新UI
+
+            // TODO 更新UI完成后，再去执行 异步请求2
+            serverResponseInfo = requestLoadUserAssets()
+            tv?.text = serverResponseInfo // 更新UI
+            tv?.setTextColor(Color.BLUE) // 更新UI
+
+            // TODO 更新UI完成后，再去执行 异步请求3
+            serverResponseInfo = requestLoadUserAssetsDetails()
+            tv?.text = serverResponseInfo // 更新UI
+            mProgressDialog?.dismiss() // 更新UI
+            tv?.setTextColor(Color.RED) // 更新UI
+        }
+```
+3. 转为的代码：
+> 1. 用自己实现的拦截功能的Continuation，传入用于切换线程的Dispatcher
+> 2. 异步请求1，resumeWith回调返回结果+更新UI。构造协程并启动startCoroutine
+> 3. 异步请求2，resumeWith回调返回结果+更新UI。构造协程并执行
+> 4. 异步请求3，resumeWith回调返回结果+更新UI。
+```kotlin
+        // TODO >>>>>>>>>>>>>>>>>>>>>>>>  t85：协程背后状态机原理 ② >>>>>>>>>>>>>>>>>>>>>>>>
+        requestLoadUser(DispatchedContinuation(object : Continuation<String> {
+            override val context: CoroutineContext
+                get() = EmptyCoroutineContext // 在这里我们破坏了协程的规则，所以这句话不生效
+
+            override fun resumeWith(result: Result<String>) {
+                var serverResponseInfo = result.getOrThrow()
+                tv?.text = serverResponseInfo // 更新UI
+                tv?.setTextColor(Color.GREEN) // 更新UI
+
+                suspend {
+                    // TODO 更新UI完成后，再去执行 异步请求2
+                    requestLoadUserAssets()
+                }.startCoroutine(object : Continuation<String> {
+                    override val context: CoroutineContext
+                        get() = Dispatchers.Main // 生效的  因为拦截器intercepted 会调用  Dispatchers.Main 切换到Main
+
+                    override fun resumeWith(result: Result<String>) {
+                        var serverResponseInfo = result.getOrThrow()
+                        tv?.text = serverResponseInfo // 更新UI
+                        tv?.setTextColor(Color.BLUE) // 更新UI
+
+                        suspend {
+                            // TODO 更新UI完成后，再去执行 异步请求3
+                            requestLoadUserAssetsDetails() // 最后一行Lambda返回
+                        }.createCoroutine(object: Continuation<String> {
+                            override val context: CoroutineContext
+                                get() = Dispatchers.Main // 生效的  因为拦截器intercepted 会调用  Dispatchers.Main 切换到Main
+
+                            override fun resumeWith(result: Result<String>) {
+                                var serverResponseInfo = result.getOrThrow()
+                                tv?.text = serverResponseInfo // 更新UI
+                                mProgressDialog?.dismiss() // 更新UI
+                                tv?.setTextColor(Color.RED) // 更新UI
+                            }
+                        }).resumeWith(Result.success(Unit))
+                    }
+                })
+            }
+        }, HandlerDispatcher))
+```
+
 ### 状态机
 
-#### 源码剖析
+#### 生成源码剖析
 
 1、下面是kotlin挂起和恢复代码，后面是反编译Java层面代码
 ```kotlin
@@ -2957,7 +3108,7 @@ public final class MyKtKt {
             }
          }
 
-         $continuation = new ContinuationImpl(var1) { 
+         $continuation = new ContinuationImpl(var1) {  // ContinuationImpl 会持有之前协程的执行结果和当前协程的执行结果。
             Object result;
             int label;
             int I$0;
@@ -3029,10 +3180,233 @@ public final class MyKtKt {
 1. 每次执行状态都会更新
 1. **非挂起函数**直接用break走遍状态机
 
+##### 状态扭转  =====> Lifecycle
 
-requestLoadUser(completion:Continuaiton)
-completion.invokeSuspend【状态扭转】 ====> 是什么？
-状态扭转什么意思？
+
+
+invokeSuspendd的状态扭转是什么意思？
+1. 状态扭转是指从一个状态转变为另一个状态的过程。
+1. 状态扭转通常用于描述有限状态机（Finite State Machine）或状态模式（State Pattern）等概念。
+1. 状态之间的转换是通过满足特定条件来触发的。当满足转换条件时，来自外部的事件或操作可以引发状态扭转，使系统从一个状态转变为另一个状态。
+1. 状态扭转的过程可以是有限的，也可以是无限的，取决于系统的设计和需求。状态扭转可以用于描述各种系统，例如计算机程序、网络协议、自动控制系统等。
+1. 通过使用状态扭转的模型和技术，可以更好地理解和管理系统的不同状态，以及它们之间的转换规则和行为。这有助于设计和实现可靠、可扩展的系统，并提供更好的用户体验。
+
+#### Kotlin核心源码剖析模拟
+
+##### ContinuationImpl
+
+KT内部不让外部使用:
+```kotlin
+/** TODO >>>>>>>>>>>>>>>>>>>>>>>>  协程背后状态机原理  >>>>>>>>>>>>>>>>>>>>>>>>
+ * Kotlin 源码中的 ContinuationImpl 无法直接访问，
+ * 为防止报错，将 ContinuationImpl 拷贝了部分代码出来
+ */
+abstract class ContinuationImpl(
+    completion: Continuation<Any?>?,
+    private val _context: CoroutineContext?
+) : Continuation<Any?> {
+
+    constructor(completion: Continuation<Any?>?) : this(completion, completion?.context)
+
+    public override val context: CoroutineContext
+        get() = _context!!
+
+    @Transient
+    private var intercepted: Continuation<Any?>? = null
+
+    public fun intercepted(): Continuation<Any?> = intercepted ?: (context[ContinuationInterceptor]?.interceptContinuation(this) ?: this).also { intercepted = it }
+
+    public final override fun resumeWith(result: Result<Any?>) { }
+
+    abstract fun invokeSuspend(result: Result<Any?>): Any? // 抽象方法定义
+
+}
+```
+枚举类：
+```kotlin
+// 枚举类定义
+enum class CoroutineSingletons { COROUTINE_SUSPENDED, UNDECIDED, RESUMED }
+```
+
+##### 自定义方法中填充状态机
+
+showCoroutine是我们写的同名方法，增加了Continuaiton参数
+1. 实现了ContinuationImpl接口，在invokeSuspend的实现中，定义了对showCoroutine的调用
+```kotlin
+fun showCoroutine(continuation: Continuation<Any?>): Any? {
+
+    class ShowContinuation(continuation: Continuation<Any?>) : ContinuationImpl(continuation) {
+        // 表示协程状态机当前的状态
+        var label = 0
+        // 协程返回结果
+        var result: Any? = null
+        // 用于保存之前协程的计算结果
+        var user: Any? = null
+        var userAssets: Any? = null
+        // invokeSuspend 是协程的关键
+        // 它最终会调用 showCoroutine(this) 开启协程状态机
+        // 状态机相关代码就是后面的 when 语句
+        // 协程的本质，可以说就是 Continuation + 状态机 完成的
+        override fun invokeSuspend(_result: Result<Any?>): Any? {
+            result = _result
+            label = label or Int.Companion.MAX_VALUE
+            return showCoroutine(this)
+        }
+    }
+
+    val continuationState: ShowContinuation = if (continuation is ShowContinuation) {
+        continuation
+    } else {
+        ShowContinuation(continuation) // 如果是初次运行，会把continuation: Continuation<Any?>作为参数传递进去
+    }
+    // 三个变量，对应原函数的三个变量
+    lateinit var user: String
+    lateinit var userAssets: String
+    lateinit var userAssetsDetails: String
+    // result 接收协程的运行结果
+    var result = continuationState.result
+    // suspendReturn 接收挂起函数的返回值
+    var suspendReturn: Any? = null
+    // CoroutineSingletons 是个枚举类
+    // COROUTINE_SUSPENDED 代表当前函数被挂起了
+    val sFlag = CoroutineSingletons.COROUTINE_SUSPENDED
+
+    var loop = true
+    while (loop) {
+
+        // 协程状态机核心代码
+        when (continuationState.label) {
+            0 -> {
+                // 检测异常
+                throwOnFailure(result)
+                println("开始执行了哦")
+                // 将 label 置为 1，准备进入下一次状态
+                continuationState.label = 1
+                // 执行 requestLoadUser
+                suspendReturn = requestLoadUser(continuation) // withContent(IO)执行耗时任务
+                // 判断是否挂起
+                if (suspendReturn == sFlag) {
+                    return suspendReturn // suspend挂起了，执行耗时任务完成后，返回suspendReturn == 加载到[用户数据]信息集
+                } else {
+                    result = suspendReturn // 未挂起，result 接收协程的运行结果
+                    // 马上进入下一个专题
+                }
+            }
+
+            1 -> {
+                // 检测异常
+                throwOnFailure(result)
+                // 获取 user 值
+                user = result as String
+                toast("更新UI:$user")
+                // 将协程结果存到 continuation 里
+                continuationState.user = user
+                // 准备进入下一个状态
+                continuationState.label = 2
+                // 执行 requestLoadUserAssets
+                suspendReturn = requestLoadUserAssets(continuation) // withContent(IO)执行耗时任务
+                // 判断是否挂起
+                if (suspendReturn == sFlag) {
+                    return suspendReturn // suspend挂起了，执行耗时任务完成后，返回suspendReturn == 加载到[用户资产数据]信息集
+                } else {
+                    result = suspendReturn // 未挂起，result 接收协程的运行结果
+                    // 马上进入下一个专题
+                }
+
+            }
+
+            2 -> {
+                throwOnFailure(result)
+                user = continuationState.user as String
+                // 获取 friendList userAssets 的值
+                userAssets = result as String
+                toast("更新UI:$userAssets")
+                // 将协程结果存到 continuation 里
+                continuationState.user = user
+                continuationState.userAssets = userAssets
+                // 准备进入下一个状态
+                continuationState.label = 3
+                // 执行 requestLoadUserAssetsDetails
+                suspendReturn = requestLoadUserAssetsDetails(continuation) // withContent(IO)执行耗时任务
+                // 判断是否挂起
+                if (suspendReturn == sFlag) {
+                    return suspendReturn // suspend挂起了，执行耗时任务完成后，返回suspendReturn == 加载到[用户资产详情数据]信息集
+                } else {
+                    result = suspendReturn // 未挂起，result 接收协程的运行结果
+                    // 马上进入下一个专题
+                }
+            }
+
+            3 -> {
+                throwOnFailure(result)
+
+                user = continuationState.user as String
+                userAssets = continuationState.userAssets as String
+                userAssetsDetails = continuationState.result as String
+                toast("更新UI:$userAssetsDetails")
+                loop = false
+            }
+        }
+    }
+
+    return Unit
+}
+```
+
+##### 异步挂起函数
+
+```kotlin
+private fun requestLoadUser(completion: Continuation<String>): Any? {
+    // no implement
+    // 调用 invokeSuspend
+    thread {
+        try {
+            Thread.sleep(3000L) // 这里的睡眠，模拟了请求网络时的耗时操作中...
+            if (completion is ContinuationImpl) {
+                completion.invokeSuspend(Result.success("加载到[用户数据]信息集")) // 状态流转
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            completion.resumeWithException(Throwable("加载[用户数据],加载失败,服务器宕机了 e:$e"))
+        }
+    }
+    return CoroutineSingletons.COROUTINE_SUSPENDED // 代表requestLoadUser是真正的挂起了 挂起函数
+}
+
+private fun requestLoadUserAssets(completion: Continuation<String>): Any? {
+    // no implement
+    // 调用 invokeSuspend
+    thread {
+        try {
+            Thread.sleep(4000L) // 这里的睡眠，模拟了请求网络时的耗时操作中...
+            if (completion is ContinuationImpl) {
+                completion.invokeSuspend(Result.success("加载到[用户资产数据]信息集"))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            completion.resumeWithException(Throwable("加载[用户资产数据],加载失败,服务器宕机了 e:$e"))
+        }
+    }
+    return CoroutineSingletons.COROUTINE_SUSPENDED // 代表requestLoadUserAssets是真正的挂起了 挂起函数
+}
+
+private fun requestLoadUserAssetsDetails(completion: Continuation<String>): Any? {
+    // no implement
+    // 调用 invokeSuspend
+    thread {
+        try {
+            Thread.sleep(5000L) // 这里的睡眠，模拟了请求网络时的耗时操作中...
+            if (completion is ContinuationImpl) {
+                completion.invokeSuspend(Result.success("加载到[用户资产详情数据]信息集"))
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            completion.resumeWithException(Throwable("加载[用户资产详情数据],加载失败,服务器宕机了 e:$e"))
+        }
+    }
+    return CoroutineSingletons.COROUTINE_SUSPENDED // 代表requestLoadUserAssets是真正的挂起了 挂起函数
+}
+```
 
 ### 拦截器
 
@@ -3204,6 +3578,51 @@ public fun <T> (suspend () -> T).createCoroutine(completion: Continuation<T>): C
 #### startCoroutine
 
 startCoroutine相比于createCoroutine会调用resume
+
+
+## 协程：底层操作
+
+### suspendCancellableCoroutine
+
+用suspendCancellableCoroutine实现suspend挂起函数
+```kotlin
+open class ResponseBean
+data class Successful(val code: Int, val msg: String, val data: String) : ResponseBean()
+data class Error(val code: Int, val msg: String, val data: String) : ResponseBean()
+
+suspend fun requestLogin(userName: String , userPwd: String) : ResponseBean
+    = suspendCancellableCoroutine { continuation: CancellableContinuation<ResponseBean> ->
+
+    continuation.invokeOnCancellation {
+        println("本次协程执行完毕，做清理回收工作 ... $it")
+        /*xxx.close()
+        xxx.release()
+        xxx.清理工作*/
+        // ...
+    }
+
+    try {
+        if ("Derry" == userName && "123456" == userPwd) {
+            continuation.resume(Successful(200, "恭喜，请求登录成功", "data{success}"))
+        } else {
+            continuation.resume(Error(404, "不恭喜，登录失败了", "data{error}"))
+        }
+    } catch (e:Exception) {
+        continuation.resumeWithException(Throwable("请求发送了异常:$e"))
+    } finally {
+        continuation.cancel(Throwable("cancel"))
+    }
+}
+```
+调用方法
+```kotlin
+fun main() = runBlocking <Unit> {
+    GlobalScope.launch {
+        val result = requestLogin("Derry", "123456")
+        println("请求结果是:${result}")
+    }.join()
+}
+```
 
 ## 协程：面试题
 
