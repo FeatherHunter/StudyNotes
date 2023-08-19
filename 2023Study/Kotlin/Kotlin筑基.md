@@ -330,7 +330,7 @@ inline fun fun01(noinline lambda:(Int)->Unit):(Int)->Unit{
 
 #### crossinline
 
-1、return难题，不内联的函数不允许直接return
+1、return难题，不内联的函数不允许直接return(因为根本不知道你要return谁)
 ```kotlin
 fun method(lambda:(Int)->Unit){
     lambda(123)

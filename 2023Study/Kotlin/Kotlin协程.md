@@ -202,23 +202,23 @@ main的第二行代码 main @coroutine#1
 ## 协程：启动
 ### launch
 ```kotlin
-    // Job
-    var job = launch {
-        println("launch")
-        delay(2000)
-    }
-    job.join() // 会等待launch执行完成
+  // Job
+  var job = launch {
+    println("launch")
+    delay(2000)
+  }
+  job.join() // 会等待launch执行完成
 ```
 ### async
 获取到返回值
 ```kotlin
-    // Deferred<T>
-    var deferred = async {
-        println("async")
-        delay(5000)
-        "获取到网络数据JSON"
-    }
-    println(deferred.await())
+  // Deferred<T>
+  var deferred = async {
+    println("async")
+    delay(5000)
+    "获取到网络数据JSON"
+  }
+  println(deferred.await())
 ```
 
 3、launch和async都会立即调度
@@ -267,15 +267,15 @@ launch 1 start
 2. join必须在协程体内使用
 3. 非阻塞
 ```kotlin
-    var job1 = launch {
-        requestUserName()
-    }
-    job1.join() // 挂起当前协程体，非阻塞
-    var job2 = launch {
-        requestUserInfo()
-    }
-    job2.join()
-    println("查询结束")
+  var job1 = launch {
+    requestUserName()
+  }
+  job1.join() // 挂起当前协程体，非阻塞
+  var job2 = launch {
+    requestUserInfo()
+  }
+  job2.join()
+  println("查询结束")
 ```
 ====> 线程的join
 1、线程的join会阻塞当前线程
@@ -284,10 +284,10 @@ launch 1 start
 2. 底层是wait实现的
 ```java
 synchronized(obj){
-    thread.join(); //join不释放锁
+  thread.join(); //join不释放锁
 }
 synchronized(thread){
-    thread.join(); //join释放锁
+  thread.join(); //join释放锁
 }
 ```
 3、yield()让出cpu执行权，不会释放锁
@@ -315,35 +315,35 @@ synchronized(thread){
 ### await
 挂起等待协程体的返回值：
 ```kotlin
-    var deferred = async {
-        println("async")
-        requestUserName()
-    }
-    println(deferred.await())
+  var deferred = async {
+    println("async")
+    requestUserName()
+  }
+  println(deferred.await())
 ```
 ### measureTimeMillis：执行时间 
 1. 获取到总共的执行时间
 2. 时间是并发执行的时间（500ms），不是顺序执行（500+500）
 ```kotlin
-    var deferred1 = async {
-        println("async")
-        requestUserName()
-    }
-    var deferred2 = async {
-        println("async")
-        requestUserName()
-    }
-    val time = measureTimeMillis {
-        deferred1.await()
-        deferred2.await()
-    }
-    println(time)
+  var deferred1 = async {
+    println("async")
+    requestUserName()
+  }
+  var deferred2 = async {
+    println("async")
+    requestUserName()
+  }
+  val time = measureTimeMillis {
+    deferred1.await()
+    deferred2.await()
+  }
+  println(time)
 ```
 ```kotlin
 public inline fun measureTimeMillis(block: () -> Unit): Long {
-    val start = System.currentTimeMillis()
-    block() // 执行前后计算时间点
-    return System.currentTimeMillis() - start
+  val start = System.currentTimeMillis()
+  block() // 执行前后计算时间点
+  return System.currentTimeMillis() - start
 }
 ```
 
@@ -413,7 +413,7 @@ IO：为磁盘和网络IO处理。核心线程数x2
 2、默认有启动模式：DEFAULT
 ```kotlin
 launch(/*start = CoroutineStart.DEFAULT*/) {  // 默认参数
-    delay(200)
+  delay(200)
 }
 // 调度时
 DEFAULT -> block.startCoroutineCancellable(completion)
@@ -628,25 +628,25 @@ MainActivity将接口CoroutineScope的实现委托给MainScope()
 ### CoroutineStart: 启动模式
 ```kotlin
 public enum class CoroutineStart {
-    DEFAULT,
-    LAZY,
-    ATOMIC,
-    UNDISPATCHED;
-    public operator fun <T> invoke(block: suspend () -> T, completion: Continuation<T>): Unit =
-        when (this) {
-            DEFAULT -> block.startCoroutineCancellable(completion)
-            ATOMIC -> block.startCoroutine(completion)
-            UNDISPATCHED -> block.startCoroutineUndispatched(completion)
-            LAZY -> Unit // will start lazily
-        }
-    public operator fun <R, T> invoke(block: suspend R.() -> T, receiver: R, completion: Continuation<T>): Unit =
-        when (this) {
-            DEFAULT -> block.startCoroutineCancellable(receiver, completion)
-            ATOMIC -> block.startCoroutine(receiver, completion)
-            UNDISPATCHED -> block.startCoroutineUndispatched(receiver, completion)
-            LAZY -> Unit // will start lazily
-        }
-    public val isLazy: Boolean get() = this === LAZY
+  DEFAULT,
+  LAZY,
+  ATOMIC,
+  UNDISPATCHED;
+  public operator fun <T> invoke(block: suspend () -> T, completion: Continuation<T>): Unit =
+    when (this) {
+      DEFAULT -> block.startCoroutineCancellable(completion)
+      ATOMIC -> block.startCoroutine(completion)
+      UNDISPATCHED -> block.startCoroutineUndispatched(completion)
+      LAZY -> Unit // will start lazily
+    }
+  public operator fun <R, T> invoke(block: suspend R.() -> T, receiver: R, completion: Continuation<T>): Unit =
+    when (this) {
+      DEFAULT -> block.startCoroutineCancellable(receiver, completion)
+      ATOMIC -> block.startCoroutine(receiver, completion)
+      UNDISPATCHED -> block.startCoroutineUndispatched(receiver, completion)
+      LAZY -> Unit // will start lazily
+    }
+  public val isLazy: Boolean get() = this === LAZY
 }
 ```
 
@@ -657,28 +657,28 @@ public enum class CoroutineStart {
 #### 生命周期
 1、Job六大生命周期
 ```kotlin
-New:        协程体被创建
-Active:     存活状态、活跃中
+New:     协程体被创建
+Active:   存活状态、活跃中
 Canceling:  取消响应状态 => job.cancel()
-->Cancelled:    已取消
+->Cancelled:   已取消
 Completing: 完成中
 Completed:  已完成
 ```
 
 2、查看job状态
 ```kotlin
-    val job = launch {
-        delay(1000)
-    }
-    // true false false // Active
-    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
-    delay(1)
-    job.cancel()
-    // false true false // Cancelled
-    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
-    delay(1)
-    // false true true // Completed
-    println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
+  val job = launch {
+    delay(1000)
+  }
+  // true false false // Active
+  println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
+  delay(1)
+  job.cancel()
+  // false true false // Cancelled
+  println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
+  delay(1)
+  // false true true // Completed
+  println("${job.isActive} ${job.isCancelled} ${job.isCompleted}")
 ```
 * 如果没有cancel，最后完成后的状态应该是 false false true
 
@@ -933,8 +933,8 @@ withTimeout(1000){
 ```kotlin
 // 线程变协程
 fun main() = runBlocking<Unit> {
-    // this持有了CoroutineScope
-    // 就可以执行launch和aysnc
+  // this持有了CoroutineScope
+  // 就可以执行launch和aysnc
 }
 ```
 1. runBlocking不是挂起函数，为什么有协程效果？
@@ -942,20 +942,20 @@ fun main() = runBlocking<Unit> {
 ```kotlin
 @Throws(InterruptedException::class)
 public fun <T> runBlocking(context: CoroutineContext = EmptyCoroutineContext, block: suspend CoroutineScope.() -> T): T {
-    val currentThread = Thread.currentThread()
-    val contextInterceptor = context[ContinuationInterceptor]
-    val eventLoop: EventLoop?
-    val newContext: CoroutineContext
-    if (contextInterceptor == null) {
-        eventLoop = ThreadLocalEventLoop.eventLoop
-        newContext = GlobalScope.newCoroutineContext(context + eventLoop)
-    } else {
-        eventLoop = (contextInterceptor as? EventLoop)?.takeIf { it.shouldBeProcessedFromContext() }?: ThreadLocalEventLoop.currentOrNull()
-        newContext = GlobalScope.newCoroutineContext(context)
-    }
-    val coroutine = BlockingCoroutine<T>(newContext, currentThread, eventLoop)
-    coroutine.start(CoroutineStart.DEFAULT, coroutine, block)
-    return coroutine.joinBlocking()
+  val currentThread = Thread.currentThread()
+  val contextInterceptor = context[ContinuationInterceptor]
+  val eventLoop: EventLoop?
+  val newContext: CoroutineContext
+  if (contextInterceptor == null) {
+    eventLoop = ThreadLocalEventLoop.eventLoop
+    newContext = GlobalScope.newCoroutineContext(context + eventLoop)
+  } else {
+    eventLoop = (contextInterceptor as? EventLoop)?.takeIf { it.shouldBeProcessedFromContext() }?: ThreadLocalEventLoop.currentOrNull()
+    newContext = GlobalScope.newCoroutineContext(context)
+  }
+  val coroutine = BlockingCoroutine<T>(newContext, currentThread, eventLoop)
+  coroutine.start(CoroutineStart.DEFAULT, coroutine, block)
+  return coroutine.joinBlocking()
 }
 ```
 
@@ -971,9 +971,9 @@ public fun <T> runBlocking(context: CoroutineContext = EmptyCoroutineContext, bl
 1、coroutineScope和runBlocking区别
 ```kotlin
 fun main() = runBlocking<Unit> {
-    coroutineScope { 
-        
-    }
+  coroutineScope { 
+    
+  }
 }
 ```
 1. 相同：都会等待协程体内任务全部执行完，才会结束
@@ -982,14 +982,14 @@ fun main() = runBlocking<Unit> {
 2、coroutineScope：一个失败全部失败
 ```kotlin
 fun main() = runBlocking<Unit> {
-    coroutineScope {
-        launch {}
-        launch {}
-        launch {
-            throw KotlinNullPointerException()
-        }
-        // 一个失败，全部失败
-    }
+  coroutineScope {
+    launch {}
+    launch {}
+    launch {
+      throw KotlinNullPointerException()
+    }
+    // 一个失败，全部失败
+  }
 }
 ```
 #### supervisorScope：一个失败不会影响其他 ===> SupervisorJob
@@ -1047,12 +1047,12 @@ fun main() = runBlocking<Unit> {
 2. 父协程，只会等待子协程
 ```kotlin
 fun main() = runBlocking<Unit> {
-    val scope = CoroutineScope(context = Dispatchers.Default)
-    scope.launch {
-        println("scope.launch")
-        delay(1000)
-        println("scope.launch2") // 这一行不会打印
-    }
+  val scope = CoroutineScope(context = Dispatchers.Default)
+  scope.launch {
+    println("scope.launch")
+    delay(1000)
+    println("scope.launch2") // 这一行不会打印
+  }
 }
 ```
 
@@ -1082,23 +1082,23 @@ fun main() = runBlocking<Unit> {
 3、CoroutineScope构造作用域和cancel的执行顺序：cancel统一管理，统一退出
 ```kotlin
 fun main() = runBlocking<Unit> {
-    val scope = CoroutineScope(context = Dispatchers.Default)
-    // 调度前
-    scope.launch {
-        println("scope.launch") // 调度后, 一定会执行
-        delay(1000)
-        println("scope.launch2") // 这一行不会打印
-    }
-    scope.cancel() // 调度后执行cancel
+  val scope = CoroutineScope(context = Dispatchers.Default)
+  // 调度前
+  scope.launch {
+    println("scope.launch") // 调度后, 一定会执行
+    delay(1000)
+    println("scope.launch2") // 这一行不会打印
+  }
+  scope.cancel() // 调度后执行cancel
 }
 ```
 #### 取消兄弟协程
 ```kotlin
-    // 调度前
-    val loginJob = scope.launch {
-        // 登录请求
-    }
-    loginJob.cancel()
+  // 调度前
+  val loginJob = scope.launch {
+    // 登录请求
+  }
+  loginJob.cancel()
 ```
 
 ### SequenceScope
@@ -1614,16 +1614,16 @@ class AllCoroutineExceptionHandler : CoroutineExceptionHandler{
 1、取消异常不捕获会静默处理
 ```kotlin
 fun main() = runBlocking<Unit> {
-    val loginJob = GlobalScope.launch {
+  val loginJob = GlobalScope.launch {
         try {
-            delay(2000)// 捕获异常 CancellationException
+        delay(2000)// 捕获异常 CancellationException
         } catch (e: CancellationException) {
             println("协程被取消了 异常是:$e")
         }
-    }
-    loginJob.cancel() // 会抛出异常
-    // 不捕获异常，会静默处理
-    loginJob.join() // 等待结果
+  }
+  loginJob.cancel() // 会抛出异常
+  // 不捕获异常，会静默处理
+  loginJob.join() // 等待结果
 }
 ```
 1. 取消子协程，会有取消异常，但是该异常不会crash父协程（静默处理）
@@ -3417,6 +3417,8 @@ private fun requestLoadUserAssetsDetails(completion: Continuation<String>): Any?
 public fun <T> interceptContinuation(continuation: Continuation<T>): Continuation<T>
 ```
 
+#### 自己实现拦截器
+
 2、自定义实现和理解拦截器
 > 使用DispatcherContinuation作为Continuation就能拦截，并且切换线程，执行恢复后的代码。
 ```kotlin
@@ -3426,13 +3428,13 @@ public interface Dispatcher{
 }
 // Andorid Handler
 object HandlerDispatcher : Dispatcher{
-    var handler = Handler(Looper.myLooper()!!)
+    var handler = Handler(Looper.getMainLooper()!!)
     override fun dispatch(run: () -> Unit) {
         handler.post(run)
     }
 }
 
-// 拦截器中转站
+// 拦截器中转站(等价于createCoroutineUnintercepted(completion).intercepted())
 class DispatcherContinuation<T>(val continuation:Continuation<T>, val dispatcher: Dispatcher):Continuation<T>{
     override val context: CoroutineContext
         get() = continuation.context
@@ -3469,54 +3471,10 @@ fun query(id: Int, continuation: Continuation<String>): Unit {
 }
 ```
 
-### 非阻塞
-
-
-startCoroutine不需要safeContinuation包裹，为什么？
-> 已经明确了resume只会执行一次
+## 协程：底层操作
 
 ### 挂起函数
 
-
-1、挂起函数类型
-```kotlin
-suspend fun getLength(str:String):Int{
-    delay(1000)
-    return str.length
-}
-// 1、常规类型
-var funType1:suspend (String)->Int = ::getLength
-// 2、编译后的类型
-//var funType2:suspend (String, Continuation<Int>)->Any? = ::getLength
-println(funType1.invoke("feather"))
-```
-
-#### suspendCoroutine
-
-1、该例子的as类型转换会报错，还要深入研究
-```kotlin
-suspend fun getLength(str:String):Int = suspendCoroutine<Int>{
-    object :Thread(){
-        override fun run() {
-            super.run()
-            it.resume(str.length)
-        }
-    }.start()
-}
-// 3、使用编译后类型，运行OK，证明无问题
-var funType3:suspend (String, Continuation<Int>)->Any? = ::getLength as suspend(String, Continuation<Int>)->Any?
-funType3.invoke("feather", object:Continuation<Int>{
-    override fun resumeWith(result: Result<Int>) {
-        println(result.getOrNull())
-    }
-    override val context: CoroutineContext
-        get() = MainScope().coroutineContext
-})
-```
-
-2、suspendCoroutine是什么？
-1. 会挂起当前协程，并且将Continuaiton对象传给lambda表达式
-1. 可以在异步任务完成后，通过Continuaiton的resume或者resumeWith
 
 #### createCoroutine
 
@@ -3577,14 +3535,20 @@ public fun <T> (suspend () -> T).createCoroutine(completion: Continuation<T>): C
 
 #### startCoroutine
 
-startCoroutine相比于createCoroutine会调用resume
+1、startCoroutine相比于createCoroutine会调用resume
 
+2、startCoroutine不需要safeContinuation包裹，为什么？
+> 已经明确了resume只会执行一次
 
-## 协程：底层操作
-
-### suspendCancellableCoroutine
+#### suspendCancellableCoroutine
 
 用suspendCancellableCoroutine实现suspend挂起函数
+1. 不使用withContext等操作，自己在异步获取数据后，交给Continuaiton回调结果给上层
+1. 需要考虑的注意点：
+> 1. suspendCancellableCoroutine 获得可以取消的CoroutineContext
+> 1. resume:上传成功或者失败的业务数据
+> 1. resumeWithException：出现异常时
+> 1. invokeOnCancellation：可以在协程执行完毕后调用
 ```kotlin
 open class ResponseBean
 data class Successful(val code: Int, val msg: String, val data: String) : ResponseBean()
@@ -3623,6 +3587,274 @@ fun main() = runBlocking <Unit> {
     }.join()
 }
 ```
+
+#### suspendCoroutine
+
+手写挂起函数：获得Continuation
+```kotlin
+suspend fun getName(id:Int):String = suspendCoroutine<String> {
+    thread(start = true){
+        println("正在做耗时操作...")
+        it.resume("$id:feather")
+    } // 用参数start来启动，不要自己start
+    println("真正读取中...")
+}
+
+// 下面：是收起来的方式，上面：展开的方式。没有区别
+suspend fun getName2(id: Int) : String  {
+    withContext(Dispatchers.IO) {
+        delay((5000L..20000L).random())
+    }
+    return "$id:feather"  // 调用Continuation回调 最终的成果长度 给 用户
+}
+```
+
+##### 回调形式
+startCoroutine创建协程体，启动协程:底层真正的样子，回调形式。
+```kotlin
+    suspend{
+        getName(10)
+    }.startCoroutine(object: Continuation<String> {
+        override val context: CoroutineContext
+            get() = EmptyCoroutineContext // 空上下文，会用上面suspend{}包裹产生的Context
+
+        override fun resumeWith(result: Result<String>) {
+            println("接收到返回数据:${result.getOrNull()}") // 执行完suspend方法后回调结果
+        }
+
+    })
+```
+
+##### 同步形式
+回调形式直接变成同步形式：底层状态机在发力
+```kotlin
+// 等价于GlobalScope.launch
+    GlobalScope.launch {
+        val result = getName(123) // Kotlin编译器 做了海量的处理，看不到
+        println(" 案例一 读完完成 长度是:${result}")
+    }
+```
+
+#### 类型判断
+
+1、挂起函数类型
+```kotlin
+suspend fun getLength(str:String):Int{
+  delay(1000)
+  return str.length
+}
+// 1、常规类型
+var funType1:suspend (String)->Int = ::getLength
+// 2、编译后的类型，写代码不支持（suspend处理为Continuation）
+//var funType2: (String, Continuation<Int>)->Any? = ::getLength
+println(funType1.invoke("feather"))
+
+// 3、可以编译过的形式
+var funType3: (String, Continuation<Int>)->Any? = ::getLength as (String, Continuation<Int>)->Any?
+```
+
+
+2、type3为什么返回的结果是Any？而不是Int？
+1. 挂起函数编译后的方法，会返回挂起标志：COROUTINE_SUSPENDED
+1. 用Any？合理
+```kotlin
+val result = funType3.invoke(xxx)
+println(result)
+输出结果: COROUTINE_SUSPENDED
+```
+
+##### suspendCoroutine
+
+1、将suspend函数用as关键字转换为编译后类型，照样调用
+```kotlin
+suspend fun getLength(str:String):Int = suspendCoroutine<Int>{
+  object :Thread(){
+    override fun run() {
+      super.run()
+      it.resume(str.length)
+    }
+  }.start()
+}
+fun main() {
+
+    // 3、使用编译后类型，运行OK，证明无问题
+    var funType3: (String, Continuation<Int>)->Any? = ::getLength as (String, Continuation<Int>)->Any?
+    funType3.invoke("feather", object:Continuation<Int>{
+        override fun resumeWith(result: Result<Int>) {
+            println(result.getOrNull())
+        }
+        override val context: CoroutineContext
+            get() = EmptyCoroutineContext
+    })
+
+}
+```
+
+2、suspendCoroutine是什么？
+1. 会挂起当前协程，并且将Continuaiton对象传给lambda表达式
+1. 可以在异步任务完成后，通过Continuaiton的resume或者resumeWith
+
+
+### 自己实现Continuation
+
+1、为什么系统Continuation需要有context和resumeWith？作用是什么？
+```kotlin
+public interface Continuation<in T> {
+    public val context: CoroutineContext
+    public fun resumeWith(result: Result<T>)
+}
+```
+> context: 当前场景主要是CoroutineDispatcher，用于线程切换
+
+2、自己实现IContinuation
+```kotlin
+interface IContinuation<T>{
+    val context:Dispatcher // Dispatcher是自定义的分发器，类似CoroutineDispatchers
+    fun resume(result:T)
+}
+```
+3、自己函数使用自定义Continuation和系统版本
+```kotlin
+fun getLength(str: String, iContinuation: IContinuation<Int>) {
+    thread {// 网络请求的时候，切换到 异步线程
+        // ...耗时操作
+        // ...分发结果
+        iContinuation.context.dispatch { // 切换回主线程main
+            iContinuation.resume(str.length) // 调用Continuation回调 最终的成果长度 给 用户
+        }
+    }
+    println("真正读取中...")
+}
+
+// 使用官方的Continuation
+suspend fun getLength(str: String)  = suspendCoroutine<Int>{
+    thread { // 网络请求的时候，切换到 异步线程
+        // ...耗时操作
+        // ...分发结果
+        it.resume(str.length) // 返回结果
+    }
+    println("真正读取中...")
+}
+```
+4、使用两个版本的挂起函数
+```kotlin
+// 自定义Continuation
+    getLength("Derry",object : IContinuation<Int> {
+        override val context: Dispatcher
+            get() = HandlerDispatcher
+
+        override fun resume(result: Int) {
+            // 输出最终结果
+        }
+    })
+// 官方框架层 API
+    suspend { getLength("Derry2") }.startCoroutine(object : Continuation<Int> {
+        override val context: CoroutineContext
+            get() = Dispatchers.Main
+
+        override fun resumeWith(result: Result<Int>) {
+            // 输出结果
+        }
+    })
+```
+
+#### 探究官方resume和startCoroutine
+
+```kotlin
+public fun <T> (suspend () -> T).startCoroutine(
+    completion: Continuation<T>
+) {
+    // 很明显调用了intercepted()
+    createCoroutineUnintercepted(completion).intercepted().resume(Unit)
+}
+```
+intercepted()直接获取到Dispatchers
+```kotlin
+        override val context: CoroutineContext
+            get() = Dispatchers.Main // 这里的部分
+// 
+val Main: MainCoroutineDispatcher get() = MainDispatcherLoader.dispatcher
+// 继承自CoroutineDispatcher
+MainCoroutineDispatcher : CoroutineDispatcher()
+
+// CoroutineDispatcher有抽象接口
+public abstract fun dispatch(context: CoroutineContext, block: Runnable)
+```
+
+#### 线程切换
+
+1、线程切换的原理
+1. 构造出拦截器Cotninuation
+1. 挂起恢复的时候，需要通过Continuaiton的resumeWith回调结果。
+1. 拦截器作为Continuation先调用resumeWith
+```kotlin
+    override fun resumeWith(result: Result<T>) {
+        dispatcher.dispatch {
+            continuation.resumeWith(result)
+        }
+    }
+```
+1. disptach会在目标线程中执行block()代码块中的真正Continuaiton
+```kotlin
+    override fun dispatch(run: () -> Unit) {
+        handler.post(run) // 内部执行的是continuation.resumeWith
+    }
+```
+
+### 挂起探究
+
+#### suspendCancellableCoroutine
+```kotlin
+suspend fun request1() = suspendCoroutine<Int> {
+
+}
+// suspendCancellableCoroutine相比于suspendCoroutine：
+// 多了invokeOnCancellation 取消时回调
+suspend fun request2() = suspendCancellableCoroutine<Int> {
+    it.invokeOnCancellation {
+
+    }
+}
+```
+
+##### suspendCoroutineUninterceptedOrReturn
+底层核心都是:**suspendCoroutineUninterceptedOrReturn**
+```kotlin
+// 编译器生成代码的 // 内建生成
+public suspend inline fun <T> suspendCoroutineUninterceptedOrReturn(crossinline block: (Continuation<T>) -> Any?): T {
+    throw NotImplementedError("Implementation of suspendCoroutineUninterceptedOrReturn is intrinsic")
+}
+```
+
+##### SafeContinuation
+
+```kotlin
+public suspend inline fun <T> suspendCoroutine(crossinline block: (Continuation<T>) -> Unit): T {
+    return suspendCoroutineUninterceptedOrReturn { c: Continuation<T> ->
+        val safe = SafeContinuation(c.intercepted()) // 包裹 ====> 包装者模式
+        block(safe) // 一样用
+        safe.getOrThrow() // 获取结果作为返回值
+    }
+}
+```
+
+
+![picture 6](../../images/34bc697e00fa00a056dbb568cbbbf3ecaae203fef7c5e0fb869509b9b1fe59e6.png)  
+
+
+#### 如何决定是挂起还是为挂起？
+
+根据挂起函数返回的结果Any?是不是`CoroutineSingletons.COROUTINE_SUSPENDED`
+1. 是：才会认为是真正挂起
+```kotlin
+var funType3: (String, Continuation<Int>)->Any? = ::getLength as (String, Continuation<Int>)->Any?
+```
+
+挂起函数：返回挂起标记
+非挂起函数：返回值
+
+#### 未挂起
+
 
 ## 协程：面试题
 
