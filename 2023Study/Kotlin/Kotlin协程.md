@@ -200,6 +200,7 @@ main的第二行代码 main @coroutine#1
 5、使用EmptyCoroutineContext，使用当前的线程的调度器`context: CoroutineContext = EmptyCoroutineContext`
 
 ## 协程：启动
+
 ### launch
 ```kotlin
   // Job
@@ -209,6 +210,14 @@ main的第二行代码 main @coroutine#1
   }
   job.join() // 会等待launch执行完成
 ```
+
+* launch返回的是Job
+```kotlin
+public interface Job : CoroutineContext.Element
+public interface Element : CoroutineContext
+```
+
+
 ### async
 获取到返回值
 ```kotlin
@@ -223,6 +232,13 @@ main的第二行代码 main @coroutine#1
 
 3、launch和async都会立即调度
 1. await只是拿返回值
+
+
+
+* aysnc返回的是Deferred
+```kotlin
+public interface Deferred<out T> : Job
+```
 
 ### withContext
 
@@ -3471,6 +3487,221 @@ fun query(id: Int, continuation: Continuation<String>): Unit {
 }
 ```
 
+#### 拦截器源码解析
+
+
+**探究后流程总结**
+1. 具有拦截器的，会构造出DispatchedContinuation, 执行resumeWith，就会调用Dispatchers如IO DefaultIoScheduler的dispatch()【step 3】
+1. 调用LimitedDispatcher的dispatch，将block作为任务加到内部队列，dispatch向上调用到DefaultScheduler.dispatchWithContext【step 7】队列一，用于执行invokeSuspend
+1. 交到CoroutineScheduler的disptach，内部创建Worker线程，并且执行Thread的run，里面while(xxx)取任务执行。 ====> LockSupport.parkNanos(idleWorkerKeepAliveNs)
+1. 将dispatch任务放到Worker内部队列中，Worker的while中取出来执行（run） >>>>>> 等于交任务投递到了目标线程中执行。 // 队列二，Worker任务线程执行任务用的。
+1. 执行上层DispatchedContinuation的父类DispatchedTask的run()，执行上层的resume()->resumeWith()
+
+
+1、Dispatchers.IO
+```kotlin
+// 1、默认IO调度器
+public val IO: CoroutineDispatcher = DefaultIoScheduler
+// 2、实现抽象类：ExecutorCoroutineDispatcher
+internal object DefaultIoScheduler : ExecutorCoroutineDispatcher(), Executor
+// 3、继承自抽象类：CoroutineDispatcher
+public abstract class ExecutorCoroutineDispatcher: CoroutineDispatcher(), Closeable
+// 4、继承接口：ContinuationInterceptor
+public abstract class CoroutineDispatcher :
+    AbstractCoroutineContextElement(ContinuationInterceptor), ContinuationInterceptor
+
+// 5、ContinuationInterceptor定义的接口：核心interceptContinuation
+public interface ContinuationInterceptor : CoroutineContext.Element {
+    companion object Key : CoroutineContext.Key<ContinuationInterceptor>
+    public fun <T> interceptContinuation(continuation: Continuation<T>): Continuation<T>
+}
+```
+2、CoroutineDispatcher：定义dispatch，实现interceptContinuation，构造DispatchedContinuation
+```kotlin
+    public abstract fun dispatch(context: CoroutineContext, block: Runnable)
+
+    public final override fun <T> interceptContinuation(continuation: Continuation<T>): Continuation<T> =
+        DispatchedContinuation(this, continuation) // 构造DispatchedContinuation
+```
+3、interceptContinuation的作用是什么？
+```kotlin
+// 1、intercepted()内部
+createCoroutineUnintercepted(completion).intercepted()
+// 2、扩展Continuaiton：intercepted()方法，调用ContinuationImpl定义并实现的intercepted()
+public actual fun <T> Continuation<T>.intercepted(): Continuation<T> = (this as? ContinuationImpl)?.intercepted() ?: this
+
+// 3、ContinuationImpl.kt的intercepted()会调用CoroutineDispatcher实现的interceptContinuation()
+public fun intercepted(): Continuation<Any?> =
+        intercepted ?: (context[ContinuationInterceptor]?.interceptContinuation(this) ?: this).also { intercepted = it }
+```
+4、DispatchedContinuation
+```kotlin
+// 1. 参数一：dispatcher分发器
+// 2. 参数二：原Continuation，用于包裹
+internal class DispatchedContinuation<in T>(
+    val dispatcher: CoroutineDispatcher,
+    val continuation: Continuation<T>
+) : DispatchedTask<T>(MODE_UNINITIALIZED), CoroutineStackFrame, Continuation<T> by continuation {
+
+    override fun resumeWith(result: Result<T>) {
+        val context = continuation.context
+        // 用分发器，dispatch// 比如获取到Dispatchers.IO
+        dispatcher.dispatch(context, this) //【step 2】 // 这里的this指的是Runnable，为什么有Runnable？实现的抽象类DispatchedTask，最顶层是Runnable
+    }
+}
+// IO为例>>>>>>>>>>>>>>>>注意下面流程都是IO线程池的样例
+public val IO: CoroutineDispatcher = DefaultIoScheduler
+object DefaultIoScheduler : ExecutorCoroutineDispatcher(), Executor {
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+        default.dispatch(context, block) // default分发 //【step 3】
+    }
+}
+private val default = UnlimitedIoScheduler.limitedParallelism(xxx) // 单例类UnlimitedIoScheduler的方法
+// UnlimitedIoScheduler
+private object UnlimitedIoScheduler : CoroutineDispatcher() {
+    override fun dispatch(context: CoroutineContext, block: Runnable) {
+        // 用 DefaultScheduler，分派
+        DefaultScheduler.dispatchWithContext(block, BlockingContext, false) // 【step 7】
+    }
+}
+// CoroutineDispatcher实现的
+public open fun limitedParallelism(parallelism: Int): CoroutineDispatcher {
+    return LimitedDispatcher(this, parallelism)
+}
+// LimitedDispatcher：实现了Runnable可以理解为...
+class LimitedDispatcher(
+    val dispatcher: CoroutineDispatcher,
+    val parallelism: Int
+) : CoroutineDispatcher(), Runnable, Delay by (dispatcher as? Delay ?: DefaultDelay){
+    override fun dispatch(context: CoroutineContext, block: Runnable) { 
+        dispatchInternal(block) { //【step 4】
+            dispatcher.dispatch(this, this)//【step 6】
+        }
+    }
+    private inline fun dispatchInternal(block: Runnable, dispatch: () -> Unit) {
+        /**===添加到queue中==========================
+         *private fun addAndTryDispatching(block: Runnable): Boolean {
+         *        queue.addLast(block)
+         *        return runningWorkers >= parallelism
+         *}
+         *========================================*/
+        if (addAndTryDispatching(block)) return //【step 5】
+        if (!tryAllocateWorker()) return
+        dispatch() // 一层层调到DefaultScheduler : SchedulerCoroutineDispatcher的dispatchWithContext，再到CoroutineScheduler的dispatch加入到队列中。
+    }
+
+    override fun run() {
+        while (true) { // while()真正实现了状态机的多次调用
+            val task = queue.removeFirstOrNull()  // ====从queue中取出====
+            task.run() // task封装的block:Runnable是上层的DispatchedTask，run()会调用resumeWith
+        }
+    }
+}
+```
+
+DefaultScheduler源码：
+```kotlin
+// 1、继承自SchedulerCoroutineDispatcher
+object DefaultScheduler : SchedulerCoroutineDispatcher
+// 2、定义了线程池的参数
+internal open class SchedulerCoroutineDispatcher(
+    private val corePoolSize: Int = CORE_POOL_SIZE,
+    private val maxPoolSize: Int = MAX_POOL_SIZE,
+    private val idleWorkerKeepAliveNs: Long = IDLE_WORKER_KEEP_ALIVE_NS,
+    private val schedulerName: String = "CoroutineScheduler",
+) : ExecutorCoroutineDispatcher() {
+
+    override val executor: Executor
+        get() = coroutineScheduler
+    private var coroutineScheduler = createScheduler() 
+    private fun createScheduler() = //【step 1】
+        CoroutineScheduler(corePoolSize, maxPoolSize, idleWorkerKeepAliveNs, schedulerName)
+        // 构建CoroutineScheduler
+// 3、交给coroutineScheduler分发，是构建的CoroutineScheduler
+    override fun dispatch(context: CoroutineContext, block: Runnable): Unit = coroutineScheduler.dispatch(block)
+    // coroutineScheduler的dispatch分发
+
+    internal fun dispatchWithContext(block: Runnable, context: TaskContext, tailDispatch: Boolean) {
+        coroutineScheduler.dispatch(block, context, tailDispatch) // 【step 8】
+    }
+}
+```
+```kotlin
+internal class CoroutineScheduler(
+    @JvmField val corePoolSize: Int,
+    @JvmField val maxPoolSize: Int,
+    @JvmField val idleWorkerKeepAliveNs: Long = IDLE_WORKER_KEEP_ALIVE_NS,
+    @JvmField val schedulerName: String = DEFAULT_SCHEDULER_NAME
+) : Executor, Closeable {
+
+    internal inner class Worker private constructor() : Thread() {
+        override fun run() = runWorker()
+        private fun runWorker() {
+            while(xxx){
+                val task = findTask(mayHaveLocalTasks) // 队列取出任务，开始执行
+                executeTask(task) // task.run() // 
+                tryPark() // 等待唤醒
+            }
+        }
+    }
+
+
+
+    fun dispatch(block: Runnable, taskContext: TaskContext = NonBlockingContext, tailDispatch: Boolean = false) {
+        val task = createTask(block, taskContext)
+        val currentWorker = currentWorker()
+        // 投递到Worker内部
+        // localQueue.add(task, fair = tailDispatch)
+        val notAdded = currentWorker.submitToLocalQueue(task, tailDispatch)
+
+        // 内部 tryUnpark()，会唤醒runWorker中等待唤醒的任务
+        signalBlockingWork(skipUnpark = skipUnpark)
+    }
+
+    private fun signalBlockingWork(skipUnpark: Boolean) {
+        if (tryCreateWorker(stateSnapshot)) return
+        tryUnpark() // Try unpark again in case there was race between permit release and parking
+    }
+
+    private fun tryCreateWorker(state: Long = controlState.value): Boolean {
+        // 比较核心线程数，决定是否创建新线程
+        if (cpuWorkers < corePoolSize) {
+            val newCpuWorkers = createNewWorker()
+        }
+        return false
+    }
+    private fun createNewWorker(): Int {
+        synchronized(workers) {
+            // 创建Worker，执行线程
+            val worker = Worker(newIndex)
+            worker.start() // start会调用run，run会调用runWorker()
+            return cpuWorkers + 1
+        }
+    }
+}
+```
+
+DispatchedTask源码：
+```kotlin
+internal abstract class DispatchedTask<in T>(public var resumeMode: Int) : SchedulerTask() {xxx}
+internal actual typealias SchedulerTask = Task
+// 核心在于类型是Runnable，就必然有run
+internal abstract class Task(var submissionTime: Long,var taskContext: TaskContext) : Runnable {xxx}
+
+// 探究DispatchedTask的run
+    public final override fun run() {
+        val taskContext = this.taskContext
+            val delegate = delegate as DispatchedContinuation<T> // delegate交给子类DispatchedContinuation去实现了，返回的结果是this
+            val continuation = delegate.continuation // DispatchedContinuation的参数二：continuation
+            withContinuationContext(continuation, delegate.countOrElement) {
+                //........................................................
+                continuation.resume(getSuccessfulResult(state)) // 执行上层的resume
+            }
+        
+    }
+
+```
+
 ## 协程：底层操作
 
 ### 挂起函数
@@ -3532,6 +3763,37 @@ public fun <T> (suspend () -> T).createCoroutine(completion: Continuation<T>): C
     SafeContinuation(createCoroutineUnintercepted(completion).intercepted(), COROUTINE_SUSPENDED)
 ```
 1. 会使用拦截器`intercepted()`
+
+4、探究createCoroutine和协程执行逻辑
+```kotlin
+
+// 1、suspend{}内部是协程需要执行的lambda代码块，如下的block
+// public inline fun <R> suspend(noinline block: suspend () -> R): suspend () -> R = block
+    val continuationBenti : Continuation<Unit> = suspend {
+        println("suspend{} thread:${Thread.currentThread().name}")
+        delay(2000L)
+        // 假设这里做了很多工作
+        // ...
+        // 1000000
+        requestAction()
+    }
+// 2、Continuation的实现，上面block()返回结果要通过 context切换线程，resumeWith回调上抛
+// 3、createCoroutine构造出【协程本体】
+    .createCoroutine(object: Continuation<Int> {
+        override val context: CoroutineContext
+            get() = Dispatchers.Default
+
+        override fun resumeWith(result: Result<Int>) {
+            println("resumeWith result:${result} thread:${Thread.currentThread().name}")
+        }
+    })
+// 4、【协程本体】真正执行
+    continuationBenti.resume(Unit)
+```
+1. 我们写的所谓协程的代码块，都只是，协程会去执行的lambda代码块
+1. 外面包裹的是suspendCoroutine
+1. createCoroutine去构造协程本体
+1. resume触发协程本体的执行
 
 #### startCoroutine
 
@@ -3758,16 +4020,95 @@ suspend fun getLength(str: String)  = suspendCoroutine<Int>{
     })
 ```
 
-#### 探究官方resume和startCoroutine
+#### 探究官方resume和startCoroutine ===> 接口和抽象类
 
+1、startCoroutine
 ```kotlin
+// 1、本质构造出ContinuationImpl
+// 2、再调用intercepted()，获得拦截器包裹Continuation
+// 3、resume，内部是resumeWith
 public fun <T> (suspend () -> T).startCoroutine(
     completion: Continuation<T>
 ) {
     // 很明显调用了intercepted()
     createCoroutineUnintercepted(completion).intercepted().resume(Unit)
 }
+
 ```
+
+2、createCoroutineFromSuspendFunction: 实现invokeSuspend
+```kotlin
+// createCoroutineUnintercepted的内部实现在IntrinsicsJvm.kt
+createCoroutineFromSuspendFunction(probeCompletion) {
+    // this是外面调用startCoroutine的Function1 var1
+    (this as Function2<R, Continuation<T>, Any?>).invoke(receiver, it)
+}
+// 底层是：createCoroutineFromSuspendFunction(continuation)
+private inline fun <T> createCoroutineFromSuspendFunction(
+    completion: Continuation<T>,
+    crossinline block: (Continuation<T>) -> Any?
+): Continuation<Unit> {
+    // 拿到上层suspend状态机部分的context（决定协程在哪儿执行）
+    val context = completion.context
+    return object : ContinuationImpl(completion, context) {
+            private var label = 0
+
+// 内部实现invokeSuspend方法，状态机，调用block(this)，也是上层suspend{}包裹生成的代码
+            override fun invokeSuspend(result: Result<Any?>): Any? =
+                when (label) {
+                    0 -> {
+                        label = 1
+                        block(this) 
+                    }
+                    1 -> {
+                        label = 2
+                    }
+                    else -> error("This coroutine had already completed")
+                }
+        }
+}
+```
+3、ContinuationImpl：实现intercepted()，构建拦截器
+```kotlin
+// 底层是ContinuationImpl
+abstract class ContinuationImpl(xxx) : BaseContinuationImpl(completion){
+    public fun intercepted(): Continuation<Any?> =
+        intercepted
+            ?: (context[ContinuationInterceptor]?.interceptContinuation(this) ?: this)
+                .also { intercepted = it }
+}
+```
+
+4、ContinuationImpl继承自BaseContinuationImpl：实现了resumeWith，会调用invokeSuspend
+```kotlin
+internal abstract class BaseContinuationImpl(val completion: Continuation<Any?>?) : Continuation<Any?>, CoroutineStackFrame, Serializable {
+
+    public final override fun resumeWith(result: Result<Any?>) {
+        // while无限循环，不停的调用
+        while (true) {
+            // 1、调用实现的invokeSuspend
+                val outcome = invokeSuspend(param)
+                // 2、挂起函数直接retuern
+                if (outcome === COROUTINE_SUSPENDED) return
+
+                completion.resumeWith(outcome)
+            }
+        }
+
+    }
+    // 定义：是invokeSuspend的开端
+    protected abstract fun invokeSuspend(result: Result<Any?>): Any?
+}
+// 层层找到实现了Continuation接口
+public interface Continuation<in T> {
+    public val context: CoroutineContext
+    public fun resumeWith(result: Result<T>)
+}
+```
+
+
+
+##### intercepted
 intercepted()直接获取到Dispatchers
 ```kotlin
         override val context: CoroutineContext
@@ -3826,7 +4167,37 @@ public suspend inline fun <T> suspendCoroutineUninterceptedOrReturn(crossinline 
 }
 ```
 
-##### SafeContinuation
+
+
+**suspendCoroutineUninterceptedOrReturn生成的代码是什么？**
+> 就是对使用协程的代码进行反编译后，生成的代码如：(伪代码)
+```kotlin
+suspend inline fun <T> suspendCoroutineUninterceptedOrReturn(crossinline block: (Continuation<T>) -> Any?): T {
+    // 创建一个 Continuation 对象
+    val completion = object : Continuation<T> {
+        override val context: CoroutineContext = EmptyCoroutineContext
+
+        override fun resumeWith(result: Result<T>) {
+            // 处理协程恢复的逻辑
+            // ...
+        }
+    }
+
+    // 调用传入的 lambda，传递 Continuation 对象
+    val value = block(completion)
+
+    // 根据 lambda 的返回值类型进行处理，返回结果或抛出异常
+    if (value != COROUTINE_SUSPENDED) {
+        @Suppress("UNCHECKED_CAST")
+        value as T
+    } else {
+        COROUTINE_SUSPENDED
+    }
+}
+
+```
+
+##### SafeContinuation ===> CAS
 
 ```kotlin
 public suspend inline fun <T> suspendCoroutine(crossinline block: (Continuation<T>) -> Unit): T {
@@ -3838,11 +4209,27 @@ public suspend inline fun <T> suspendCoroutine(crossinline block: (Continuation<
 }
 ```
 
+1、作用
+1. 作用是为了避免多次调用：resume
+1. 
+
+* SafeContinuation是expect修饰，代表不同平台不同实现类，JVM的实现
+```kotlin
+// actual关键字
+internal actual class SafeContinuation<in T>
+```
+
+* kotlin底层协程有三种状态
+```kotlin
+internal enum class CoroutineSingletons { COROUTINE_SUSPENDED, UNDECIDED, RESUMED }
+```
 
 ![picture 6](../../images/34bc697e00fa00a056dbb568cbbbf3ecaae203fef7c5e0fb869509b9b1fe59e6.png)  
 
 
-#### 如何决定是挂起还是为挂起？
+#### 挂起和非挂起？  =====> OkHttp
+
+**如何决定是挂起还是非挂起？**
 
 根据挂起函数返回的结果Any?是不是`CoroutineSingletons.COROUTINE_SUSPENDED`
 1. 是：才会认为是真正挂起
@@ -3853,8 +4240,131 @@ var funType3: (String, Continuation<Int>)->Any? = ::getLength as (String, Contin
 挂起函数：返回挂起标记
 非挂起函数：返回值
 
-#### 未挂起
+====> OkHttp
+也分同步还是异步，调用enqueue和execute。
+execute是直接获取到结果，返回。
 
+### resume：手工构造协程本体全流程解析
+
+#### 源代码
+```kotlin
+fun main() {
+    val continuationBenti: Continuation<Unit> = suspend {
+        delay(2000L)
+        1000000
+    }.createCoroutine(object : Continuation<Int> {
+        override val context: CoroutineContext
+            get() = Dispatchers.Default
+
+        override fun resumeWith(result: Result<Int>) {
+            println("resumeWith result:${result} thread:${Thread.currentThread().name}")
+        }
+    })
+    continuationBenti.resume(Unit)
+}
+```
+
+#### Kotlin编译器构造
+kotlin构造出的代码分为三大部分
+```kotlin
+// STEP 1: 构造出suspend对应部分（状态机部分代码）
+Function1 var1 = new Function1((Continuation)null) {xxx};
+// STEP 2: 构造Continuation，在后面获得结果的时候切换到Dispatchers的指定线程，执行resumeWith
+Continuation continuationBenti = createCoroutine(var1, new Continuation() {xxx});
+// STEP 3: 驱动协程执行
+continuationBenti.resumeWith(xxx);
+```
+
+Function1代码
+```java
+      Function1 var1 = (Function1)(new Function1((Continuation)null) {
+         int label;
+
+         public final Object invokeSuspend(@NotNull Object $result) {
+            Object var2 = IntrinsicsKt.getCOROUTINE_SUSPENDED();
+            switch (this.label) {
+               case 0:
+                  ResultKt.throwOnFailure($result);
+                  this.label = 1;
+                  if (DelayKt.delay(2000L, this) == var2) {
+                     return var2;
+                  }
+                  break;
+               case 1:
+                  ResultKt.throwOnFailure($result);
+                  break;
+            }
+
+            return Boxing.boxInt(1000000);
+         }
+
+         @NotNull
+         public final Continuation create(@NotNull Continuation completion) {
+            Intrinsics.checkNotNullParameter(completion, "completion");
+            Function1 var2 = new <anonymous constructor>(completion);
+            return var2;
+         }
+// invoke会调用自己的invokeSuspend
+         public final Object invoke(Object var1) {
+            return ((<undefinedtype>)this.create((Continuation)var1)).invokeSuspend(Unit.INSTANCE);
+         }
+      });
+```
+
+
+#### 流程总结
+
+请参考《拦截器源码分析》的代码关于拦截器流程
+
+```c
+// >>>>>>>>>>>> 【第一轮】 >>>>>>>>>>>>>>>>>>>>>>>>>>
+// >>>>>>>>>>>> 跳转到目标线程执行业务的流程 >>>>>>>>>>>>>>>>>>>>>>>
+1. resumeWith会调用拦截器DispatchedContinuation的resumeWith
+2. 会执行dispatcher分发器的dispatch系列任务
+3. 创建Worker线程，启动，while循环中从任务队列取任务，无任务就park
+4. 将dispatch任务，投递到Worker线程的任务队列，并且unpark
+// >>>>>>>>>>>> Runnable的run，到上层Kotlin编译器实现的，invoke、invokeSuspend >>>>>>>>>>>>>>>>>>
+1. Worker执行的是DispatchedContinuation的父类DispatchedTask的run()，执行上层的resume()->resumeWith()
+2. resumeWith由BaseContinuationImpl实现，内部调用invokeSuspend
+3. invokeSuspend由ContinuationImpl的匿名内部类实现，会调用生成的FunctionX的invoke，invoke会调用上层kotlin为协程代码块生成的invoke，内部是上层invokeSuspend
+4. kotlin用状态机实现invokeSuspend，进入第一轮，发现是挂起函数直接返回COROUTINE_SUSPENDED
+// >>>>>>>>>>>> 运行结果给上层，切换到目标协程执行 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+1. 获取到原先线程如主线程,投递到Handler中执行，resumeWith(实现了结果返回后切换线程执行后续代码)
+// >>>>>>>>>>>> 【第二轮】 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+// 再投递任务调目标线程Worker中执行
+// 执行invokeSuspend方法
+// 切换回原先线程，resumeWith返回返回值。
+// >>>>>>>>>>>> 【第三轮】重复 >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+```
+
+简单语言描述下：
+resume是调用拦截器的resumeWith，进行dispatch，内部流程，到线程池中，找到Worker线程，并且投递到内部的local队列中，执行unpark会唤醒，worker线程的park，worker线程会while循环中循环处理local队列中的任务，没有任务就park。执行任务就是指执行封装好的Task内部的RUnnable的run方法。
+run方法中，执行上层block这个上层实现的lambda方法，实现了线程切换。然后执行到上面挂起函数，被kotlin编译器生成的Function的invoke方法，invoke会调用invokeSuspend方法，这里面就是根据我们的多次挂起恢复的代码，生成的状态机，利用状态翻转，触发反复进入invokeSuspend方法。实现拆解地狱回调。
+在每一invokeSuspend完成一个挂起任务，并且执行好操作需要返回数据时。根通过拦截器，切换到我们需要回复的线程，假如是Android的UI线程，内部dispatch就是通过handler的post进行切换，然后执行resume方法，一层层传递到COntinuation实现的remsueWith代码，这段代码就是我们上层用户希望恢复后会执行的代码。
+
+### receiver版本coroutine
+```kotlin
+@RestrictsSuspension // 会限定对DerryScope的扩展函数，必须使用DerryScope的函数
+class DerryScope
+suspend fun DerryScope.suspendAction():Int = 200
+fun test(lambda: (suspend DerryScope.() -> Int)){
+    lambda.createCoroutine(DerryScope(), object: Continuation<Int>{
+        override val context: CoroutineContext
+            get() = Dispatchers.Default
+
+        override fun resumeWith(result: Result<Int>) {
+            println("resumeWith ${result.getOrNull()}")
+        }
+    }).resume(Unit)
+}
+
+
+// 调用，像系统的launch一样
+    test{
+        suspendAction() // 必须调用DerryScope的扩展函数
+//        suspendAction2() // 错误！不可以
+    }
+```
 
 ## 协程：面试题
 
@@ -3897,32 +4407,8 @@ LiveData关联布局，产生DataBinding
 
 
 ## 协程核心类和Api：结构和源码剖析
-CoroutineContext
--EmptyCoroutineContext
-Continuation
--SafeContinuation
-CoroutineScope
--GlobalScope
--MainScope
--lifecycleScope
--viewmodelScope
-runBlocking
-delay
-launch
-async
-Job
-```kotlin
-public interface Job : CoroutineContext.Element
-public interface Element : CoroutineContext
-```
--Deferred
-```kotlin
-public interface Deferred<out T> : Job
-```
-架构：
-结构化并发
 
-EmptyCoroutineContext
+
 ThreadLocalEventLoop
 EventLoop
 ContinuationInterceptor
