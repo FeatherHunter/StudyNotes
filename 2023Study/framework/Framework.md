@@ -66,21 +66,7 @@ Window
 1. mWindow加入到Display中
 2. mInputChannel：准备好接收事件
 3. 但没有relayout，还没有有效的Surface
-## Binder
-### transact流程
-[参考文章链接](https://blog.csdn.net/Yellow_Matrix/article/details/103918841)
-1、transact流程
-```
-BinderProxy.transact
-BpBinder.transact => remote()->transact
-IPCThreadState.transact
--write参数 =====> Parcel
--waitForResponse：等待结果才是真正发送数据
---talkWithDriver
-```
-2、BinderProxy：aidl文件生成的java类
-3、BpProxy：Binder驱动生成的C++类
-4、binder_write_read:记录了mOut和mIn信息，Binder驱动借助该信息实现数据的读写
+
 ## SurfaceFlinger
 ### 三线程
 ```
