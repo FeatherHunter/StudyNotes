@@ -1202,62 +1202,6 @@ ProcessState是每个进程有一个
 ### joinThreadPool
 
 
-## Zygote流程：ZygoteServer
-1、ZygoteServer源码      ==========>Poll
-1. poll机制，多路复用
-2. 处理客户端连接请求
-3. 处理数据处理请求：processOneCommand
-```c
-  Runnable runSelectLoop(String abiList) {
-        //mZygoteSocket 是socket通信中的服务端，即zygote进程。保存到socketFDs[0]
-        socketFDs.add(mZygoteSocket.getFileDescriptor());
-        while (true) {
-            // Step 1：Poll机制，IO多路复用。没有事件到来就阻塞
-            // 1. 每次循环，都重新创建需要监听的pollFds。并且关注事件：POLLIN
-            StructPollfd[] pollFDs;
-            for (FileDescriptor socketFD : socketFDs) {
-                pollFDs[pollIndex].events = (short) POLLIN; // 关注事件的到来
-            }
-            // 2. Poll机制：处理轮询状态，当pollFds有事件到来则往下执行，否则阻塞在这里
-            pollReturnValue = Os.poll(pollFDs, pollTimeoutMs);
-            while (--pollIndex >= 0) {
-                // Step 2：处理 客户端发出连接请求
-                if (pollIndex == 0) { // 意味着有客户端连接请求
-                    ZygoteConnection newPeer = acceptCommandPeer(abiList);// 则创建ZygoteConnection对象,并添加到socketFDs。
-                    peers.add(newPeer); //  加入到peers和socketFDs，下一次也开始监听
-                    socketFDs.add(newPeer.getFileDescriptor());
-                }
-                // Step 3：处理 数据处理请求
-                else if (pollIndex < usapPoolEventFDIndex) {
-                    //pollIndex>0，则代表通过socket接收来自对端的数据，并执行相应操作
-                    ZygoteConnection connection = peers.get(pollIndex);
-                    ///////////////////////////重要细节///////////////////////////
-                    //  进行进程的处理:创建进程
-                    final Runnable command = connection.processOneCommand(this);
-                    // TODO (chriswailes): Is this extra check necessary?
-                    if (mIsForkChild) {
-                        return command; // child
-                    } else {
-                        socketFDs.remove(pollIndex);//处理完则从socketFDs中移除该文件描述符
-                    }
-                    
-                }
-            }
-        }
-    }
-```
-2、ZygoteServer和select、poll、epoll
-1. select <= Andorid 5.0，使用复杂，最大1024FD
-2. poll >= Android 6.0，取消FD数量限制
-
-3、为什么使用poll，不使用epoll？
-1. fork进程频率远不如Handler的Looper，epoll在低并发场景下并没有特别优势
-2. epoll还需要维护事件队列，没有必要
-
-### poll
-[Title](https://www.cnblogs.com/s2603898260/p/14624187.html)
-[死磕epoll](https://zhuanlan.zhihu.com/p/63179839)
-
 ## mmap
 内存读写，代替IO读写。
 
