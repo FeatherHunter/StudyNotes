@@ -29,10 +29,13 @@ startOtherServices()
    1. 构造DisplayMetrics：保存...等信息 ===> ?
    2. 构造PermissionManager：权限管理
    3. 创建Settings保存安装包信息：保存在/data/system/profile目录下package.xml  ===> 有什么用？
-2. 系统扫描阶段: 扫描/system/vendor，priveapp等系统app
+2. 系统扫描阶段: 扫描/system/vendor，/system/priveapp等系统app
+> 权限文件
+> 需要copy权限文件到/system/etc/permissions目录下，扩展思路
 3. Data扫描阶段: 扫描data目录app                  ===> Data扫描阶段
 4. 扫描结束: OTA升级，首次启动，清理不必要缓存
 5. 就绪: GC回收内存
+
 2、扫描阶段干了什么？
 1. parseBaseApplication对application、activity等进行扫描
 
