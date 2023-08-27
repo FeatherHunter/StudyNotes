@@ -286,22 +286,32 @@ onTrimMemory(int level){
 2、数组快
 3、CPU缓存机制
 
-## 类加载
-
 ## Android N 运行机制
 
-1、运行机制
+1、Android 7.0(N)开始运行机制
 1. 运行时解释执行
+> ART的ELF文件是dex+机器码，Dalvik odex是dex优化版本
 2. 将热点代码，JIT即时编译，编译的方法会记录到Profile配置文件中。位于/data/misc/profiles
-3. 设备空闲、充电时，根据Profile进行AOT。下次运行时可以直接运行。=>BackgroundDexOptService
+3. 设备空闲、充电时，根据Profile进行AOT(生成base.art)。下次运行时可以直接运行。=>BackgroundDexOptService(编译守护进程)
+> 机器码中找到了class，不用再去文件中找了。
 
-2、相关目录
+![picture 2](../../images/d4461017cbe798bf66c8eceea388c428280101d5df5061826cb8930649242346.png)  
+
+
+2、Dex文件
+ - Dalvk：Apk安装时 dexopt工具 dex会优化成odex文件（更快的dex）
+ - ART：Apk安装时 dex2oat (AOT) 会将dex中字节码编译成机器码 elf（dex和native code）
+
+3、相关目录
 1. /data/app
    1. base.odex 优化后的odex文件
    2. base.art AOT：编译成机器码放入
 2. /data/misc/profiles
    1. cur
    2. ref
+
+![picture 0](../../images/3cb6d0099f6aa38e0663d342f56041be05b155cfd3f1584b6f2f6f5f2858dc01.png)  
+
 
 3、AOT和BackgroundDexOptService 后台服务
 1. dex2oat，会处理，编译好后生成base.art文件放入到/data/app
@@ -310,15 +320,23 @@ onTrimMemory(int level){
 1. Apk打包流程中会将dex优化为odex
 1. 第一次加载dex时，会优化成odex文件
 
+### 基于寄存器
+
+1、Dalvik和Art虚拟机基于寄存器
+1. 将局部变量表和操作数栈合并为虚拟寄存器
+1. 指令数量明显变少，性能更好
+
 ## 双亲委派机制
 
 1、双亲委派机制-mParent变量：
 会将所有的加载请求交给父类处理，父类加载class失败，会调用自己的findClass，没找到会抛出ClassNotFoundException异常
 
 2、BootClassLoader - Framework class文件
+1. String
+1. Activity
 
 3、PathClassLoader - BaseDexClassLoader（pathlis: DexPathList）
-1. 加载应用class文件
+1. 加载应用class文件，如：AppCompatActivity、MainActivity等等
 2. 需要传入so位置
 
 4、DexClassLoader
@@ -328,6 +346,71 @@ onTrimMemory(int level){
 5、PathClassLoader和DexClassLoader的区别？
 1. 源码层面，唯一区别的参数在API 27已经废弃。（传入的是null，两者如今调用的是同一个父类构造方法）
 2. 没有区别，都可以加载sdcard上外置的Dex文件
+
+
+6、Classloader流程
+1. loadClass>findLoadedClass 找缓存
+2. 没有缓存，parent.loadClass交给父去加载。双亲委派
+
+7、PathClassLoader的parent是BootClassLoader(对象的父亲)
+
+![picture 1](../../images/4de9f9eb9f7f2abc1b0760098649a1fe0bbe04535d8e4ce542093b3b4a45c05f.png)  
+
+
+![classloader](../../images/classloader.png)  
+
+
+8、类如何确定唯一性
+1. ClassLoader + 类 共同确定
+
+### 双亲委派和ASM
+
+
+
+1、双亲委派决定了安全
+1. ASM可以修改业务逻辑，没办法修改系统类
+1. 比如修改一个Handler，系统的Handler不会被我们影响
+
+### PathClassLoader
+
+1、PathClassLoader是什么时候加载的？交给我们的App的？
+1. 在执行ZygoteInit的zygoteInit方法之前，会用BootClassLoader创建PathClassLoader
+1. 传入到zygoteInit方法中
+1. 反射调用main方法（PathClassLoader）
+```java
+//ZygoteInit.java frameworks\base\core\java\com\android\internal\os\
+private static Runnable handleSystemServerProcess(ZygoteArguments parsedArgs) 
+    // pathclassloader
+    ClassLoader cl = createPathClassLoader(systemServerClasspath, parsedArgs.mTargetSdkVersion); // ===============================> PathClassLoader
+
+    return ZygoteInit.zygoteInit(parsedArgs.mTargetSdkVersion,
+                    parsedArgs.mDisabledCompatChanges,
+                    parsedArgs.mRemainingArgs, cl);
+}
+
+// 双亲委派，用BootClassLoader构造PathClassLoader，传入库路径："java.library.path"
+    static ClassLoader createPathClassLoader(String classPath, int targetSdkVersion) {
+        String libraryPath = System.getProperty("java.library.path");
+        ClassLoader parent = ClassLoader.getSystemClassLoader().getParent(); // We use the boot class loader, that's what the runtime expects at AOT.
+        return ClassLoaderFactory.createClassLoader(classPath, libraryPath, libraryPath,parent, targetSdkVersion, true /* isNamespaceShared */, null /* classLoaderName */);
+    }
+//ZygoteInit.java frameworks\base\core\java\com\android\internal\os\
+    public static final Runnable zygoteInit(xxx) {
+        //1. 初始化运行环境
+        RuntimeInit.commonInit();//初始化运行环境 
+        //2. 启动Binder ，方法在 androidRuntime.cpp中注册       
+        ZygoteInit.nativeZygoteInit();
+        //3. 通过反射创建程序入口函数的 Method 对象，并返回 Runnable 对象
+        // ActivityThread.main
+        return RuntimeInit.applicationInit(targetSdkVersion, disabledCompatChanges, argv, classLoader);
+    }
+
+    protected static Runnable applicationInit(xxx, ClassLoader classLoader) {
+        // startClass: 如果AMS通过socket传递过来的是 ActivityThread
+        return findStaticMain(args.startClass, args.startArgs, classLoader);
+    }
+```
+
 
 ## 热修复
 
@@ -395,11 +478,14 @@ Andorid提供压缩类：
 3、List加锁怎么加？
 4、5G数据，如何在500MV的内存情况下排序？桶排序
 5、大文件传输中要考虑哪些问题？如何保证大文件的一致性。
+
 # 实战
 1、如何设计一个WX朋友圈首页的功能，UI、数据等方面
 2、如何设计一个无限数据的气泡聊天功能
+
 # 锁
 1、synchronized、Lock实现原理
+
 # 性能
 1、App性能优化：内存优化、cpu占用率(优化)、流畅性
 2、如何评价一款App的性能

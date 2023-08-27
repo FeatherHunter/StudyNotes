@@ -174,6 +174,21 @@ HashMap（特点、容量、负载因子、扩容、散列函数）=> ArrayMap�
 6、扩容规则，超过负载因子，且发生哈希冲突。
 7、转为红黑树条件：达到8个节点，且数组大小>64，<=64会扩容。
 
+### HashMap存储空间效率问题  =============> 内存优化
+
+1、`HashMap<Long, Long>`存储数据文件空间效率太低
+1. 加载上百MB数据到内存中分析时，会很快占满Eden空间，从而引发Minor GC。但GC后大部分对象仍存储，会导致复制到Survivor区。
+1. 标记-复制会影响性能（新生代算法，是标记复制，思想是存活对象少）
+
+2、`HashMap<Long, Long>`有效数据分析
+1. 结论：有效数据占比 18%
+1. 有效数据：long 8byte，value 8byte = 16byte
+1. 总共内存空间：long转为对象 = 对象头（8byte Markword + 8byte class指针）+ 实际long值 8byte => 24byte.
+1. 2个Long组成Map.Entry = 24 * 2 = 48 byte
+1. Map.Entry其他部分：16byte 对象头 + 实例数据（8byte next字段 + 4byte int类型hashcode + 24*2 ） + 4byte 对齐填充 + 8byte HashMap对Entry的引用 共88byte。
+1. 实际占比：18%
+
+
 ### 散列表
 
 1、如何获取到高质量的散列函数
@@ -307,6 +322,11 @@ HashSet
 1. 性能高
 2. 数组，地址连续
 隐式转换
+
+Java用基本数据类型的好处：
+1. 占用内存小
+2. 可以借助CPU缓存机制
+3. 数组，可以直接取值，地址连续
 
 ## 包装类
 1. 数组，地址不连续

@@ -438,7 +438,7 @@ mActivityTaskManager.initialize(mIntentFirewall, mPendingIntentController,Displa
         final ActivityStack stack = mRootWindowContainer.getTopDisplayFocusedStack();
 
 		// 2、启动那些需要启动，但是一直没有来得及启动的Activitys（内部调用API最终也startActivityUnchecked）
-        mController.doPendingActivityLaunches(false); 
+        mController.doPendingActivityLaunches(false);  // 比如一个页面，两个Activity。或者同时大量Activity。
          // 3、启动最后需要启动的activity，也就是当前activity
         mLastStartActivityResult = startActivityUnchecked(r, sourceRecord, voiceSession,
                 request.voiceInteractor, startFlags, true /* doResume */, checkedOptions, inTask,
@@ -1136,7 +1136,7 @@ Runnable runSelectLoop(String abiList) {
             if (pid == 0) {
                 // 关闭Socket链接
                 zygoteServer.setForkChild();
-                zygoteServer.closeServerSocket();
+                zygoteServer.closeServerSocket(); // fork出来的子进程不需要Socket服务器。
                 IoUtils.closeQuietly(serverPipeFd);
                 serverPipeFd = null;
                 // 3、处理子进程
@@ -1329,12 +1329,14 @@ static void SpecializeCommon(/*省略参数*/) {
         // 1、bindApplication
         thread.bindApplication(processName, /*省略参数*/);
         // 2、makeActive
-        app.makeActive(thread, mProcessStats);
+        app.makeActive(thread, mProcessStats); // 将IAplicationThread交给ProcessRecord
+        // 3、把AMS的ProcessRecord，添加到，mLruProcess。AMS不会直接持有ProcessRecord。
+        mProcessList.updateLruProcessLocked(app, false, null); //ProcessList有多个ProcessRecord
 
         ////上面说到，这里为true，去真正启动Activity
         if (normalMode) {
             try {
-            	// 3、attachApplication，真正启动Activity
+            	// 3、attachApplication，真正启动ActivitybindApplication
                 didSomething = mAtmInternal.attachApplication(app.getWindowProcessController());
             } catch (Exception e) {
                 Slog.wtf(TAG, "Exception thrown launching activities in " + app, e);
@@ -1362,6 +1364,14 @@ static void SpecializeCommon(/*省略参数*/) {
                             rootTask.topRunningActivity());
         c.recycle();
         return didSomething;
+    }
+    private boolean startActivityForAttachedApplicationIfNeeded(ActivityRecord r,
+            WindowProcessController app, ActivityRecord top) {
+
+            // ActivityStackSupervisor#
+        mStackSupervisor.realStartActivityLocked(r, app,top == r && r.isFocusable() /*andResume*/, true /*checkConfig*/);
+
+        return false;
     }
 // ActivityStackSupervisor.java-等同正常StartActivity的流程
     boolean realStartActivityLocked(ActivityRecord r, xxx){
@@ -1430,7 +1440,6 @@ AMS会捕获所有Native Crash：Socket+while()
             }
         }
 
-        try {
             FileDescriptor serverFd = Os.socket(AF_UNIX, SOCK_STREAM, 0);
             final UnixSocketAddress sockAddr = UnixSocketAddress.createFileSystem(DEBUGGERD_SOCKET_PATH);
             Os.bind(serverFd, sockAddr);
@@ -1439,106 +1448,26 @@ AMS会捕获所有Native Crash：Socket+while()
 
             while (true) {
                 FileDescriptor peerFd = null;
-                try {
                     peerFd = Os.accept(serverFd, null /* peerAddress */);
-                    if (peerFd != null) {
-                        // the reporting thread may take responsibility for
-                        // acking the debugger; make sure we play along.
-                        consumeNativeCrashData(peerFd); // 消费native crash
-                    }
-                } catch (Exception e) {
-                    Slog.w(TAG, "Error handling connection", e);
-                } finally {
-                    // Always ack crash_dump's connection to us.  The actual
-                    // byte written is irrelevant.
-                    if (peerFd != null) {
-                        try {
-                            Os.write(peerFd, ackSignal, 0, 1);
-                        } catch (Exception e) {
-                        }
-                        try {
-                            Os.close(peerFd);
-                        } catch (ErrnoException e) {
-                        }
-                    }
-                }
+
+                    consumeNativeCrashData(peerFd); // 消费native crash
+
             }
-        } catch (Exception e) {
-            Slog.e(TAG, "Unable to init native debug socket!", e);
-        }
     }
 
     // Read a crash report from the connection
     void consumeNativeCrashData(FileDescriptor fd) {
-        if (MORE_DEBUG) Slog.i(TAG, "debuggerd connected");
-        final byte[] buf = new byte[4096];
-        final ByteArrayOutputStream os = new ByteArrayOutputStream(4096);
-
-        try {
-            StructTimeval timeout = StructTimeval.fromMillis(SOCKET_TIMEOUT_MILLIS);
-            Os.setsockoptTimeval(fd, SOL_SOCKET, SO_RCVTIMEO, timeout);
-            Os.setsockoptTimeval(fd, SOL_SOCKET, SO_SNDTIMEO, timeout);
-
-            // The socket is guarded by an selinux neverallow rule that only
-            // permits crash_dump to connect to it. This allows us to trust the
-            // received values.
-
-            // first, the pid and signal number
-            int headerBytes = readExactly(fd, buf, 0, 8);
-            if (headerBytes != 8) {
-                // protocol failure; give up
-                Slog.e(TAG, "Unable to read from debuggerd");
-                return;
-            }
-
-            int pid = unpackInt(buf, 0);
-            int signal = unpackInt(buf, 4);
-            if (DEBUG) {
-                Slog.v(TAG, "Read pid=" + pid + " signal=" + signal);
-            }
-
-            // now the text of the dump
-            if (pid > 0) {
-                final ProcessRecord pr;
-                synchronized (mAm.mPidsSelfLocked) {
-                    pr = mAm.mPidsSelfLocked.get(pid);
-                }
-                if (pr != null) {
-                    // Don't attempt crash reporting for persistent apps
-                    if (pr.isPersistent()) {
-                        if (DEBUG) {
-                            Slog.v(TAG, "Skipping report for persistent app " + pr);
-                        }
-                        return;
-                    }
+                final ProcessRecord pr = mAm.mPidsSelfLocked.get(pid);
 
                     int bytes;
                     do {
                         // get some data
                         bytes = Os.read(fd, buf, 0, buf.length);
-                        if (bytes > 0) {
-                            if (MORE_DEBUG) {
-                                String s = new String(buf, 0, bytes, "UTF-8");
-                                Slog.v(TAG, "READ=" + bytes + "> " + s);
-                            }
-                            // did we just get the EOD null byte?
-                            if (buf[bytes-1] == 0) {
-                                os.write(buf, 0, bytes-1);  // exclude the EOD token
-                                break;
-                            }
-                            // no EOD, so collect it and read more
-                            os.write(buf, 0, bytes);
-                        }
+                        // xxx
                     } while (bytes > 0);
 
                     final String reportString = new String(os.toByteArray(), "UTF-8");
                     (new NativeCrashReporter(pr, signal, reportString)).start(); // 报告NativeCrash
-                }
-            }
-        } catch (Exception e) {
-            Slog.e(TAG, "Exception dealing with report", e);
-            // ugh, fail.
-        }
     }
 
 // 报告Native Crash
@@ -1556,20 +1485,12 @@ AMS会捕获所有Native Crash：Socket+while()
 
         @Override
         public void run() {
-            try {
                 CrashInfo ci = new CrashInfo();
                 ci.exceptionClassName = "Native crash";
                 ci.exceptionMessage = Os.strsignal(mSignal);
-                ci.throwFileName = "unknown";
-                ci.throwClassName = "unknown";
-                ci.throwMethodName = "unknown";
-                ci.stackTrace = mCrashReport;
 
                 // 抛给Application
                 mAm.handleApplicationCrashInner("native_crash", mApp, mApp.processName, ci);
-            } catch (Exception e) {
-                Slog.e(TAG, "Unable to report native crash", e);
-            }
         }
     }
 
@@ -1577,199 +1498,19 @@ AMS会捕获所有Native Crash：Socket+while()
     void handleApplicationCrashInner(String eventType, ProcessRecord r, String processName,
             ApplicationErrorReport.CrashInfo crashInfo) {
 
-        EventLogTags.writeAmCrash(Binder.getCallingPid(),
-                UserHandle.getUserId(Binder.getCallingUid()), processName,
-                r == null ? -1 : r.info.flags,
-                crashInfo.exceptionClassName,
-                crashInfo.exceptionMessage,
-                crashInfo.throwFileName,
-                crashInfo.throwLineNumber);
-
-        FrameworkStatsLog.write(FrameworkStatsLog.APP_CRASH_OCCURRED,
-                Binder.getCallingUid(),
-                eventType,
-                processName,
-                Binder.getCallingPid(),
-                (r != null && r.info != null) ? r.info.packageName : "",
-                (r != null && r.info != null) ? (r.info.isInstantApp()
-                        ? FrameworkStatsLog.APP_CRASH_OCCURRED__IS_INSTANT_APP__TRUE
-                        : FrameworkStatsLog.APP_CRASH_OCCURRED__IS_INSTANT_APP__FALSE)
-                        : FrameworkStatsLog.APP_CRASH_OCCURRED__IS_INSTANT_APP__UNAVAILABLE,
-                r != null ? (r.isInterestingToUserLocked()
-                        ? FrameworkStatsLog.APP_CRASH_OCCURRED__FOREGROUND_STATE__FOREGROUND
-                        : FrameworkStatsLog.APP_CRASH_OCCURRED__FOREGROUND_STATE__BACKGROUND)
-                        : FrameworkStatsLog.APP_CRASH_OCCURRED__FOREGROUND_STATE__UNKNOWN,
-                processName.equals("system_server") ? ServerProtoEnums.SYSTEM_SERVER
-                        : (r != null) ? r.getProcessClassEnum()
-                                      : ServerProtoEnums.ERROR_SOURCE_UNKNOWN
-        );
-
-        final int relaunchReason = r == null ? RELAUNCH_REASON_NONE
-                        : r.getWindowProcessController().computeRelaunchReason();
-        final String relaunchReasonString = relaunchReasonToString(relaunchReason);
-        if (crashInfo.crashTag == null) {
-            crashInfo.crashTag = relaunchReasonString;
-        } else {
-            crashInfo.crashTag = crashInfo.crashTag + " " + relaunchReasonString;
-        }
-
-        addErrorToDropBox(
-                eventType, r, processName, null, null, null, null, null, null, crashInfo);
-
         mAppErrors.crashApplication(r, crashInfo);
     }
 // AppErrors.java
 
     void crashApplication(ProcessRecord r, ApplicationErrorReport.CrashInfo crashInfo) {
-        final int callingPid = Binder.getCallingPid();
-        final int callingUid = Binder.getCallingUid();
-
-        final long origId = Binder.clearCallingIdentity();
-        try {
-            crashApplicationInner(r, crashInfo, callingPid, callingUid);
-        } finally {
-            Binder.restoreCallingIdentity(origId);
-        }
+        crashApplicationInner(r, crashInfo, callingPid, callingUid);
     }
 
-    void crashApplicationInner(ProcessRecord r, ApplicationErrorReport.CrashInfo crashInfo,
-            int callingPid, int callingUid) {
-        long timeMillis = System.currentTimeMillis();
-        String shortMsg = crashInfo.exceptionClassName;
-        String longMsg = crashInfo.exceptionMessage;
-        String stackTrace = crashInfo.stackTrace;
-        if (shortMsg != null && longMsg != null) {
-            longMsg = shortMsg + ": " + longMsg;
-        } else if (shortMsg != null) {
-            longMsg = shortMsg;
-        }
+    void crashApplicationInner(ProcessRecord r, ApplicationErrorReport.CrashInfo crashInfo, xxx) {
 
-        if (r != null) {
-            mPackageWatchdog.onPackageFailure(r.getPackageListWithVersionCode(),
-                    PackageWatchdog.FAILURE_REASON_APP_CRASH);
 
-            mService.mProcessList.noteAppKill(r, (crashInfo != null
-                      && "Native crash".equals(crashInfo.exceptionClassName))
-                      ? ApplicationExitInfo.REASON_CRASH_NATIVE
-                      : ApplicationExitInfo.REASON_CRASH,
-                      ApplicationExitInfo.SUBREASON_UNKNOWN,
-                    "crash");
-        }
-
-        final int relaunchReason = r != null
-                ? r.getWindowProcessController().computeRelaunchReason() : RELAUNCH_REASON_NONE;
-
-        AppErrorResult result = new AppErrorResult();
-        int taskId;
-        synchronized (mService) {
-            /**
-             * If crash is handled by instance of {@link android.app.IActivityController},
-             * finish now and don't show the app error dialog.
-             */
-            if (handleAppCrashInActivityController(r, crashInfo, shortMsg, longMsg, stackTrace,
-                    timeMillis, callingPid, callingUid)) {
-                return;
-            }
-
-            // Suppress crash dialog if the process is being relaunched due to a crash during a free
-            // resize.
-            if (relaunchReason == RELAUNCH_REASON_FREE_RESIZE) {
-                return;
-            }
-
-            /**
-             * If this process was running instrumentation, finish now - it will be handled in
-             * {@link ActivityManagerService#handleAppDiedLocked}.
-             */
-            if (r != null && r.getActiveInstrumentation() != null) {
-                return;
-            }
-
-            // Log crash in battery stats.
-            if (r != null) {
-                mService.mBatteryStatsService.noteProcessCrash(r.processName, r.uid);
-            }
-
-            AppErrorDialog.Data data = new AppErrorDialog.Data();
-            data.result = result;
-            data.proc = r;
-
-            // If we can't identify the process or it's already exceeded its crash quota,
-            // quit right away without showing a crash dialog.
-            if (r == null || !makeAppCrashingLocked(r, shortMsg, longMsg, stackTrace, data)) {
-                return;
-            }
-
-            final Message msg = Message.obtain();
-            msg.what = ActivityManagerService.SHOW_ERROR_UI_MSG;
-
-            taskId = data.taskId;
-            msg.obj = data;
-            mService.mUiHandler.sendMessage(msg);
-        }
-
-        int res = result.get();
-
-        Intent appErrorIntent = null;
-        MetricsLogger.action(mContext, MetricsProto.MetricsEvent.ACTION_APP_CRASH, res);
-        if (res == AppErrorDialog.TIMEOUT || res == AppErrorDialog.CANCEL) {
-            res = AppErrorDialog.FORCE_QUIT;
-        }
-        synchronized (mService) {
-            if (res == AppErrorDialog.MUTE) {
-                stopReportingCrashesLocked(r);
-            }
-            if (res == AppErrorDialog.RESTART) {
-                mService.mProcessList.removeProcessLocked(r, false, true,
-                        ApplicationExitInfo.REASON_CRASH, "crash");
-                if (taskId != INVALID_TASK_ID) {
-                    try {
-                        mService.startActivityFromRecents(taskId,
-                                ActivityOptions.makeBasic().toBundle());
-                    } catch (IllegalArgumentException e) {
-                        // Hmm...that didn't work. Task should either be in recents or associated
-                        // with a stack.
-                        Slog.e(TAG, "Could not restart taskId=" + taskId, e);
-                    }
-                }
-            }
-            if (res == AppErrorDialog.FORCE_QUIT) {
-                long orig = Binder.clearCallingIdentity();
-                try {
-                    // Kill it with fire!
-                    mService.mAtmInternal.onHandleAppCrash(r.getWindowProcessController());
-                    if (!r.isPersistent()) {
-                        mService.mProcessList.removeProcessLocked(r, false, false,
-                                ApplicationExitInfo.REASON_CRASH, "crash");
-                        mService.mAtmInternal.resumeTopActivities(false /* scheduleIdle */);
-                    }
-                } finally {
-                    Binder.restoreCallingIdentity(orig);
-                }
-            }
-            if (res == AppErrorDialog.APP_INFO) {
-                appErrorIntent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
-                appErrorIntent.setData(Uri.parse("package:" + r.info.packageName));
-                appErrorIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            }
-            if (res == AppErrorDialog.FORCE_QUIT_AND_REPORT) {
-                appErrorIntent = createAppErrorIntentLocked(r, timeMillis, crashInfo);
-            }
-            if (r != null && !r.isolated && res != AppErrorDialog.RESTART) {
-                // XXX Can't keep track of crash time for isolated processes,
-                // since they don't have a persistent identity.
-                mProcessCrashTimes.put(r.info.processName, r.uid,
-                        SystemClock.uptimeMillis());
-            }
-        }
-
-        if (appErrorIntent != null) {
-            try {
-                mContext.startActivityAsUser(appErrorIntent, new UserHandle(r.userId));
-            } catch (ActivityNotFoundException e) {
-                Slog.w(TAG, "bug report receiver dissappeared", e);
-            }
-        }
+            // Kill it with fire!
+            mService.mAtmInternal.onHandleAppCrash(r.getWindowProcessController());
     }
 // ActivityTaskManagerService.java
         @Override
@@ -1957,4 +1698,11 @@ private final int[] mOomAdj = new int[] {
 
 
 ## 如何管理App的Binder
+
+## 黑白屏
+
+1. 需要让用户感觉到被响应了
+
+
+1. Activity的onStop空闲时才执行，不要在这里面做停止动画等操作。
 
