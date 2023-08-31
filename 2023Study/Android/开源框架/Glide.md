@@ -1,68 +1,5 @@
 [toc]
 
-两种注册方式
-1. RequestManager.onStart中去回调
-2. 加入到xxxlifecycle addlistenner自己根据生命周期去回调。不需要处理很多周期。属于模板方法
-
-
-
-## Glide相关知识点
-2. 引用计数
-
-
-![picture 0](../../../images/953b913c76972c8d14dd44e68ecdb1c65ad8ad3d66ef20e4319524551a354192.jpg)  
-
-如何自己实现Glide？
-1、分目录
-1. cache:三级缓存
-2. fragment：空白Fragment和生命周期回调
-3. manager：管理
-4. resource：资源
-5. loaddata：触发实际请求，在目标线程池中处理，切换回主线程回调接口
-
-
-2、三级缓存
-1. DisLruCache\StrictLineReader\Util
-1. disk目录：
-1. DiskLruCacheImpk.java 磁盘缓存实现类，需要处理key=String，value=Bitmap情况
-```
-sizeof() 需要重写
-put() 需要将Bitmap IO 到 DiskLruCache获取的流中
-get() 从InputStream中获取并且转换Bitmap
-```
-1. ActiveCache：活动缓存
-1. #recycleActives() 遍历HashMap，调用value的recycle()，内部通过callback把value交给外部，并且移除。
-1. MemoryCache.java 内存缓存
-> #callback 将活动缓存添加到内存缓存中
-
-3、resource
-1. Key 将url编码后保存，方便存储在本地文件中
-1. value 封装Bitmap
-1. ValueCallback 在Fragment oNDestory的时候将所有活动缓存添加到内存缓存中
-
-4、loadData LoadDataManager
-1. #loadResource 触发本地网络请求，线程池中 ThreadPoolExecutor(xxx).execute(this)
-1. #run() 实际的网络请求图片 1.Bitmap缩放压缩处理等，切换回主线程处理，回调抛出Value 成功：
-
-
-![picture 1](../../../images/c8dbe5e7e36ccbae7cdcd1c28d0e82451f54b54d54c60e09d964f987186899ae.jpg)  
-
-![picture 2](../../../images/79a48eea5064d252f1983fc44fae99df6ef75f370137de9b702824cda309e18f.jpg)  
-
-
-1. 网络请求时：存到磁盘缓存和活动缓存
-1. 空白Fragment释放时，onDESTORY会触发release，将活动缓存提那家到内存缓存中。callback
-1. Activity退出时空白Fragment会通知到所有的类，不要再干活了
-1. 空白Fragment：内存紧张是会释放 
-
-磁盘缓存大小
-2、空白Fragment添加后的双重保障：集合+空白Handler发送消息。，后续版本中该空白Msg和另一个消息合并
-
-commit并不是立即生效的，findFragmentByTag也可能获取不到。导致重复添加。
-
-3、BitMap复用是什么？？？
-
-
 # Glide
 
 Profile：
@@ -182,16 +119,16 @@ Context➡️with（RequestManagerRetriever）➡️RequestManager
 ```java
 // Glide.java with 入口处
 
-  public static RequestManager with(@NonNull Context context) {
+  public static RequestManager with(Context context) {
     return getRetriever(context).get(context);
   }
-  public static RequestManager with(@NonNull FragmentActivity activity) {
+  public static RequestManager with(FragmentActivity activity) {
     return getRetriever(activity).get(activity);
   }
-  public static RequestManager with(@NonNull Fragment fragment) {
+  public static RequestManager with(Fragment fragment) {
     return getRetriever(fragment.getContext()).get(fragment);
   }
-  public static RequestManager with(@NonNull View view) {
+  public static RequestManager with(View view) {
     return getRetriever(view.getContext()).get(view);
   }
 
@@ -199,12 +136,12 @@ Context➡️with（RequestManagerRetriever）➡️RequestManager
   private static RequestManagerRetriever getRetriever(@Nullable Context context) {
     return Glide.get(context).getRequestManagerRetriever();
   }
-  @NonNull
+  
   public RequestManagerRetriever getRequestManagerRetriever() {
     return requestManagerRetriever;
   }
 // RequestManagerRetriver.java
-  public RequestManager get(@NonNull Context context) {
+  public RequestManager get(Context context) {
     if (context == null) {
       throw new IllegalArgumentException("You cannot start a load on a null Context");
     } else if (Util.isOnMainThread() && !(context instanceof Application)) {
@@ -220,7 +157,7 @@ Context➡️with（RequestManagerRetriever）➡️RequestManager
   }
 // 用Application的Lifecycle构造
 // 😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈😈
-  private RequestManager getApplicationManager(@NonNull Context context) {
+  private RequestManager getApplicationManager(Context context) {
     // Either an application context or we're on a background thread.
     if (applicationManager == null) {
       synchronized (this) { // 双重检查加锁，保证多线程的安全问题 =========================================> 双重检查加锁
@@ -241,7 +178,7 @@ Context➡️with（RequestManagerRetriever）➡️RequestManager
 
 // 用Activity的Lifecycle构造出RequestManager返回
 // 👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟👟
-  public RequestManager get(@NonNull FragmentActivity activity) {
+  public RequestManager get(FragmentActivity activity) {
     if (Util.isOnBackgroundThread()) { // 不在主线程，直接使用🥶ApplicationContext，切换作用域
       return get(activity.getApplicationContext());
     }
@@ -260,7 +197,7 @@ Context➡️with（RequestManagerRetriever）➡️RequestManager
   }
 // 用Fragment作用域
 // 📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇📇
-  public RequestManager get(@NonNull Fragment fragment) {
+  public RequestManager get(Fragment fragment) {
     Preconditions.checkNotNull(
         fragment.getContext(),
         "You cannot start a load on a fragment before it is attached or after it is destroyed");
@@ -403,10 +340,10 @@ getOrCreate：构造LifecycleLifecycle，注册系统Lifecycle的监听器
 
 ```java
 final class LifecycleLifecycle implements Lifecycle, LifecycleObserver {
-  @NonNull
+  
   private final Set<LifecycleListener> lifecycleListeners = new HashSet<LifecycleListener>();
 
-  @NonNull private final androidx.lifecycle.Lifecycle lifecycle;
+  private final androidx.lifecycle.Lifecycle lifecycle;
 
   // 1️⃣1、构造时就把自己注册到Lifecycle中
   // 💯 只注册了一个到系统中，剩下触发都是观察者模式通知Listener
@@ -417,21 +354,21 @@ final class LifecycleLifecycle implements Lifecycle, LifecycleObserver {
 
   // 2️⃣2、以下都是监听Lifecycle生命周期的回调事件
   @OnLifecycleEvent(Event.ON_START)
-  public void onStart(@NonNull LifecycleOwner owner) {
+  public void onStart(LifecycleOwner owner) {
     for (LifecycleListener lifecycleListener : Util.getSnapshot(lifecycleListeners)) {
       lifecycleListener.onStart();
     }
   }
 
   @OnLifecycleEvent(Event.ON_STOP)
-  public void onStop(@NonNull LifecycleOwner owner) {
+  public void onStop(LifecycleOwner owner) {
     for (LifecycleListener lifecycleListener : Util.getSnapshot(lifecycleListeners)) {
       lifecycleListener.onStop();
     }
   }
 
   @OnLifecycleEvent(Event.ON_DESTROY)
-  public void onDestroy(@NonNull LifecycleOwner owner) {
+  public void onDestroy(LifecycleOwner owner) {
     for (LifecycleListener lifecycleListener : Util.getSnapshot(lifecycleListeners)) {
       lifecycleListener.onDestroy();
     }
@@ -440,7 +377,7 @@ final class LifecycleLifecycle implements Lifecycle, LifecycleObserver {
 
   // 3️⃣3、维护内部的Set集合，来通知Glide的哥哥组件
   @Override
-  public void addListener(@NonNull LifecycleListener listener) {
+  public void addListener(LifecycleListener listener) {
     lifecycleListeners.add(listener);
     if (lifecycle.getCurrentState() == State.DESTROYED) {
       // 当前为DESTRPYES 销毁
@@ -454,7 +391,7 @@ final class LifecycleLifecycle implements Lifecycle, LifecycleObserver {
   }
 
   @Override
-  public void removeListener(@NonNull LifecycleListener listener) {
+  public void removeListener(LifecycleListener listener) {
     lifecycleListeners.remove(listener);
   }
 }
@@ -475,19 +412,19 @@ public interface ConnectivityMonitorFactory {
   // 个人理解是抽象工厂模式
   // 根据不同需求选择不同工厂
   // 工厂内部根据不同部分的组合，产生不同的产品。
-  @NonNull
+  
   ConnectivityMonitor build(
-      @NonNull Context context, @NonNull ConnectivityMonitor.ConnectivityListener listener);
+      Context context, ConnectivityMonitor.ConnectivityListener listener);
 }
 // 工厂的实现一:
 public class DefaultConnectivityMonitorFactory implements ConnectivityMonitorFactory {
   private static final String TAG = "ConnectivityMonitor";
   private static final String NETWORK_PERMISSION = "android.permission.ACCESS_NETWORK_STATE";
 
-  @NonNull
+  
   @Override
   public ConnectivityMonitor build(
-      @NonNull Context context, @NonNull ConnectivityMonitor.ConnectivityListener listener) {
+      Context context, ConnectivityMonitor.ConnectivityListener listener) {
     // 检查网络权限
     int permissionResult = ContextCompat.checkSelfPermission(context, NETWORK_PERMISSION);
     boolean hasPermission = permissionResult == PackageManager.PERMISSION_GRANTED;
@@ -530,7 +467,7 @@ final class DefaultConnectivityMonitor implements ConnectivityMonitor {
 
   final ConnectivityListener listener;
 
-  DefaultConnectivityMonitor(@NonNull Context context, @NonNull ConnectivityListener listener) {
+  DefaultConnectivityMonitor(Context context, ConnectivityListener listener) {
     this.context = context.getApplicationContext();
     this.listener = listener;
   }
@@ -584,11 +521,11 @@ public final class TargetTracker implements LifecycleListener {
       Collections.newSetFromMap(new WeakHashMap<Target<?>, Boolean>());
 
   // track加入列表
-  public void track(@NonNull Target<?> target) {
+  public void track(Target<?> target) {
     targets.add(target);
   }
 
-  public void untrack(@NonNull Target<?> target) {
+  public void untrack(Target<?> target) {
     targets.remove(target);
   }
 
@@ -732,7 +669,7 @@ into会构造出Request、构造出target并且添加到TargetTracker之中
 ```java
 // RequestBuilder.java
   // 针对ImageView的ScaleType做特殊处理。构造RequestOptions
-  public ViewTarget<ImageView, TranscodeType> into(@NonNull ImageView view) {
+  public ViewTarget<ImageView, TranscodeType> into(ImageView view) {
     Util.assertMainThread();
     BaseRequestOptions<?> requestOptions = this;
       switch (view.getScaleType()) {
@@ -764,7 +701,7 @@ into会构造出Request、构造出target并且添加到TargetTracker之中
   }
 //👉工厂构造ImageViewTarget🏗️>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
   public <X> ViewTarget<ImageView, X> buildImageViewTarget(
-      @NonNull ImageView imageView, @NonNull Class<X> transcodeClass) {
+      ImageView imageView, Class<X> transcodeClass) {
     return imageViewTargetFactory.buildTarget(imageView, transcodeClass);
   }
 // ImageViewTargetFactory.java
@@ -773,7 +710,7 @@ public class ImageViewTargetFactory {
     if (Bitmap.class.equals(clazz)) {
       return (ViewTarget<ImageView, Z>) new BitmapImageViewTarget(view);
     } else if (Drawable.class.isAssignableFrom(clazz)) {
-      return (ViewTarget<ImageView, Z>) new DrawableImageViewTarget(view);
+      return (ViewTarget<ImageView, Z>) new DrawableImageViewTarget(view); //🔁👈💢终极回收，请求到数据后 ，设置给ImageView
     } else {
       throw new IllegalArgumentException(
           "Unhandled class: " + clazz + ", try .as*(Class).transcode(ResourceTranscoder)");
@@ -818,13 +755,13 @@ public class ImageViewTargetFactory {
   }
 
 // 3️⃣ RequestManager.java
-  synchronized void track(@NonNull Target<?> target, @NonNull Request request) {
+  synchronized void track(Target<?> target, Request request) {
     targetTracker.track(target); // Target添加
     requestTracker.runRequest(request); // 添加Request并且执行
   }
   // requestTracker是在构造RequestManager时，传入赋值：new RequestTracker()
 // RequestTracker.java
-  public void runRequest(@NonNull Request request) {
+  public void runRequest(Request request) {
     requests.add(request); // 执行队列
     if (!isPaused) {
       request.begin(); // 执行命令
@@ -1013,7 +950,7 @@ public class ImageViewTargetFactory {
           }
 
           @Override
-          public void onLoadFailed(@NonNull Exception e) {
+          public void onLoadFailed(Exception e) {
             if (isCurrentRequest(toStart)) {
               onLoadFailedInternal(toStart, e);
             }
@@ -1024,7 +961,7 @@ public class ImageViewTargetFactory {
 // HttpGlideUrlLoader.java 构造出 HttpUrlFetcher
   @Override
   public LoadData<InputStream> buildLoadData(
-      @NonNull GlideUrl model, int width, int height, @NonNull Options options) {
+      GlideUrl model, int width, int height, Options options) {
     GlideUrl url = model;
     if (modelCache != null) {
       url = modelCache.get(model, 0, 0);
@@ -1078,7 +1015,7 @@ private InputStream loadDataWithRedirects(URL url, int redirects, URL lastUrl, M
     resource = decodeFromData(currentFetcher, currentData, currentDataSource);// 👈 
 
     if (resource != null) {
-      notifyEncodeAndRelease(resource, currentDataSource, isLoadingFromAlternateCacheKey);
+      notifyEncodeAndRelease(resource, currentDataSource, isLoadingFromAlternateCacheKey);// 🔁 很久之后，从InputStream获取到Bitmap后，调用这里。
     } else {
       runGenerators(); // 下一阶段，注册机，层层走
     }
@@ -1109,16 +1046,150 @@ private InputStream loadDataWithRedirects(URL url, int redirects, URL lastUrl, M
       DataRewinder<DataType> rewinder,
       int width,
       int height,
-      @NonNull Options options,
+      Options options,
       DecodeCallback<ResourceType> callback){
     // 1️⃣StreamBitmapDecode.decode 👉 DownSampler.decode(采样压缩) 👉 返回Bitmap
+    // 💞💞💞💞InputStream转为Bitmap是直接用的网络上的代码
     // Resource<Bitmap>
     Resource<ResourceType> decoded = decodeResource(rewinder, width, height, options);
     // 2️⃣还给DecodeJob
     Resource<ResourceType> transformed = callback.onResourceDecoded(decoded);
     return transcoder.transcode(transformed, options);
   }
+// DecodeJob.java，通知上层
+  private final class DecodeCallback<Z> implements DecodePath.DecodeCallback<Z> {
 
+    private final DataSource dataSource;
+
+    @Synthetic
+    DecodeCallback(DataSource dataSource) {
+      this.dataSource = dataSource;
+    }
+
+    
+    @Override
+    public Resource<Z> onResourceDecoded(Resource<Z> decoded) {
+      return DecodeJob.this.onResourceDecoded(dataSource, decoded);
+    }
+  }
+  <Z> Resource<Z> onResourceDecoded(DataSource dataSource, Resource<Z> decoded) {
+    // 一些操作
+    return result;
+  }
+// 🔁 很久之后，从InputStream获取到Bitmap后，调用这里。
+  private void notifyEncodeAndRelease(Resource<R> resource, DataSource dataSource, boolean isLoadedFromAlternateCacheKey) {
+    notifyComplete(result, dataSource, isLoadedFromAlternateCacheKey);
+  }
+  private void notifyComplete(xxx) {
+    callback.onResourceReady(resource, dataSource, isLoadedFromAlternateCacheKey);
+  }
+// EngineJob
+  void callCallbackOnResourceReady(ResourceCallback cb) {
+    cb.onResourceReady(engineResource, dataSource, isLoadedFromAlternateCacheKey);
+  }
+// EngineJob.java#CallResourceReady
+  private class CallResourceReady implements Runnable {
+
+    private final ResourceCallback cb;
+
+    CallResourceReady(ResourceCallback cb) {
+      this.cb = cb;//👈赋接口
+    }
+
+    @Override
+    public void run() {
+      synchronized (cb.getLock()) {
+        synchronized (EngineJob.this) {
+          if (cbs.contains(cb)) {
+            engineResource.acquire();
+            callCallbackOnResourceReady(cb); //👈
+            removeCallback(cb);
+          }
+          decrementPendingCallbacks();
+        }
+      }
+    }
+  }
+// EngjneJob.java 添加接口
+  synchronized void addCallback(final ResourceCallback cb, Executor callbackExecutor) {
+    cbs.add(cb, callbackExecutor);
+    callbackExecutor.execute(new CallResourceReady(cb));//👈
+  }
+// EngjneJob.java 发起网络请求，构造EngineJob和DecodeJob时，添加了接口，并且start()在线程池发情网络请求
+  private <R> LoadStatus waitForExistingOrStartNewJob(xxx) {
+
+    EngineJob<R> engineJob = engineJobFactory.build(xx);
+    DecodeJob<R> decodeJob = decodeJobFactory.build(xxx);
+    jobs.put(key, engineJob);
+
+    engineJob.addCallback(cb, callbackExecutor);//👈添加了cb接口，会在网络请求结束后调用
+    engineJob.start(decodeJob);
+    return new LoadStatus(cb, engineJob);
+  }
+// SingleRequest.job 👆层层向上，发现是SingleRequest传入接口this
+  @Override
+  public void onResourceReady(Resource<?> resource, DataSource dataSource, boolean isLoadedFromAlternateCacheKey) {
+    // 核心🌹
+    onResourceReady((Resource<R>) resource, (R) received, dataSource, isLoadedFromAlternateCacheKey);
+  }
+  // 核心🌹 会交给Target的onResourceReady(ImageViewTarget)
+  private void onResourceReady(Resource<R> resource, R result, DataSource dataSource, boolean isAlternateCacheKey) {
+
+      Transition<? super R> animation = animationFactory.build(dataSource, isFirstResource);
+      target.onResourceReady(result, animation); //👈ImageViewTarget
+  }
+  private final Target<R> target; // 构造SingleRequest时传入
+// RequestBuilder.java obtain时传入
+  private Request obtainRequest(Target<TranscodeType> target,xxx) {
+    return SingleRequest.obtain(xxx, target, xxx);
+  }
+// 👆
+// 👆
+// 👆...层层向上
+// RequestBuilder.java
+  private <Y extends Target<TranscodeType>> Y into(
+      Y target,//👈 target
+      null,
+      BaseRequestOptions<?> options,
+      Executor callbackExecutor) {
+    // 1️⃣ 构造请求
+    Request request = buildRequest(target, targetListener, options, callbackExecutor);//👈 target
+    // 2️⃣ target目标
+    requestManager.clear(target);
+    target.setRequest(request);
+    // 3️⃣ Target<?> target添加到targetTracker
+    requestManager.track(target, request);
+
+    return target;
+  }
+// 👆
+// 👆...层层向上
+// RequestBuilder.java
+  public ViewTarget<ImageView, TranscodeType> into(ImageView view) {
+
+    // 省略
+
+    return into(
+        glideContext.buildImageViewTarget(view, transcodeClass),// 👈工厂构造ImageViewTarget🏗️
+        /* targetListener= */ null,
+        requestOptions,
+        Executors.mainThreadExecutor());
+  }
+// 🤪🤪🤪🤪🤪🤪🤪🤪🤪🤪🤪🤪🤪🤪🤪🤪
+// 会调用ImageViewTarget的onResourceReady
+// ImageViewTarget.java
+  @Override
+  public void onResourceReady(Z resource, @Nullable Transition<? super Z> transition) {
+    setResourceInternal(resource); // 👈
+  }
+  private void setResourceInternal(@Nullable Z resource) {
+    setResource(resource); // 👈
+  }
+  protected abstract void setResource(@Nullable Z resource); // 抽象方法
+// DrawableImageViewTarget.java
+  protected void setResource(@Nullable Drawable resource) {
+    view.setImageDrawable(resource);// 👈 设置给ImageView
+  }
 ```
 
 ### Loadata和注册机
@@ -1200,30 +1271,220 @@ Glide的初始化中使用了工厂模式构造Glide，里面使用了注册机
 * String对应new HttpGlideUrlLoader.Factory()
 * Drawable对应 UnitModelLoader.Factory.<Drawable>getInstance()
 
-
-
-
-
 面试题：Glide为什么要加入网络权限？
-
-活动缓存：没有上限，为了解决内存缓存有上限的问题。
-
-4.11后都是工厂设计模式
-1. SourceGenerator
-2. LoadData<Data> Glide构造时有【注册机】，注册很多类，GlideUrl注册机的好处？
-3. HttpGlideUrlLoader.buildLoadData 内部是HttpUrlFetcher装饰 = String URL
-4.  Listanbul<LoadData>
-HttpUrlFetcher去执行HttpUrlConnection，返回inputstream
+1. HttpUrlFetcher去执行HttpUrlConnection，返回inputstream
+1. InputStream ---> Bitmap 操作都是作者直接使用网上的
+2. 
+3. LoadData<Data> Glide构造时有【注册机】，注册很多类，GlideUrl注册机的好处？
 
 callback把stream交给上层->SourceGenerator
 LoadPath.load 将数据变成Bitmap
-DecodePath decodeResource
 
-result = decoder.decode data with height options
-String URL ---> StringBitmapDecode
-InputStream ---> Bitmap 操作都是作者直接使用网上的 69
 
-## 
+## 缓存
+
+1、内存缓存找到目标后，会提升到活动缓存
+2、页面释放后，release，会将活动缓存都放到内存缓存。
+3、内存紧张时，ReportFragment\Lifecycle会监听Low Memmory，会释放资源
+4、网络/本地加载到磁盘缓存后，保存到磁盘缓存+活动缓存
+
+5、为什么要有活动缓存\内存缓存
+1. 内存LRU缓存会有上限
+2. 可能会释放还在显示的图片
+3. 活动缓存用非LRU，Mpa存储
+
+6、资源的回收
+1. 活动缓存依赖于页面被释放（空白Fragment）---回收---> 内存LRU缓存
+2. 内存LRU缓存、磁盘LRU缓存，依赖于内存空间大小
+
+7、App关闭或者资源紧张
+1. 内存LRU缓存会释放
+
+### 资源封装
+
+1、资源需要什么？
+1. Key
+2. Resource
+
+2、EngineKey：唯一性
+```java
+  private int hashCode; // 签名、款、高、资源类的hashcode、选项等一同确定唯一，是存储在磁盘的那个唯一文件名
+  private final Key signature;
+  private final Object model;
+  private final int width;
+  private final int height;
+  private final Class<?> resourceClass;
+  private final Class<?> transcodeClass;
+  private final Map<Class<?>, Transformation<?>> transformations;
+  private final Options options;
+```
+
+3、Resource
+```java
+public interface Resource<Z> {
+  Z get();
+  int getSize();
+  void recycle(); //回收,可能是从活动缓存放到内存缓存
+}
+```
+
+### 资源管理Engine
+
+#### 活动缓存
+
+1、是什么？
+非LRU缓存、前台缓存、活跃缓存
+活动缓存：没有上限，为了解决内存缓存有上限的问题。
+
+2、引用计数
+```java
+  private int acquired; // ===============================> 引用计数法
+  ++acquired;
+```
+> 相关操作会加锁
+
+3、活动缓存源码
+1. 弱引用         
+2. 引用队列
+```java
+final class ActiveResources {
+
+// 1、HashMap存放缓存
+  final Map<Key, ResourceWeakReference> activeEngineResources = new HashMap<>();// =====> HashMap、弱引用
+// 2、引用队列(被回收了才会加入)
+  private final ReferenceQueue<EngineResource<?>> resourceReferenceQueue = new ReferenceQueue<>(); // ===================> 引用队列
+
+  static final class ResourceWeakReference extends WeakReference<EngineResource<?>> { // 弱引用
+    final Key key;
+    Resource<?> resource;
+    final boolean isCacheable;
+  }
+}
+```
+
+#### 内存LRU缓存
+
+1、LRU缓存
+```java
+// 创建内存LRU缓存
+memoryCache = new LruResourceCache(memorySizeCalculator.getMemoryCacheSize());
+```
+```java
+// 内存缓存接口
+public interface MemoryCache {
+  Resource<?> remove(Key key); // 
+  Resource<?> put(Key key, @Nullable Resource<?> resource); //
+  interface ResourceRemovedListener {
+    void onResourceRemoved(Resource<?> removed);
+  }
+  long getCurrentSize();
+  long getMaxSize(); //
+  void setSizeMultiplier(float multiplier);
+  void setResourceRemovedListener(ResourceRemovedListener listener);
+  void clearMemory();
+  void trimMemory(int level);
+}
+// 内存缓存
+public class LruResourceCache extends LruCache<Key, Resource<?>> implements MemoryCache {
+  // 使用LruCache必须重写getSize
+  protected int getSize(@Nullable Resource<?> item) {
+    if (item == null) {
+      return super.getSize(null);
+    } else {
+      return item.getSize();
+    }
+  }
+}
+public class LruCache<T, Y> { // ============================> LinkedHashMap
+  private final Map<T, Entry<Y>> cache = new LinkedHashMap<>(100, 0.75f, true);
+}
+```
+
+2、要使用LruCache注意点
+1. 要重写getSize，决定Item的大小
+```java
+  protected int getSize(@Nullable Y item) {
+    return 1;
+  }
+```
+
+
+### 磁盘缓存LRU
+
+1、DiskCache接口
+```java
+public interface DiskCache {
+
+  interface Factory {
+    /** 250 MB of cache. */
+    int DEFAULT_DISK_CACHE_SIZE = 250 * 1024 * 1024;
+    String DEFAULT_DISK_CACHE_DIR = "image_manager_disk_cache";
+    DiskCache build();
+  }
+
+  interface Writer {
+    boolean write(File file);
+  }
+
+  File get(Key key);
+  void put(Key key, Writer writer);
+  void delete(Key key);
+
+  void clear();
+}
+
+public class DiskLruCacheWrapper implements DiskCache {
+  private static DiskLruCacheWrapper wrapper;
+  private DiskLruCache diskLruCache; // Glide LRU+IO
+}
+```
+> 生成目录：disk_lru_cache_dir
+
+
+
+![picture 0](../../../images/953b913c76972c8d14dd44e68ecdb1c65ad8ad3d66ef20e4319524551a354192.jpg)  
+
+如何自己实现Glide？
+1、分目录
+1. cache:三级缓存
+2. fragment：空白Fragment和生命周期回调
+3. manager：管理
+4. resource：资源
+5. loaddata：触发实际请求，在目标线程池中处理，切换回主线程回调接口
+
+
+2、三级缓存
+1. DisLruCache\StrictLineReader\Util
+1. disk目录：
+1. DiskLruCacheImpk.java 磁盘缓存实现类，需要处理key=String，value=Bitmap情况
+```
+sizeof() 需要重写
+put() 需要将Bitmap IO 到 DiskLruCache获取的流中
+get() 从InputStream中获取并且转换Bitmap
+```
+1. ActiveCache：活动缓存
+1. #recycleActives() 遍历HashMap，调用value的recycle()，内部通过callback把value交给外部，并且移除。
+1. MemoryCache.java 内存缓存
+> #callback 将活动缓存添加到内存缓存中
+
+3、resource
+1. Key 将url编码后保存，方便存储在本地文件中
+1. value 封装Bitmap
+1. ValueCallback 在Fragment oNDestory的时候将所有活动缓存添加到内存缓存中
+
+4、loadData LoadDataManager
+1. #loadResource 触发本地网络请求，线程池中 ThreadPoolExecutor(xxx).execute(this)
+1. #run() 实际的网络请求图片 1.Bitmap缩放压缩处理等，切换回主线程处理，回调抛出Value 成功：
+
+
+![picture 1](../../../images/c8dbe5e7e36ccbae7cdcd1c28d0e82451f54b54d54c60e09d964f987186899ae.jpg)  
+
+![picture 2](../../../images/79a48eea5064d252f1983fc44fae99df6ef75f370137de9b702824cda309e18f.jpg)  
+
+
+
+3、BitMap复用是什么？？？
+
 
 
 
