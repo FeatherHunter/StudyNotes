@@ -1,7 +1,10 @@
 import DP.Code_02_Knight
+import LeetCode.P992_subarrays_with_k_different_integers
 
 fun main(args: Array<String>) {
-//    println(Code_02_Knight.knightProbability(8,30,6,4))
-    println(Code_02_Knight.knightProbabilityDP(8,30,6,4))
-    println(Code_02_Knight.knightProbability(8,30,6,4))
+
+
+    val arr = intArrayOf(1,2,1,2,3)
+
+    println(P992_subarrays_with_k_different_integers.subarraysWithKDistinct(arr, 2))
 }
