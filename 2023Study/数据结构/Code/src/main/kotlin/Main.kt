@@ -1,10 +1,8 @@
 import DP.Code_02_Knight
+import LeetCode.P6_N字形变换
 import LeetCode.P992_subarrays_with_k_different_integers
 
 fun main(args: Array<String>) {
 
-
-    val arr = intArrayOf(1,2,1,2,3)
-
-    println(P992_subarrays_with_k_different_integers.subarraysWithKDistinct(arr, 2))
+    println(P6_N字形变换.convert("abc", 2))
 }
