@@ -1,5 +1,6 @@
 package Tree;
 
+import java.util.Arrays;
 import java.util.HashMap;
 
 /**
@@ -15,7 +16,7 @@ import java.util.HashMap;
 public class Code_02_TrieTree_array {
 
     public static class Trie {
-        static int n = 2001; // n根据空间判断
+        static int n = 70001; // n根据空间判断
         static int m = 26;// 例如只有字符a b c，就是3个
         /**
          * 0下标数据，默认弃用。则
@@ -32,7 +33,12 @@ public class Code_02_TrieTree_array {
         int size = 0; // 有多少个字符串构成的。
 
         public Trie() {
-
+            // 还原数据
+            for (int i = 0; i < trie.length; i++) {
+                Arrays.fill(trie[i], 0);
+            }
+            Arrays.fill(pass, 0);
+            Arrays.fill(end, 0);
         }
 
         public void insert(String word) {
