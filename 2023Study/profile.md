@@ -13,21 +13,26 @@
 ## 专业技能
 
 1. 熟练掌握 Java（对面向对象思想有深入理解，并发，注解，反射）
+   
 2. 熟练掌握 Kotlin，精通高阶函数。
+   
 3. 深入研究过 Kotlin协程源码和机制(挂起恢复、状态机、拦截器、线程切换)
-2. 熟悉常设计模式(状态、桥接、访问者、观察者、代理、策略等)多次采用设计模式重构app代码
-3. 实现类ButterKnife依赖注入框架【是否可以在onCreate中自动注入？】
-5. 熟练掌握 JVM(GC、类文件结构、类加载机制、内存模型、优化技术、并发原理)
 
-4.  熟练掌握 Framework，研究过WMS(刷新机制、绘制流程、事件分发原理)、Binder机制
+4. 熟悉常设计模式(状态、桥接、访问者、观察者、代理、策略等)多次采用设计模式重构app代码
 
-5.  熟练掌握 Jetpack Lifecycle、LiveData、ViewModel、DataBinding原理，研究过Jetpack WorkManager源码
+5. 实现类ButterKnife依赖注入框架【是否可以在onCreate中自动注入？】
 
-6.  深入研究过图形系统，熟悉SurfaceFlinger原理
+6. 熟练掌握 JVM(GC、类文件结构、类加载机制、内存模型、优化技术、并发原理)
 
-7.  研究过 AMS原理，系统启动流程，有实际项目自定义系统服务的经验
+7.  熟练掌握 Framework，研究过WMS(刷新机制、绘制流程、事件分发原理)、Binder机制
 
-8.  研究过 PKMS(权限验证流程、SystemServer启动七步曲)封装出AOP思想基于Aspectj权限框架
+8.  熟练掌握 Jetpack Lifecycle、LiveData、ViewModel、DataBinding原理，研究过Jetpack WorkManager源码
+
+9.  深入研究过图形系统，熟悉SurfaceFlinger原理
+
+10. 研究过 AMS原理，系统启动流程，有实际项目自定义系统服务的经验
+
+11. 研究过 PKMS(权限验证流程、SystemServer启动七步曲)封装出AOP思想基于Aspectj权限框架
 
 
 10. 有JNI封装底层代码经验，项目中实现变声功能和手写实现过Parcelable功能
