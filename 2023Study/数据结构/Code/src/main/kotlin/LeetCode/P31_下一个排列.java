@@ -3,43 +3,42 @@ package LeetCode;
 import java.util.Arrays;
 
 public class P31_下一个排列 {
-    // 123
-    // 132
-    // 213 // 231
-    // 231
-    // 312
-    // 321
     public void nextPermutation(int[] nums) {
-
-        // TODO 没有通过！！！！！！！！！！
-        if (nums == null || nums.length < 2) return;
-        int n = nums.length;
-        int i = n - 1;
-        while (i > 0){
-            for (int j = i-1; j >=0; j--) {
-                if(nums[j] < nums[i]){
-
-                    // 找到咯
-                    // 说明i的数据需要到j去
-                    int temp = nums[i];
-                    for (int k = i-1; k >= j; k--) {
-                        nums[k + 1] = nums[k];
-                    }
-                    nums[j] = temp;
-                    return;
-                }
+        int i;
+        /**
+         * 1、从右到左找到第一个下降的位置i
+         */
+        for (i = nums.length - 2; i >= 0; i--) {
+            if (nums[i] < nums[i + 1]) {
+                break;
             }
-            i--;
         }
-        // 走到这里说明是反序列的，需要重置
-        for (i = 0; i < n / 2; i++) {
-            swap(nums, i, n - 1 - i);
+        /**
+         * 2、从右到i找到第一个大于i的数，并且交换
+         */
+        for (int j = nums.length - 1; j > i && i >= 0; j--) { // i需要合法
+            if (nums[j] > nums[i]) {
+                int temp = nums[i];
+                nums[i] = nums[j];
+                nums[j] = temp;
+                break;
+            }
+        }
+        /**
+         * 3、从右到i，除了i，翻转
+         * 4、若从右到左，一个下降都没有，说明是最大字典序，翻转成最小的
+         * 两者情况相同：都是从i+1开始反转
+         */
+        // 双指针
+        int l = i + 1;
+        int r = nums.length - 1;
+        while (l < r) {
+            int temp = nums[l];
+            nums[l] = nums[r];
+            nums[r] = temp;
+            l++;
+            r--;
         }
     }
-    public static void swap(int[] nums, int i, int j){
-        if(i == j) return;
-        nums[i] = nums[i] ^ nums[j];
-        nums[j] = nums[i] ^ nums[j];
-        nums[i] = nums[i] ^ nums[j];
-    }
+
 }
