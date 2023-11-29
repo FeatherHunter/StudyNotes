@@ -27,9 +27,42 @@ Lambda和高阶函数
 ```
 
 3、kotlin中Any和Java的Object有什么区别吗？
-1. Any是所有非空类型的超类型，类似于Java中的Object。Object不能持有null。
+1. Any是所有非空类型的超类型，类似于Java中的Object。Any不能持有null。
 1. Any?是所有类型的超类型，包括可空类型。
 Any?可以持有null值
+
+3*【补充】Kotlin中Any和Java中Object的区别是什么？
+```java
+1.类型系统的差异： 
+// Kotlin 中的 Any
+val anyValue: Any = "Hello, World!" //非空
+
+// Java 中的 Object
+Object obj = "Hello, World!"; // 可以为null
+
+2.空安全性：
+// Kotlin 中的 Any 不包括 null
+val anyValue: Any = "Hello, World!"
+
+// Kotlin 中的 Any? 可以包括 null
+val nullableAny: Any? = null
+
+3.类型检查和转换：
+// Kotlin 中的类型检查和转换
+val anyValue: Any = "Hello, World!"
+
+if (anyValue is String) { // is进行类型检查和转换
+    val length: Int = anyValue.length
+}
+
+// Java 中的类型检查和转换
+Object obj = "Hello, World!";
+
+if (obj instanceof String) {
+    String str = (String) obj; // 需要强制类型转换
+    int length = str.length();
+}
+```
 
 4、函数如何调用/函数的实现（lambda）？invoke是什么？
 ```kotlin
