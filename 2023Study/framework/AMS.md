@@ -35,10 +35,10 @@
 ### ActivityManagerService
 管理90个服务：需要管理类SystemServiceManager
 ```java
-// 主题流程：
+// 主体流程：
 // 1. startService：反射构造，并且执行onStart，再ServiceManager.publish去发布
 // 2. setSystemProcess：将各种服务addService到ServiceManager中
-// 3. syytemReady
+// 3. systemReady
     private void startBootstrapServices(@NonNull TimingsTraceAndSlog t) {
         // 1、SystemServiceManager来启动ATMS
         ActivityTaskManagerService atm = mSystemServiceManager.startService(ActivityTaskManagerService.Lifecycle.class).getService();  // startService（1）
