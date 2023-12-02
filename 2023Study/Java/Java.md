@@ -36,7 +36,7 @@ HashMap（散列表-哈希算法、ArrayMap、SparseMap、HashTable、HashSet）
 
 ## 序列化
 1、什么是序列化？
-1. 序列化就是一个流程，不是简单地接口
+1. 序列化就是一个流程，不是简单的接口
 2. 数据转为二进制数据(序列化) -> 传输 -> 反序列化
 3. 最重要的就是打标记，帮助反序列化(Serializable)
 4. 序列化方案有很多：JSON、xml、protobuf
