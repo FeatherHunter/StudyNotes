@@ -161,7 +161,8 @@ fun Int.method21(n:Int):String{
     return "两数相加的结果:${this+n}"
 }
 println(2.method21(22))
-// println(method21(2, 22)) // 不可以这样写了
+// println(method21(2, 22)) // 不可以这样写了 
+// 解释：整数2并不是Int对象，调用2.method21(22)会创建Int对象2，再调用method21(22)。
 ```
 
 ## 输出（返回类型）
