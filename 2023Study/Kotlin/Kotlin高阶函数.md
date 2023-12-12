@@ -256,7 +256,7 @@ val method3:Function1<String, Unit> = { println(it) }
 fun study02() = {lambda:(Int, Int) -> String, studyInfo: String ->
     lambda(1, 99)
 }
-// 答案：((Int, Int) -> String, String) -> Unit 
+// 答案：((Int, Int) -> String, String) -> String 
 
 // 使用：
 study02()({n1, n2-> "$n1 + $n2 = ${n1 + n2}" }, "wch")
@@ -267,7 +267,7 @@ fun study04() = {str:String, num:Int, lambda1:(String)->Unit, lambda2:(Int)->Boo
     lambda1(str)
     lambda2(num)
 }
-// 答案：(String,Int,(String)->Unit,(Int)->Unit)->Boolean
+// 答案：(String,Int,(String)->Unit,(Int)->Boolean)->Boolean
 
 // 使用：
 println(study04()("wch", 123, { println("$it lambda1") }, { it > 99}))

@@ -9,3 +9,12 @@ fun main(args: Array<String>) {
 
     println(P327_区间和的个数.countRangeSum(intArrayOf(2147483647,-2147483648,-1,0), -1, 0))
 }
+
+fun study04() = {str:String, num:Int, lambda1:(String)->Unit, lambda2:(Int)->Boolean->
+    lambda1(str)
+    lambda2(num)
+}
+
+fun study02() = {lambda:(Int, Int) -> String, studyInfo: String ->
+    lambda(1, 99)
+}
