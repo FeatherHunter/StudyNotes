@@ -23,7 +23,6 @@ Lambda和高阶函数
     val method02:(Int, Int)->Unit
     val method03:(String, Double)->Any // 相当于Object
     val method04:(String, Double, Float)->Boolean
-
 ```
 
 3、kotlin中Any和Java的Object有什么区别吗？
@@ -412,7 +411,7 @@ fun<T> T.derry4(number:Double, mm: T.(Double) -> Unit){
 fun<T> T.myRunPlus(block: T.(T, T) -> Boolean) = block(this,this)
 ```
 
-5、T.() -> Boolean s是什么意思？
+5、T.() -> Boolean 是什么意思？
 1. 对T扩展出匿名函数
 1. 匿名函数是 ()->Boolean
 1. 该匿名扩展函数只有这个高阶函数可以使用，其他地方用不出来
