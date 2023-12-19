@@ -443,6 +443,8 @@ fun lambdaImpl(name:String):Unit{
 var r1:Function1<String, Unit> = ::lambdaImpl
 var r2:(String)->Unit = ::lambdaImpl
 var r3:String.()->Unit = ::lambdaImpl // (String)等价于String.()
+// r2 是普通的函数引用
+// r3 是扩展的函数引用，只能用于特定接收者
 ```
 
 ## 集合、泛型
