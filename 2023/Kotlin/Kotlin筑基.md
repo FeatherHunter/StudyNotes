@@ -703,7 +703,7 @@ val number:Int? = "666.6f".toIntOrNull() // 不会报错为Null
 
 ## Double 转为 Int
 ```kotlin
-64.55.toInt() // 四舍五入
+64.55.toInt() // 直接舍去小数
 64.55.roundToInt() // 四舍五入
 
 // 保留小数点
