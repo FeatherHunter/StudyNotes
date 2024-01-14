@@ -197,6 +197,31 @@ fun main() {
 
 ```
 
+> 完善版本：（可以运行的）将initializer作为参数传入哦
+```kotlin
+class LazyInitDelegate<T>(private var initializer: (() -> T)?) {
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): T {
+        return initializer?.invoke() ?: throw IllegalStateException("Property not initialized")
+    }
+    operator fun setValue(thisRef: Any?, property: KProperty<*>, value: (() -> T)) {
+        initializer = value
+    }
+}
+
+class Example {
+    val lazyProperty: String by LazyInitDelegate {
+        // 在第一次访问属性时执行初始化逻辑
+        println("Initializing lazy property")
+        "Lazy Initialized"
+    }
+}
+
+fun main() {
+    val example = Example()
+    println(example.lazyProperty) // 输出：Initializing lazy property \n Lazy Initialized
+}
+```
+
 #### 属性委托的日志记录
 
 ```kotlin
