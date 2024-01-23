@@ -1,5 +1,11 @@
+import LeetCode.P405_数字转换为十六进制数
 import kotlin.reflect.KProperty
+import kotlin.system.measureTimeMillis
 
+
+/**
+ *
+ **/
 
 class LazyInitDelegate<T>(private var initializer: (() -> T)?) {
     operator fun getValue(thisRef: Any?, property: KProperty<*>): T {
@@ -27,4 +33,13 @@ fun main() {
     val example = Example()
     println("Hello")
     println(example.lazyProperty) // 输出：Initializing lazy property \n Lazy Initialized
+
+    println(P405_数字转换为十六进制数.toHex(1000))
+
+    val deferred = async{
+        println()
+    }
+    val time =  measureTimeMillis {
+        deferred.await()
+    }
 }
