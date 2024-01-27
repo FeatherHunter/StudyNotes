@@ -943,7 +943,9 @@ withTimeout(1000){
 2. 父协程中cancel会取消所有子协程，并且抛出JobCancellationException
 
 ### 作用域构建器
+
 结构化并发的实战：作用域构建器
+
 #### runBlocking
 1、runBlocking
 ```kotlin
