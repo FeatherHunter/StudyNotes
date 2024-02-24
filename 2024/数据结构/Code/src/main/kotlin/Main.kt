@@ -36,10 +36,10 @@ fun main() {
 
     println(P405_数字转换为十六进制数.toHex(1000))
 
-    val deferred = async{
-        println()
-    }
-    val time =  measureTimeMillis {
-        deferred.await()
-    }
+//    val deferred = async{
+//        println()
+//    }
+//    val time =  measureTimeMillis {
+//        deferred.await()
+//    }
 }
