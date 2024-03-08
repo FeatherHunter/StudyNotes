@@ -340,3 +340,200 @@ throw t;
 ## 通配符类型
 
 
+# Java泛型补充问题
+
+1、静态方法可以使用泛型吗？不可以使用属于泛型类的泛型，但是本身可以是泛型方法
+2、泛型和异常有哪些知识点？【为什么？】 ===> 感觉涉及到JVM中关于异常和异常表相关的处理，异常的具体类型需要提前知道
+1. try-catch不可以捕获extends Exception的泛型。为什么不可以？
+> 泛型在运行时指定，catch捕获的异常，需要编译时就知道，并且生成在class文件中。
+2. 可以把泛型异常，throw抛出。为什么可以？
+```java
+// throw抛出
+    public static <T extends Exception> void showInfo(T t) throws T {
+        try{
+            throw new Exception();
+        }catch (Exception e){
+            throw t;
+        }
+    }
+// 使用静态方法
+    public static void main(String[] args) {
+        try {
+            showInfo(new MyException());
+        } catch (MyException e) {
+            e.printStackTrace();
+        }
+    }
+    static class MyException extends Exception{}
+// 为什么可以？
+// 静态泛型方法，调用时需要指明具体类型，编译时编译器用具体类型进行了替换
+```
+
+
+# 泛型类型的继承规则
+
+1、泛型类传入父类和子类，两者是独立的类型
+```java
+// P1和P2的关系是什么？完全是两个独立的类型，没有任何关系
+Person<Fruit> p1 = new Person<>();
+Person<Apple> p2 = new Person<>();
+```
+
+2、泛型类具有继承关系，参考ArrayList和List
+
+
+# 通配符
+
+1、在需要`Person<Fruit>`和`Person<Apple>`都可以使用的时候应该怎么办？
+> 使用通配符
+```java
+// 注意！两者是不同的类型
+//        Person<Fruit> p = new Person<Apple>();
+// 用通配符，来适配。可以传入任何类
+Person<?> all = new Person<Apple>();
+all = new Person<Fruit>();
+
+// 可以是Person<Fruit>也可以是Person<Apple>
+Person<? extends Fruit> p = new Person<Apple>();
+p = new Person<Fruit>();
+
+// 可以传入Apple和Apple的父类
+Person<? super Apple> a = new Person<Apple>();
+a = new Person<Fruit>();
+```
+
+2、通配符的作用是什么？
+> 解决，泛型类，传入父类和子类，会认为是不同类型的问题
+> 类具有继承关系，不代表带入泛型类还有继承关系
+
+
+3、使用这种方式能实现什么效果？
+```java
+// 问题：代码无法复用
+// 可以打印水果列表
+showInfo(new ArrayList<Fruit>());
+// 不可以打印苹果列表
+//        showInfo(new ArrayList<Apple>());
+public static void showInfo(List<Fruit> list){
+for (Fruit fruit : list) {
+System.out.println(fruit);
+}
+}
+// 解决一：通配符，作为Object进行打印
+public static void showInfo(List<?> list){
+for (Object o : list) {
+System.out.println(o);
+}
+}
+
+// 解决二：可以打印水果和所有子类的列表（可以确保是Fruit类，调用Fruit的相关方法）
+public static void showInfo(List<? extends Fruit> list){
+for (Fruit fruit : list) {
+System.out.println(fruit);
+}
+}
+```
+
+4、通配符的限定/约束
+> 需要使用通配符的场景（实参），但是需要打印
+> extends限定上界
+> super限定下界
+
+
+5、`T extends Fruit`和`? extends Fruit`区别？
+1. 前者用于泛型的限定/约束。指明泛型必须是某些类的子类或者父类。保证可以调用到需要的方法
+2. 后者是通配符，用于泛型类的使用处，解决泛型传入父类和子类会认为是不同的类型的问题，实现代码的复用
+
+
+6、`T super Fruit`是什么？
+> 错误！不存在这种写法，只有`T extends Fruit`
+
+7、Java设计时为什么设计泛型传入父类和子类会是不同的类型？
+
+
+### 协变、逆变
+
+1、`? extends Fruit`协变
+1. 父类引用 = 子类对象
+2. 只读，不可写
+3. 生产者模式
+```java
+// 只读模式
+List<? extends Fruit> list = new ArrayList<Apple>();
+//        list.add(new Apple());
+//        list.add(new Fruit());
+//        list.add(new Object()); //可以是ArrayList<Apple>()、ArrayList<Fruit>、ArrayList<Orange>，添加的时候，如何知道具体是哪种列表呢？
+// 如果是ArrayList<Apple>()，加进入的数据是Fruit()，肯定是不合适的
+Fruit f = list.get(0);
+//        Apple a = list.get(0); // 只能作为Fruit和Object读取
+Object o = list.get(0);
+```
+
+
+2、`? super Apple`逆变
+1. 子类引用 = 父类对象
+2. 只写，不可读
+3. 消费者模式
+```java
+// 只写模式
+List<? super Apple> list = new ArrayList<Fruit>();
+list.add(new Apple());
+//        list.add(new Food());// 只能作为Apple和子类添加 // 假如是ArrayList<Fruit>()列表，添加Food()是有问题的，避免该场景，所以不能添加Apple父类
+//        list.add(new Object());
+
+// 不可以读取，特例作为Object读取
+//        Fruit f = list.get(0);
+//        Apple a = list.get(0);
+Object o = list.get(0);
+```
+
+
+3、自己写类感受List和逆变、协变的关系
+```java
+// Person类
+
+static class Person<T extends Apple>{
+T data;
+// 写入：参数是T
+public void setData(T info){
+System.out.println(info);
+data = info;
+}
+// 读取：返回值是T
+public T getData(){
+return data;
+}
+}
+
+// 使用：
+// 只读
+Person<? extends Apple> all = new Person<Apple>();
+//        all.setData(new Apple());
+//        all.setData(new Fruit());
+//        all.setData(new Object());
+Apple a = all.getData();
+//        ChinaApple ca = all.getData(); // 只可以作为父类读取
+Fruit f = all.getData();
+Object o = all.getData();
+```
+
+4、为什么有协变、逆变的这些概念？为什么需要这些？
+1. 协变，只读，保证可以安全的访问数据，不会被内鬼修改
+2. 逆变，只写，
+
+
+## 泛型擦除
+
+1、T都会擦除为Object
+
+2、T extends Number，都会擦除为 Number
+
+3、T super Number，会擦除为什么？？
+
+## JVM如何实现泛型？
+
+1、JVM如何实现泛型？
+> 泛型擦除
+> C#中是真的泛型
+
+
