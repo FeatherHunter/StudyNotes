@@ -109,7 +109,9 @@ CLASS-字节码级别
 适合技术：字节码增强技术，ASM，新增或者更改class文件的逻辑等
 RUNTIME-运行时
 适合技术：反射，运行时根据标志进行反射，实现相关逻辑
-### SOURCE-APT2
+### SOURCE
+
+#### APT2
 编写注解处理器：Java工程
 注解处理运行在什么阶段？
 1. 编译阶段
@@ -138,7 +140,85 @@ annotationProcessor project(':compiler')
 @SupportedAnnotationTypes("com.feather.compiler.MyProcessor")
 // 会在Build Output的Task中输出
 ```
-## 问题
+
+#### LINT检查
+
+source阶段的注解，可以用于IDE语法检查，例如：
+1. `@IntDef`：自制开源库时，参数需要限定范围，例如int参数，需要在枚举类A和B中二选一
+
+
+##### IntDef
+
+1. 是注解的注解：元注解
+2. 提供语法检查：由谁实现的？IDE在编辑时进行语法检查
+
+
+1、如何限定参数的类型？
+1. 枚举
+2. IntDef等注解
+
+2、枚举限定参数的类型有哪些问题？
+```java
+    // 枚举的每一个元素都是对象，一个对象占用多少字节？（12字节（对象头）+对象体+8byte字节对齐）
+    enum WeekDay{
+        MONDAY,SUNDAY
+    }
+    WeekDay field;
+    // 枚举占用内存
+    public void setWeekDay(WeekDay weekDay){
+        field = weekDay;
+    }
+```
+
+3、IntDef如何限定int参数必须为哪些指定参数？
+```java
+    /**
+     * 常量代替枚举类型, 定义
+     */
+    public static final int SUNDAY = 0;
+    public static final int MONDAY = 1;
+    static int day;
+    @IntDef({SUNDAY, MONDAY})
+    @interface WEEKDAY{}
+    public static void setDay(@WEEKDAY int newday){
+        day = newday;
+    }
+
+    // @IntDef({SUNDAY, MONDAY}) 不可以用于参数
+//    public static void setDay2(@IntDef({SUNDAY, MONDAY}) int newday){
+//        day = newday;
+//    }
+
+// 使用
+    public void test(){
+        setDay(Test.SUNDAY); // 必须使用@IntDef限定的参数
+    }
+```
+
+4、DrawableRes
+```java
+    // AndroidX定义好的语法检查规则
+    public void setDrawable(@DrawableRes int drawable){
+
+    }
+```
+
+5、Kotlin实现的DrawableRes
+```kotlin
+@MustBeDocumented
+@kotlin.annotation.Retention(AnnotationRetention.BINARY) //BINARY二进制
+@Target(
+    AnnotationTarget.FUNCTION,
+    AnnotationTarget.PROPERTY_GETTER,
+    AnnotationTarget.PROPERTY_SETTER,
+    AnnotationTarget.VALUE_PARAMETER,
+    AnnotationTarget.FIELD,
+    AnnotationTarget.LOCAL_VARIABLE
+)
+public annotation class DrawableRes
+```
+
+### 问题
 1、APK构建流程
 2、
 
