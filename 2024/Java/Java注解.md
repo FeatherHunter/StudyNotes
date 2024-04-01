@@ -218,6 +218,30 @@ source阶段的注解，可以用于IDE语法检查，例如：
 public annotation class DrawableRes
 ```
 
+### CLASS-字节码增强
+aspectj
+AOP
+插桩
+应用场景：
+1. 热修复
+2. 用@InjectTime注释方法，在.class前后增加打印方法执行时间的代码
+1、什么是字节码增强/字节码插桩？
+> 本质：在字节码中写代码
+> 原理：将源码编译成class文件后，在Android生成dex文件前，修改class文件
+> 修改、增强原来的代码逻辑
+2、class文件有特定格式，就可以修改
+3、流程
+```java
+.class -> IO -> byte[] -> 按照格式修改 -> .class
+```
+javap：反编译、查看字节码
+### RUNTIME-反射-IOC注入
+1、注解+反射：才能在运行时，反射相关标注的代码
+2、IOC是什么意思？
+> 1. Inversion of Control 控制反转技术，也叫做依赖注入
+> 2. 将代码中“主动获取的资源”变成运行时，动态的将某种依赖关系注入到对象中 ==> 依赖注入
+
+
 ### 问题
 1、APK构建流程
 2、
