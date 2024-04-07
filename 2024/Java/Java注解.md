@@ -241,6 +241,88 @@ javap：反编译、查看字节码
 > 1. Inversion of Control 控制反转技术，也叫做依赖注入
 > 2. 将代码中“主动获取的资源”变成运行时，动态的将某种依赖关系注入到对象中 ==> 依赖注入
 
+Field：自己+父类的成员，不包括private
+DeclaredField：只能获取自己的成员（不包括父类）（全部的）
+```java
+    Class clazz = Code24.class;
+    Field field = clazz.getDeclaredField("age");
+    // 获取字段
+    int age = (int) field.get(new Code24()); // 获取到名称
+    // 调用方法
+    Method method = clazz.getDeclaredMethod("setAge");
+    method.invoke(new Code24(), 24);
+```
+#### 实战：注入TextView
+**注解**
+```java
+@Target(ElementType.FIELD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface InjectView {
+    @IdRes int value();
+}
+```
+**使用**
+```java
+    @InjectView(R.id.tv_name)
+    TextView tv;
+// 注入-activity中
+    InjectUtils.injectView(this);
+```
+**注入**
+```java
+    public static void injectView(Activity activity){
+        Class cls = activity.getClass();
+        // 1、遍历activity的所有字段
+        Field[] fields = cls.getDeclaredFields();
+        for (Field field:fields){
+            // 2、找到InjectView注入的Field
+            if(field.isAnnotationPresent(InjectView.class)){
+                InjectView injectView = field.getAnnotation(InjectView.class);
+                // 拿到资源ID
+                @IdRes int id = injectView.value();
+                // 获取View
+                View view = activity.findViewById(id);
+                // 设置访问权限（用于private、以及提高性能）
+                field.setAccessible(true);
+                // 设置，注入成功
+                try {
+                    field.set(activity, view);
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+```
+#### 反射+泛型：Type体系
+Type：本身是接口
+```java
+public interface Type {
+    // 本身用到了JDK1.8的默认方法，为接口提供有实现的方法
+    default String getTypeName() {
+        return toString();
+    }
+}
+```
+Type的四个实现接口：
+```java
+TypeVariable // 泛型类型变量，包含泛型上下限等信息
+ParameterizedType // 具体的泛型类，可以获得元数据中泛型的签名类型（泛型的真实类型）
+GnericArrayType // 泛型类的数组，如List[] Map[] 会用到该Type
+WildcardType // 通配符类型，获得上下限信息
+```
+2、Type的实现类是什么？
+> Class类
+3、真实类型的使用场景
+> Gson中传入的是泛型，在反序列化时如何获取到泛型的真实类型（泛型擦除了）
+```java
+// ERROR!!!代码会报错
+Response<Data> res = gson.fromJson(json, Response.class); // 如何将Response传入的泛型，在json中正确解析呢？
+// 解决办法,Gson提供的TypeToken
+Response<Data> res = gson.fromJson(json, new TypeToken<Response<Data>>(){}.getType());
+```
+
+
 
 ### 问题
 1、APK构建流程
