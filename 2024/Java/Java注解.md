@@ -294,6 +294,7 @@ public @interface InjectView {
         }
     }
 ```
+
 #### 反射+泛型：Type体系
 Type：本身是接口
 ```java
@@ -308,7 +309,7 @@ Type的四个实现接口：
 ```java
 TypeVariable // 泛型类型变量，包含泛型上下限等信息
 ParameterizedType // 具体的泛型类，可以获得元数据中泛型的签名类型（泛型的真实类型）
-GnericArrayType // 泛型类的数组，如List[] Map[] 会用到该Type
+GenericArrayType // 泛型类的数组，如List[] Map[] 会用到该Type
 WildcardType // 通配符类型，获得上下限信息
 ```
 2、Type的实现类是什么？
@@ -321,7 +322,42 @@ Response<Data> res = gson.fromJson(json, Response.class); // 如何将Response�
 // 解决办法,Gson提供的TypeToken
 Response<Data> res = gson.fromJson(json, new TypeToken<Response<Data>>(){}.getType());
 ```
-
+##### TypeToken原理
+1、TypeToken源码解析
+```java
+public class TypeToken<T> {
+  final Class<? super T> rawType;
+  final Type type;
+  protected TypeToken() {
+    this.type = getSuperclassTypeParameter(getClass()); // 获取到Response<Data>的类型class
+    this.rawType = (Class<? super T>) $Gson$Types.getRawType(type);
+  }
+  static Type getSuperclassTypeParameter(Class<?> subclass) { // 传入的是TypeToken<Response<Data>>(){}构造的匿名内部类的class文件
+    Type superclass = subclass.getGenericSuperclass();
+    ParameterizedType parameterized = (ParameterizedType) superclass; // 获取到实际的泛型参数数组，[0]下标0拿到第一个，也就是Response<Data>，此时class的签名中已经明确了是Response<Data>
+    return $Gson$Types.canonicalize(parameterized.getActualTypeArguments()[0]);
+  }
+  public final Class<? super T> getRawType() {return rawType;}
+  public final Type getType() {return type;}
+}
+```
+> 总结：生成的匿名内部类的signature中会有实际类型
+>
+> 为什么一定要包裹Response<\Data>?
+> 通过Response<\Data>并调用parameterized.getActualTypeArguments()[0]只能拿到Data.class而不是Response<\Data>的class
+```java
+Response<Data>.class // 不允许这样写，因为泛型擦除，不可以给泛型类调用.class
+```
+2、TypeToken有无花括号的区别
+1. 有花括号：匿名内部类，能存储Reponse<\Data>的信息。等效于：
+```java
+class ChildTypeToken{
+    Response<Data> data; // 等效于这种，已经写明了
+}
+```
+2. 无花括号：只是TypeToken对象，因为泛型擦除只知道Object（signature中是Object），无法知道Response<\Data>的存在
+> TypeToken为了避免该情况，会将构造方法设置为protected,不让外部构造该对象
+#### 实战：参数自动注入（注解+反射）
 
 
 ### 问题
