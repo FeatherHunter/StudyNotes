@@ -122,3 +122,118 @@ void change(int*a, int*b){
 }
 // printf("%p %d", &a, a); 打印指针/内存地址和数值
 ```
+
+
+### 指针的指针
+```c
+    int a = 100;
+    int *p = &a;
+    int **pp = &p;
+    int ***ppp = &pp; // 项目中最多三级指针
+    
+    printf("%d %d", **pp, *p);
+```
+### 数组和数组指针
+C中的遍历：
+```c
+    int i = 0;
+    for(i = 0; i < 4; ++i){
+        // xxx
+    }
+```
+数组定义：
+```c
+    // 数组1
+    int a[] = {1,2,3,4};
+    // 数组2
+    int b[10];
+```
+数组首地址：
+```c
+    /**
+     * 数组和指针直接挂钩，因为指针就是内存地址
+     * 下面数据完全一致：
+    */
+   printf("%p\n", a);
+   printf("%p\n", &a);
+   printf("%p\n", &a[0]);
+```
+指针遍历数组：
+```c
+    printf("%d", p[1]); // 指针直接当做数组使用
+   int *p = a;
+   int i = 0;
+   for(i = 0; i < 4; i++){
+    printf("%d", *p);
+    p++; // 设定p的类型为int *，在++时候才知道移动的距离
+   }
+   *p = a;
+   int i = 0;
+   for(i = 0; i < 4; i++){
+    printf("%d", *(p+i)); // 指针作为数组使用
+    printf("%d", p[i]);
+   }
+```
+指针给数组赋值
+```c
+    int a[] = {1,2,3,4};
+    int *p = a;
+    
+    int i = 0;
+    for(i = 0; i < 4; i++){
+        p[i] = i*2; // 修改数据
+        printf("%d", a[i]);
+    }
+```
+用sizeof遍历数组：
+```c
+    int i;
+    // sizeof
+    for(i = 0; i < sizeof(a)/sizeof(int); i++){
+//     for(i = 0; i < sizeof(a)/sizeof(p); i++){ // 错误！p作为int *指针，大小为8字节（64位），int为4字节
+        p[i] = i*2; // 修改数据
+        printf("%d", a[i]);
+    }
+```
+打印int、int[]、int *的sizeof大小：
+```c
+    printf("%d", sizeof(a)); // 16
+    printf("%d", sizeof(p)); // 8 
+    printf("%d", sizeof(int)); // 4
+```
+### 指针类型
+指针的类型不匹配：
+```c
+    int a = 100;
+    int *p = &a;
+    double *d = &a;// 会报错
+    printf("%lf", *d); // 打印的数据位0.000000
+```
+为什么不用统一的指针？
+1. 指针统一是4字节/8字节
+2. 指针类型是为了处理数据时，知道数据的具体格式，适合处理
+### 函数指针
+1、初步使用函数指针
+> 是什么？存放函数的地址
+```c
+void change(int *a, int *b){
+    int temp = *a;
+    *a = *b;
+    *b = temp;
+}
+// 函数指针
+void operate(void (*fp)(int*, int*)){
+    int a = 100;
+    int b = 200;
+    printf("%d %d\n", a, b);
+    fp(&a, &b);
+    printf("%d %d\n", a, b);
+}
+int main(){
+    operate(change);
+    return 0;
+}
+```
+2、函数指针有什么用？
+> 依赖倒置，控制反转。将执行的操作交由外部实现。
+
