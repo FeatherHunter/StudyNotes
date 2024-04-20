@@ -49,6 +49,20 @@ printf("int占用多少字节：%d\n", sizeof(int));
 ```
 3、NULL等价于0
 
+### 布尔
+```c
+    /**
+     * C中的Boolean
+     * 非0 = true
+    */
+    int a = 100;
+    if(a){
+        printf("true");
+    }
+    // 0和0.0都是false
+```
+
+
 ## 指针
 
 1、打印地址
@@ -237,3 +251,12 @@ int main(){
 2、函数指针有什么用？
 > 依赖倒置，控制反转。将执行的操作交由外部实现。
 
+3、函数指针的两种调用方法
+```c
+void operate(int(*op)(int, double*), int a, double * p){
+    // 函数调用一
+    op(a, p);
+    // 函数调用二：可以省略*
+    (*op)(a, p);
+}
+```
