@@ -83,6 +83,38 @@
 > 和多态有关
 5、PC寄存器值
 > 数值会重复，一个方法一个栈帧，指示当前方法的字节码指令的偏移量即可（可以粗浅理解为行号如0,1,2,3,4...）
-> 
+
+
+#### 本地方法栈，JVM和线程
+
+1、Java\JVM没办法直接操作线程
+> 只能通过native方法，调用操作系统的API，调用底层的线程方法
+
+2、调用hashCode等native方法，会在本地方法栈中创建栈帧
+
+
+3、HotSpot将虚拟机栈和本地方法栈合二为一
+> 迎合规范，但是有自己的实现
+
+### 方法区
+
+1、变量、常量是如何在JVM中分配的
+```java
+//MyClass分配在方法区
+public class MyClass{
+    static int age = 10; // 静态变量，放在方法区 【类加载，会先给零值，类初始化时给数值10】
+    final static int age2 = 20; // 常量，分配在运行时常量池，编译到class文件的常量池中 【类加载，const字段】
+    MyClass obj = new MyClass(); // 成员变量（对象），分配在堆 【类加载时，不会执行】
+    private boolean isOk = false; // 成员变量，分配在堆（MyClass对象的堆内存中）【类加载时，不会执行】
+    public static void test(){
+        int x = 10; // 局部变量，栈帧中 【运行时在操作数栈中，逻辑上需要稳定存储时在局部变量表】
+        MyClass obj = new MyClass(); // 局部变量（对象），引用在栈帧中，对象在堆中【运行时在操作数栈中，逻辑上需要稳定存储时在局部变量表】
+        obj.hashCode(); // 本地方法，C++写JNI
+        ByteBuffer bb = ByteBuffer.allocateDirect(128*1024*1024); // 128MB分配在直接内存中，运行时数据区外内存。
+    }
+}
+
+```
+> 静态方法和方法的区别？静态方法的局部变量表中没有下标为0的this指针
 
 

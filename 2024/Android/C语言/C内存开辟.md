@@ -11,3 +11,15 @@ int main(){
     return 0;
 }
 ```
+
+
+## 动态开辟
+
+1、malloc 在堆区开辟
+```c
+#include <stdlib.h>
+int * arr = (int*)malloc(1 * 1024 * 1024); // 堆区开辟
+// 调用该方法后，不释放，会导致内存泄漏
+
+
+```
