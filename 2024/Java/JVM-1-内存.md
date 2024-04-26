@@ -109,6 +109,7 @@ public class MyClass{
     public static void test(){
         int x = 10; // 局部变量，栈帧中 【运行时在操作数栈中，逻辑上需要稳定存储时在局部变量表】
         MyClass obj = new MyClass(); // 局部变量（对象），引用在栈帧中，对象在堆中【运行时在操作数栈中，逻辑上需要稳定存储时在局部变量表】
+        // => 创建MyClass的对象时，会创建MyClass对象，会导致无限循环吗？？
         obj.hashCode(); // 本地方法，C++写JNI
         ByteBuffer bb = ByteBuffer.allocateDirect(128*1024*1024); // 128MB分配在直接内存中，运行时数据区外内存。
     }
@@ -118,3 +119,38 @@ public class MyClass{
 > 静态方法和方法的区别？静态方法的局部变量表中没有下标为0的this指针
 
 
+2、MyClass中obj对象会导致无限循环创建吗？
+> 会导致！会导致无限创建MyClass对象，除非是static的
+
+
+### 直接内存
+
+3、如何释放直接内存?
+> 1. 如果直接调用unsafe的分配内存方法`allocateMemory`，需要反射调用
+> 2. 通过ByteBuffer的API调用更安全
+
+4、unsafe有哪些好用的API？
+1. park/unpark
+2. loadFence/storeFence/fullFence： 可以手动实现volatile的内存屏障效果，volatile本质上是语法上实现内存屏障，读屏障，写屏障，全屏障
+
+5、直接内存有哪些特点？
+1. 可以绕开JVM的垃圾回收
+2. 可以轻微提速：避免了GC的时间暂停
+3. 缺点：
+4. 1. 可能内存泄漏
+5. 2. 可能覆盖数据，和别人的冲突了
+#### ByteBuffer
+
+1、ByteBuffer可以避免内存泄漏
+1. 会有线程去轮询
+2. 使用了幽灵👻引用进行垃圾回收
+
+## JVM内存处理全流程（Java代码执行+对象创建全流程）
+
+
+1、全流程概述
+1. JVM申请内存
+2. 初始化运行时数据区
+3. 类加载
+4. 执行方法
+5. 创建对象
