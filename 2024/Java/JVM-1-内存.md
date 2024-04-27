@@ -154,3 +154,26 @@ public class MyClass{
 3. 类加载
 4. 执行方法
 5. 创建对象
+
+2、jps命令是干什么的？
+
+```
+jps // 看到进程的号，如10004
+jinfo -flags 10004 // 不设置任何参数，都会有默认参数
+```
+
+3、代码解析
+```java
+public class MyClass{
+    public final static String MAN_TYPE = "man";
+    public final static String WOMAN_TYPE = "woman";
+    // 流程1、2、3后，方法区内放入 MyClass.class、MAN_TYPE、WOMAN_TYPE
+    public static void main(){
+        // 流程4后，在栈中放入main方法的栈帧
+        Teacher t = new Teacher();
+        // 流程5后，创建对象，存放在堆中 Teacher，引用t放在栈帧中
+    }
+}
+```
+
+## JHSDB解析JVM运行时数据区
